@@ -36,3 +36,12 @@ externalPort = 3000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3002
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "node server/index.js & npx serve -s client/build -l 5000"]
+build = ["bash", "-c", "cd client && npm run build"]
