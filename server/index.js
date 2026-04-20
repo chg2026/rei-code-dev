@@ -10,18 +10,22 @@ const PORT = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
-// API routes
-app.use('/api/properties', require('./routes/properties'))
-app.use('/api/contractors', require('./routes/contractors'))
-app.use('/api/projects', require('./routes/projects'))
-app.use('/api/tenants', require('./routes/tenants'))
-app.use('/api/deals', require('./routes/deals'))
-app.use('/api/tasks', require('./routes/tasks'))
-app.use('/api/invoices', require('./routes/invoices'))
+const { requireAuth } = require('./middleware/auth')
 
+// Public endpoints (no auth)
+app.use('/api/auth', require('./routes/auth'))
 app.get('/api/health', (req, res) => {
   res.json({ status: 'CHG CRM is running', version: '1.0.0', timestamp: new Date().toISOString() })
 })
+
+// Protected API routes — every CRUD endpoint requires a valid session token
+app.use('/api/properties', requireAuth, require('./routes/properties'))
+app.use('/api/contractors', requireAuth, require('./routes/contractors'))
+app.use('/api/projects', requireAuth, require('./routes/projects'))
+app.use('/api/tenants', requireAuth, require('./routes/tenants'))
+app.use('/api/deals', requireAuth, require('./routes/deals'))
+app.use('/api/tasks', requireAuth, require('./routes/tasks'))
+app.use('/api/invoices', requireAuth, require('./routes/invoices'))
 
 // Serve React build in production (after API routes)
 const buildPath = path.join(__dirname, '..', 'client', 'build')

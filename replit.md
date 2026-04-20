@@ -16,9 +16,11 @@ Internal CRM system for Cleveland Holding Group, used for real estate portfolio 
   /src
     App.js       - Main single-page application
 /server          - Express backend
-  index.js       - Entry point
+  index.js       - Entry point (mounts auth + protected API routes)
   db.js          - Supabase client
-  /routes        - API route handlers (properties, tenants, projects, deals, tasks, invoices, contractors)
+  /middleware
+    auth.js      - JWT issuance + requireAuth middleware
+  /routes        - API route handlers (auth, properties, tenants, projects, deals, tasks, invoices, contractors)
 /scripts         - DB utilities (schema.sql, seed.js)
 ```
 
@@ -26,6 +28,17 @@ Internal CRM system for Cleveland Holding Group, used for real estate portfolio 
 
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Supabase anonymous key
+- `APP_PASSWORD` - Team password required to log into the CRM. Rotate any time in the Secrets tab.
+- `JWT_SECRET` - Secret used to sign session tokens. If rotated, all users will need to log in again.
+
+## Authentication
+
+The CRM is gated behind a single shared team password (`APP_PASSWORD`). Login lives at
+`POST /api/auth/login` and returns a 7-day JWT, which the React client stores in
+localStorage and sends as `Authorization: Bearer <token>` on every request. All
+`/api/*` routes (except `/api/auth/*` and `/api/health`) require a valid token.
+A 401 response automatically clears the token and bounces the user back to the
+login screen. There is also a "Sign out" button in the app header.
 
 ## Running the App
 

@@ -3,6 +3,33 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || '';
 
+// ─── Auth: token storage + axios interceptors ─────────────────────────────────
+
+const TOKEN_KEY = 'chg_auth_token';
+const getToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
+const setToken = (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {} };
+
+// Listener pattern lets the App re-render to the login screen when the token
+// is cleared (either explicitly via logout or by the 401 response interceptor).
+const authListeners = new Set();
+const notifyAuthChange = () => authListeners.forEach(fn => { try { fn(); } catch {} });
+
+axios.interceptors.request.use((config) => {
+  const t = getToken();
+  if (t) config.headers = { ...(config.headers || {}), Authorization: `Bearer ${t}` };
+  return config;
+});
+axios.interceptors.response.use(
+  (resp) => resp,
+  (err) => {
+    if (err?.response?.status === 401) {
+      setToken(null);
+      notifyAuthChange();
+    }
+    return Promise.reject(err);
+  }
+);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtDate = (d) => {
@@ -925,7 +952,65 @@ function ProjectCard({ project, projectInvoices, onEdit, onDelete, onAddPhase, o
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
+function LoginScreen({ onLoggedIn }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (!password) return;
+    setBusy(true); setError('');
+    try {
+      const res = await axios.post(`${API}/api/auth/login`, { password });
+      setToken(res.data.token);
+      notifyAuthChange();
+      onLoggedIn?.();
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Login failed.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0f0f0f', color: '#f0ede8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <form onSubmit={submit} style={{ width: '100%', maxWidth: 380, background: '#1a1a1a', border: '0.5px solid #2a2a2a', borderRadius: 16, padding: 28 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#c8a96e', letterSpacing: '0.12em', marginBottom: 6 }}>CHG</div>
+        <div style={{ fontSize: 20, fontWeight: 500, marginBottom: 4 }}>Cleveland Holding Group</div>
+        <div style={{ fontSize: 13, color: '#9a9690', marginBottom: 22 }}>Sign in to continue</div>
+        <label style={lbl}>Team Password</label>
+        <input
+          type="password"
+          autoFocus
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={inp}
+          placeholder="Enter password"
+        />
+        {error && <div style={{ fontSize: 12, color: '#c97b6e', padding: '8px 12px', background: '#2d1a1a', borderRadius: 8, marginTop: 12 }}>{error}</div>}
+        <button type="submit" disabled={busy || !password} style={{ ...primaryBtn(busy || !password), width: '100%', marginTop: 18, padding: '11px 20px' }}>
+          {busy ? 'Signing in…' : 'Sign In'}
+        </button>
+        <div style={{ fontSize: 11, color: '#5a5855', marginTop: 16, lineHeight: 1.5 }}>
+          The password is stored as <code style={{ color: '#9a9690' }}>APP_PASSWORD</code> in Replit Secrets and can be rotated there.
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function App() {
+  const [authed, setAuthed] = useState(() => !!getToken());
+  useEffect(() => {
+    const fn = () => setAuthed(!!getToken());
+    authListeners.add(fn);
+    return () => authListeners.delete(fn);
+  }, []);
+  if (!authed) return <LoginScreen onLoggedIn={() => setAuthed(true)} />;
+  return <AppShell onLogout={() => { setToken(null); setAuthed(false); }} />;
+}
+
+function AppShell({ onLogout }) {
   const [activeTab,     setActiveTab]     = useState('overview');
   const [projects,      setProjects]      = useState([]);
   const [tenants,       setTenants]       = useState([]);
@@ -1016,7 +1101,10 @@ function App() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-        <div style={s.headerBadge}>CHG</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onLogout} style={ghostBtn}>Sign out</button>
+          <div style={s.headerBadge}>CHG</div>
+        </div>
       </div>
 
       {/* ── Nav ── */}
