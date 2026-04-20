@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
+const fs = require('fs')
 require('dotenv').config()
 
 const app = express()
@@ -18,9 +19,12 @@ app.use('/api/deals', require('./routes/deals'))
 app.use('/api/tasks', require('./routes/tasks'))
 app.use('/api/invoices', require('./routes/invoices'))
 
-// Serve React build in production
-const fs = require('fs')
-const buildPath = path.join(__dirname, '../client/build')
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'CHG CRM is running', version: '1.0.0', timestamp: new Date().toISOString() })
+})
+
+// Serve React build in production (after API routes)
+const buildPath = path.join(__dirname, '..', 'client', 'build')
 const hasBuild = fs.existsSync(path.join(buildPath, 'index.html'))
 
 if (hasBuild) {
@@ -42,7 +46,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`CHG CRM server running on port ${PORT}`)
 })
 
