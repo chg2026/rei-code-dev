@@ -319,7 +319,7 @@ export default function ProjectDashboard() {
 
       {/* Notes & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8">
-        <NotesSection notes={notes} canEdit={canEdit} currentUserId={profile?.id}
+        <NotesSection notes={notes} canEdit={canEdit} canConvert={canEditDepartment('tasks')} currentUserId={profile?.id}
           isAdmin={canApproveAddendum}
           onAdd={() => setShowNoteModal(true)}
           onEdit={(n) => setEditingNote(n)}
@@ -1513,7 +1513,7 @@ const fmtTimestamp = (s) => {
 };
 const authorName = (a) => a?.full_name || a?.email || 'Teammate';
 
-function NotesSection({ notes, canEdit, currentUserId, isAdmin, onAdd, onEdit, onDelete, onConvert }) {
+function NotesSection({ notes, canEdit, canConvert, currentUserId, isAdmin, onAdd, onEdit, onDelete, onConvert }) {
   return (
     <Card>
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -1550,8 +1550,8 @@ function NotesSection({ notes, canEdit, currentUserId, isAdmin, onAdd, onEdit, o
                   </div>
                   {canEdit && (
                     <div className="flex items-center gap-1 text-xs">
-                      <button onClick={() => onConvert(n, 'task')} className="px-2 py-1 rounded hover:bg-gray-100 text-gray-600">→ Task</button>
-                      <button onClick={() => onConvert(n, 'reminder')} className="px-2 py-1 rounded hover:bg-gray-100 text-gray-600">→ Reminder</button>
+                      {canConvert && <button onClick={() => onConvert(n, 'task')} className="px-2 py-1 rounded hover:bg-gray-100 text-gray-600">→ Task</button>}
+                      {canConvert && <button onClick={() => onConvert(n, 'reminder')} className="px-2 py-1 rounded hover:bg-gray-100 text-gray-600">→ Reminder</button>}
                       {isAuthor && <button onClick={() => onEdit(n)} className="px-2 py-1 rounded hover:bg-gray-100 text-gray-600">Edit</button>}
                       {(isAuthor || isAdmin) && <button onClick={() => onDelete(n)} className="px-2 py-1 rounded hover:bg-red-50 text-red-600">Delete</button>}
                     </div>
@@ -1568,6 +1568,8 @@ function NotesSection({ notes, canEdit, currentUserId, isAdmin, onAdd, onEdit, o
 }
 
 function NoteFormModal({ projectId, note, onClose, onSaved }) {
+  const { isSuperAdmin, isAccountAdmin } = useAuth();
+  const canSetAdminVisibility = isSuperAdmin || isAccountAdmin;
   const [content, setContent] = useState(note?.content || '');
   const [noteType, setNoteType] = useState(note?.note_type || 'note');
   const [visibility, setVisibility] = useState(note?.visibility || 'all');
@@ -1606,7 +1608,7 @@ function NoteFormModal({ projectId, note, onClose, onSaved }) {
                 <select value={visibility} onChange={e => setVisibility(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg">
                   <option value="all">All Team</option>
-                  <option value="admin">Admin Only</option>
+                  {canSetAdminVisibility && <option value="admin">Admin Only</option>}
                 </select>
               </FormField>
             </div>
