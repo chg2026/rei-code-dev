@@ -35,7 +35,7 @@ const typeLabel = (v) => PROPERTY_TYPES.find(t => t.value === v)?.label || (v ||
 const statusLabel = (v) => STATUS_OPTIONS.find(s => s.value === v)?.label || (v || '').replace(/_/g, ' ');
 
 export default function PropertiesPage() {
-  const { canEditDepartment, user } = useAuth();
+  const { canEditDepartment, profile } = useAuth();
   const canEdit = canEditDepartment('property_management');
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -161,7 +161,7 @@ export default function PropertiesPage() {
         )}
       </Card>
 
-      {editing !== null && <PropertyFormModal property={editing} accountId={user?.account_id} onClose={() => setEditing(null)} onSave={handleSave} />}
+      {editing !== null && <PropertyFormModal property={editing} accountId={profile?.account_id} onClose={() => setEditing(null)} onSave={handleSave} />}
       {deleting && <ConfirmModal title="Delete Property" message={`Delete "${deleting.name || deleting.address}"? This will also remove related units, tenants, projects, and invoices.`} confirmLabel="Delete" danger onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </Layout>
   );
@@ -218,7 +218,11 @@ function PropertyFormModal({ property, accountId, onClose, onSave }) {
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !accountId) return;
+    if (!file) return;
+    if (!accountId) {
+      toast.error('Account not loaded — please refresh and try again');
+      return;
+    }
     setUploading(true);
     try {
       const ext = file.name.split('.').pop() || 'jpg';
