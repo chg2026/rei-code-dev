@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/dashboard/Dashboard';
 import PropertiesPage from './pages/dashboard/PropertiesPage';
@@ -22,6 +23,7 @@ export default function AppRouter() {
         <Toaster position="top-right" toastOptions={{ duration: 3000, style: { fontSize: '14px' } }} />
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

@@ -26,6 +26,7 @@ Operations platform for Cleveland Holding Group — real estate portfolio manage
       ui.jsx                     - Shared UI (StatusBadge, Card, Modal, etc.)
     /pages
       Login.jsx                  - Email/password login + forgot password
+      Signup.jsx                 - New account registration (company + user)
       ResetPassword.jsx          - Password reset form
       /admin
         AdminDashboard.jsx       - Super Admin: accounts, users, roles mgmt
@@ -53,7 +54,7 @@ Operations platform for Cleveland Holding Group — real estate portfolio manage
     auth.js                      - Supabase Auth token validation + user profile loading
     permissions.js               - Department access + account scoping
   /routes
-    auth.js                      - GET /me (profile + permissions)
+    auth.js                      - POST /signup + GET /me (signup + profile)
     admin.js                     - Super Admin CRUD (accounts, users, roles)
     users.js                     - User profile updates
     dashboard.js                 - Dashboard stats (account-scoped)
@@ -127,6 +128,19 @@ Run `scripts/saas-migration.sql` in Supabase SQL Editor to:
 4. Create helper functions (`is_super_admin()`, `current_account_id()`)
 5. Seed a default "CHG Internal" account + Super Admin role
 6. Link existing data to CHG Internal account
+
+## Test Users
+
+After running the migration, seed test users with:
+```
+node scripts/seed-test-users.js
+```
+This creates 3 test accounts (blocked in production via NODE_ENV check):
+- **Super Admin**: `admin@chg.com` / `admin123`
+- **Account Admin**: `manager@chg.com` / `manager123`
+- **Regular User**: `user@chg.com` / `user1234`
+
+New users can also self-register via the Sign Up page (`/signup`).
 
 ## Running the App
 
