@@ -185,18 +185,54 @@ BEGIN
   FOREACH tbl IN ARRAY ARRAY['units','master_phases','addendums','project_notes','project_activity'] LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Super admin full access on %1$s" ON %1$s', tbl);
     EXECUTE format('DROP POLICY IF EXISTS "Tenant isolation on %1$s" ON %1$s', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Tenant read on %1$s" ON %1$s', tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "Tenant insert on %1$s" ON %1$s', tbl);
   END LOOP;
 END $$;
 
--- Standard tenant isolation pattern: super admin sees all, others see own account
+-- Standard tenant isolation pattern (full CRUD) for mutable tables
 DO $$
 DECLARE tbl TEXT;
 BEGIN
-  FOREACH tbl IN ARRAY ARRAY['units','master_phases','addendums','project_notes','project_activity'] LOOP
+  FOREACH tbl IN ARRAY ARRAY['units','master_phases','addendums','project_notes'] LOOP
     EXECUTE format('CREATE POLICY "Super admin full access on %1$s" ON %1$s FOR ALL USING (is_super_admin())', tbl);
     EXECUTE format('CREATE POLICY "Tenant isolation on %1$s" ON %1$s FOR ALL USING (account_id = current_account_id())', tbl);
   END LOOP;
 END $$;
+
+-- project_activity is an APPEND-ONLY audit log:
+--   • Super admin can read everything (no mutation needed via UI)
+--   • Tenant users can read their own account's entries
+--   • Tenant users can insert (so the app can write events under the user's session)
+--   • No UPDATE or DELETE policies → these operations are denied for non-service roles
+--   • The service_role key bypasses RLS entirely, so backend cleanup jobs still work
+CREATE POLICY "Super admin full access on project_activity"
+  ON project_activity FOR SELECT USING (is_super_admin());
+
+CREATE POLICY "Tenant read on project_activity"
+  ON project_activity FOR SELECT USING (account_id = current_account_id());
+
+CREATE POLICY "Tenant insert on project_activity"
+  ON project_activity FOR INSERT WITH CHECK (account_id = current_account_id());
+
+-- Belt-and-suspenders: hard-block UPDATE/DELETE at the trigger level for any
+-- non-service role that somehow bypasses missing policies.
+CREATE OR REPLACE FUNCTION block_project_activity_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+  RAISE EXCEPTION 'project_activity is append-only';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS no_update_project_activity ON project_activity;
+CREATE TRIGGER no_update_project_activity
+  BEFORE UPDATE ON project_activity
+  FOR EACH ROW EXECUTE FUNCTION block_project_activity_mutation();
+
+DROP TRIGGER IF EXISTS no_delete_project_activity ON project_activity;
+CREATE TRIGGER no_delete_project_activity
+  BEFORE DELETE ON project_activity
+  FOR EACH ROW EXECUTE FUNCTION block_project_activity_mutation();
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- updated_at TRIGGERS (set_updated_at function defined in saas-migration.sql)
