@@ -43,6 +43,9 @@ ALTER TABLE contractors ADD COLUMN IF NOT EXISTS insurance_url     TEXT;
 ALTER TABLE contractors ADD COLUMN IF NOT EXISTS insurance_expiry  DATE;
 ALTER TABLE contractors ADD COLUMN IF NOT EXISTS notes             TEXT;
 ALTER TABLE contractors ADD COLUMN IF NOT EXISTS performance_score INTEGER CHECK (performance_score BETWEEN 1 AND 10);
+ALTER TABLE contractors ADD COLUMN IF NOT EXISTS w9_status         TEXT DEFAULT 'missing' CHECK (w9_status IN ('on_file','expired','missing'));
+ALTER TABLE contractors ADD COLUMN IF NOT EXISTS agreement_signed  BOOLEAN DEFAULT FALSE;
+ALTER TABLE contractors ADD COLUMN IF NOT EXISTS company_name      TEXT;
 
 -- ─── UNITS ────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS units (

@@ -10,6 +10,7 @@ import PropertyDashboard from './pages/dashboard/PropertyDashboard';
 import UnitDashboard from './pages/dashboard/UnitDashboard';
 import ConstructionPage from './pages/dashboard/ConstructionPage';
 import ContractorsPage from './pages/dashboard/ContractorsPage';
+import ContractorDetail from './pages/dashboard/ContractorDetail';
 import AcquisitionsPage from './pages/dashboard/AcquisitionsPage';
 import FinancePage from './pages/dashboard/FinancePage';
 import TasksPage from './pages/dashboard/TasksPage';
@@ -38,6 +39,7 @@ export default function AppRouter() {
           <Route path="/properties/:propId/units/:unitId" element={<ProtectedRoute department="property_management"><UnitDashboard /></ProtectedRoute>} />
           <Route path="/tenants" element={<ProtectedRoute department="property_management"><TenantsPage /></ProtectedRoute>} />
           <Route path="/contractors" element={<ProtectedRoute department="contractors"><ContractorsPage /></ProtectedRoute>} />
+          <Route path="/contractors/:id" element={<ProtectedRoute department="contractors"><ContractorDetail /></ProtectedRoute>} />
           <Route path="/finance" element={<ProtectedRoute department="finance"><FinancePage /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute department="tasks"><TasksPage /></ProtectedRoute>} />
 
