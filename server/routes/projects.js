@@ -407,6 +407,198 @@ router.post('/:id/phases/bulk', requireEdit, async (req, res) => {
   }
 })
 
+// ─── INVOICES (project-scoped; FinancePage still uses /api/invoices) ────────
+//
+// Categories:
+//   labor      → rolls into project.labor_spent + phase.labor_spent
+//   materials  → rolls into project.material_spent + phase.materials_spent
+//   equipment | permits | other  → tracked but not auto-rolled into spent totals
+//
+// Storage column on invoices.classification mirrors category prefixed with
+// "construction_" for back-compat with the existing FinancePage list.
+
+const INVOICE_CATEGORIES = ['labor', 'materials', 'equipment', 'permits', 'other']
+
+function classificationFor(category) {
+  switch (category) {
+    case 'labor':     return 'construction_labor'
+    case 'materials': return 'construction_material'
+    case 'equipment': return 'construction_equipment'
+    case 'permits':   return 'construction_permits'
+    default:          return 'construction_other'
+  }
+}
+
+async function recalcProjectSpent(projectId) {
+  // Resolve owning account once so every read/write is tenant-scoped.
+  const { data: proj } = await db().from('construction_projects')
+    .select('id, account_id').eq('id', projectId).single()
+  if (!proj) return
+  const accountId = proj.account_id
+
+  const { data: phases } = await db().from('construction_phases')
+    .select('id').eq('project_id', projectId)
+  const phaseIds = (phases || []).map(p => p.id)
+
+  // ONE aggregate read for the whole project — eliminates the N+1.
+  const { data: rows } = await db().from('invoices')
+    .select('amount, category, phase_id')
+    .eq('project_id', projectId)
+    .eq('account_id', accountId)
+
+  const perPhase = new Map() // phaseId -> { labor, mats }
+  let pLabor = 0, pMats = 0
+  for (const r of rows || []) {
+    const a = Number(r.amount) || 0
+    if (r.category === 'labor') pLabor += a
+    else if (r.category === 'materials') pMats += a
+    if (r.phase_id) {
+      const cur = perPhase.get(r.phase_id) || { labor: 0, mats: 0 }
+      if (r.category === 'labor') cur.labor += a
+      else if (r.category === 'materials') cur.mats += a
+      perPhase.set(r.phase_id, cur)
+    }
+  }
+
+  // Update phases in parallel — recompute is idempotent so any later
+  // invoice mutation on this project triggers another full recalc, so
+  // a stale overwrite is self-healing on the next write.
+  await Promise.all(phaseIds.map(phId => {
+    const v = perPhase.get(phId) || { labor: 0, mats: 0 }
+    return db().from('construction_phases')
+      .update({ labor_spent: v.labor, materials_spent: v.mats })
+      .eq('id', phId)
+      .eq('project_id', projectId)
+  }))
+
+  await db().from('construction_projects')
+    .update({ labor_spent: pLabor, material_spent: pMats })
+    .eq('id', projectId)
+    .eq('account_id', accountId)
+}
+
+async function logActivity(projectId, accountId, userId, eventType, description, metadata = {}) {
+  try {
+    await db().from('project_activity').insert([{
+      project_id: projectId, account_id: accountId, event_type: eventType,
+      description, metadata, created_by: userId || null,
+    }])
+  } catch { /* activity log is best-effort; the dedicated activity task wires the UI */ }
+}
+
+router.get('/:id/invoices', async (req, res) => {
+  try {
+    if (!(await verifyProjectOwnership(req.params.id, req.account_filter))) {
+      return res.status(403).json({ error: 'Access denied.' })
+    }
+    let listQ = db().from('invoices')
+      .select('*, construction_phases(id, name)')
+      .eq('project_id', req.params.id)
+      .order('invoice_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+    if (req.account_filter) listQ = listQ.eq('account_id', req.account_filter)
+    const { data, error } = await listQ
+    if (error) throw error
+    res.json(data || [])
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.post('/:id/invoices', requireEdit, async (req, res) => {
+  try {
+    if (!(await verifyProjectOwnership(req.params.id, req.account_filter))) {
+      return res.status(403).json({ error: 'Access denied.' })
+    }
+    const body = stripAccountId(req.body || {})
+    const category = INVOICE_CATEGORIES.includes(body.category) ? body.category : 'other'
+    const amount = parseFloat(body.amount) || 0
+
+    // Validate phase ownership
+    let phaseId = body.phase_id || null
+    if (phaseId) {
+      const owned = await getPhaseProjectId(phaseId, req.account_filter)
+      if (owned !== req.params.id) return res.status(400).json({ error: 'Phase does not belong to this project.' })
+    }
+
+    const { data: proj } = await db().from('construction_projects').select('account_id, property_id').eq('id', req.params.id).single()
+
+    const row = {
+      account_id: req.account_filter || proj?.account_id,
+      project_id: req.params.id,
+      property_id: proj?.property_id || null,
+      phase_id: phaseId,
+      vendor: (body.vendor || '').trim() || 'Unknown',
+      amount,
+      invoice_date: body.invoice_date || null,
+      invoice_number: body.invoice_number || null,
+      category,
+      classification: classificationFor(category),
+      notes: body.notes || null,
+      file_url: body.file_url || null,
+      submitted_by: req.user?.id || null,
+    }
+    const { data, error } = await db().from('invoices').insert([row]).select('*, construction_phases(id, name)').single()
+    if (error) throw error
+
+    await recalcProjectSpent(req.params.id)
+    await logActivity(req.params.id, row.account_id, req.user?.id, 'invoice_logged',
+      `Invoice ${row.invoice_number ? '#' + row.invoice_number + ' ' : ''}from ${row.vendor} ($${amount.toLocaleString()}) logged.`,
+      { invoice_id: data.id, category, amount })
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.put('/invoices/:id', requireEdit, async (req, res) => {
+  try {
+    let q = db().from('invoices').select('*').eq('id', req.params.id)
+    if (req.account_filter) q = q.eq('account_id', req.account_filter)
+    const { data: existing } = await q.single()
+    if (!existing) return res.status(403).json({ error: 'Access denied.' })
+
+    const body = stripAccountId(req.body || {})
+    const updates = {}
+    if (body.vendor !== undefined) updates.vendor = body.vendor || null
+    if (body.amount !== undefined) updates.amount = parseFloat(body.amount) || 0
+    if (body.invoice_date !== undefined) updates.invoice_date = body.invoice_date || null
+    if (body.invoice_number !== undefined) updates.invoice_number = body.invoice_number || null
+    if (body.notes !== undefined) updates.notes = body.notes || null
+    if (body.file_url !== undefined) updates.file_url = body.file_url || null
+    if (body.category !== undefined && INVOICE_CATEGORIES.includes(body.category)) {
+      updates.category = body.category
+      updates.classification = classificationFor(body.category)
+    }
+    if (body.phase_id !== undefined) {
+      if (body.phase_id) {
+        const owned = await getPhaseProjectId(body.phase_id, req.account_filter)
+        if (owned !== existing.project_id) return res.status(400).json({ error: 'Phase does not belong to this project.' })
+        updates.phase_id = body.phase_id
+      } else {
+        updates.phase_id = null
+      }
+    }
+
+    const { data, error } = await db().from('invoices').update(updates).eq('id', req.params.id)
+      .select('*, construction_phases(id, name)').single()
+    if (error) throw error
+
+    if (existing.project_id) await recalcProjectSpent(existing.project_id)
+    res.json(data)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+router.delete('/invoices/:id', requireEdit, async (req, res) => {
+  try {
+    let q = db().from('invoices').select('id, project_id, account_id').eq('id', req.params.id)
+    if (req.account_filter) q = q.eq('account_id', req.account_filter)
+    const { data: existing } = await q.single()
+    if (!existing) return res.status(403).json({ error: 'Access denied.' })
+
+    const { error } = await db().from('invoices').delete().eq('id', req.params.id)
+    if (error) throw error
+    if (existing.project_id) await recalcProjectSpent(existing.project_id)
+    res.json({ success: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── EXPENSES (legacy quick-log; full invoice flow lives in invoices route) ──
 
 router.post('/:id/expenses', requireEdit, async (req, res) => {

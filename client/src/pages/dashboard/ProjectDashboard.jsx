@@ -11,6 +11,21 @@ import {
   phaseRowAccent, computeOnTime, budgetHealth, fmtUsd, fmtDate,
 } from '../../lib/projectStatus';
 
+const INVOICE_CATEGORIES = [
+  { value: 'labor',     label: 'Labor' },
+  { value: 'materials', label: 'Materials' },
+  { value: 'equipment', label: 'Equipment Rental' },
+  { value: 'permits',   label: 'Permits & Fees' },
+  { value: 'other',     label: 'Other' },
+];
+const invCatLabel = (v) => (INVOICE_CATEGORIES.find(c => c.value === v)?.label) || v || 'Other';
+
+const ADDENDUM_CHANGE_TYPES = [
+  { value: 'scope',    label: 'Scope' },
+  { value: 'budget',   label: 'Budget' },
+  { value: 'timeline', label: 'Timeline' },
+];
+
 const DOC_KINDS = [
   { key: 'agreement_url', label: 'Signed Agreement', emoji: '📝' },
   { key: 'w9_url',        label: 'Contractor W9',    emoji: '🧾' },
@@ -20,29 +35,41 @@ const DOC_KINDS = [
 export default function ProjectDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canEditDepartment, profile } = useAuth();
+  const { canEditDepartment, profile, isSuperAdmin, isAccountAdmin } = useAuth();
   const canEdit = canEditDepartment('construction');
+  const canApproveAddendum = isSuperAdmin || isAccountAdmin;
 
   const [project, setProject] = useState(null);
   const [contractors, setContractors] = useState([]);
   const [masterPhases, setMasterPhases] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [addendums, setAddendums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProject, setEditingProject] = useState(false);
   const [addingPhases, setAddingPhases] = useState(false);
   const [deletingPhase, setDeletingPhase] = useState(null);
   const [deletingProject, setDeletingProject] = useState(false);
   const [editingPhase, setEditingPhase] = useState(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(null);
+  const [showAddendumModal, setShowAddendumModal] = useState(false);
+  const [reviewingAddendum, setReviewingAddendum] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const [pRes, cRes, mRes] = await Promise.all([
+      const [pRes, cRes, mRes, iRes, aRes] = await Promise.all([
         api.get(`/projects/${id}`),
         api.get('/projects/lookups/contractors').catch(() => ({ data: [] })),
         api.get('/master-phases').catch(() => ({ data: [] })),
+        api.get(`/projects/${id}/invoices`).catch(() => ({ data: [] })),
+        api.get(`/addendums?project_id=${id}`).catch(() => ({ data: [] })),
       ]);
       setProject(pRes.data);
       setContractors(cRes.data || []);
       setMasterPhases(mRes.data || []);
+      setInvoices(iRes.data || []);
+      setAddendums(aRes.data || []);
     } catch {
       toast.error('Could not load project');
     }
@@ -53,8 +80,12 @@ export default function ProjectDashboard() {
 
   const reload = async () => {
     try {
-      const { data } = await api.get(`/projects/${id}`);
-      setProject(data);
+      const [{ data: p }, { data: i }, { data: a }] = await Promise.all([
+        api.get(`/projects/${id}`),
+        api.get(`/projects/${id}/invoices`).catch(() => ({ data: [] })),
+        api.get(`/addendums?project_id=${id}`).catch(() => ({ data: [] })),
+      ]);
+      setProject(p); setInvoices(i || []); setAddendums(a || []);
     } catch { /* ignore */ }
   };
 
@@ -249,14 +280,25 @@ export default function ProjectDashboard() {
       <h2 className="text-lg font-semibold text-gray-900 mb-3 mt-8">Quick Actions</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <QuickAction icon="🧾" label="Log Invoice"
-          onClick={() => toast('Invoice logging arrives in the next step.', { icon: '🧾' })} disabled={!canEdit} />
+          onClick={() => setShowInvoiceModal(true)} disabled={!canEdit} />
         <QuickAction icon="📑" label="Request Addendum"
-          onClick={() => toast('Addendum approvals arrive in the next step.', { icon: '📑' })} disabled={!canEdit} />
+          onClick={() => setShowAddendumModal(true)} disabled={!canEdit} />
         <QuickAction icon="📝" label="Add Note"
           onClick={() => toast('Notes & activity log arrive in the next step.', { icon: '📝' })} disabled={!canEdit} />
         <QuickAction icon="📊" label="Construction Overview"
           onClick={() => navigate('/construction')} />
       </div>
+
+      {/* Invoices */}
+      <InvoicesSection invoices={invoices} phases={phases} canEdit={canEdit} project={project}
+        onAdd={() => setShowInvoiceModal(true)}
+        onEdit={(inv) => setEditingInvoice(inv)}
+        onDelete={(inv) => setDeletingInvoice(inv)} />
+
+      {/* Addendums */}
+      <AddendumsSection addendums={addendums} canEdit={canEdit} canApprove={canApproveAddendum}
+        onAdd={() => setShowAddendumModal(true)}
+        onReview={(ad) => setReviewingAddendum(ad)} />
 
       {/* Modals */}
       {editingProject && (
@@ -283,7 +325,557 @@ export default function ProjectDashboard() {
         <ConfirmModal title="Delete Project" message={`Delete "${project.name}"? All phases will be removed too.`}
           confirmLabel="Delete" danger onConfirm={removeProject} onCancel={() => setDeletingProject(false)} />
       )}
+
+      {(showInvoiceModal || editingInvoice) && (
+        <InvoiceFormModal projectId={id} accountId={profile?.account_id}
+          phases={phases} invoice={editingInvoice}
+          onClose={() => { setShowInvoiceModal(false); setEditingInvoice(null); }}
+          onSaved={async () => { setShowInvoiceModal(false); setEditingInvoice(null); await reload(); toast.success('Invoice saved'); }} />
+      )}
+      {deletingInvoice && (
+        <ConfirmModal title="Delete Invoice"
+          message={`Delete this $${Number(deletingInvoice.amount || 0).toLocaleString()} invoice from ${deletingInvoice.vendor || 'unknown vendor'}?`}
+          confirmLabel="Delete" danger
+          onConfirm={async () => {
+            try { await api.delete(`/projects/invoices/${deletingInvoice.id}`); toast.success('Invoice removed'); setDeletingInvoice(null); await reload(); }
+            catch (e) { toast.error(e?.response?.data?.error || 'Delete failed'); }
+          }}
+          onCancel={() => setDeletingInvoice(null)} />
+      )}
+
+      {showAddendumModal && (
+        <AddendumFormModal projectId={id} accountId={profile?.account_id}
+          onClose={() => setShowAddendumModal(false)}
+          onSaved={async () => { setShowAddendumModal(false); await reload(); toast.success('Addendum submitted'); }} />
+      )}
+      {reviewingAddendum && (
+        <AddendumReviewModal addendum={reviewingAddendum} canApprove={canApproveAddendum}
+          onClose={() => setReviewingAddendum(null)}
+          onReviewed={async () => { setReviewingAddendum(null); await reload(); }} />
+      )}
     </Layout>
+  );
+}
+
+// ─── Invoices ────────────────────────────────────────────────────────────────
+
+function InvoicesSection({ invoices, phases, canEdit, project, onAdd, onEdit, onDelete }) {
+  const [filterCat, setFilterCat] = useState('all');
+  const [filterPhase, setFilterPhase] = useState('all');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+
+  const filtered = invoices.filter(i => {
+    if (filterCat !== 'all' && i.category !== filterCat) return false;
+    if (filterPhase === 'none' && i.phase_id) return false;
+    if (filterPhase !== 'all' && filterPhase !== 'none' && i.phase_id !== filterPhase) return false;
+    const d = i.invoice_date || i.created_at;
+    if (filterFrom && (!d || d < filterFrom)) return false;
+    if (filterTo && (!d || d > filterTo)) return false;
+    return true;
+  });
+  const totalLabor = filtered.filter(i => i.category === 'labor').reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const totalMats  = filtered.filter(i => i.category === 'materials').reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const totalOther = filtered.filter(i => !['labor', 'materials'].includes(i.category)).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  // Live over-budget warning vs current project budgets
+  const laborBudget = Number(project?.labor_budget || 0);
+  const matBudget   = Number(project?.material_budget || 0);
+  const laborSpent  = Number(project?.labor_spent || 0);
+  const matSpent    = Number(project?.material_spent || 0);
+  const banner = (() => {
+    const list = [];
+    const test = (label, spent, budget) => {
+      if (budget <= 0) return;
+      if (spent > budget) list.push({ tone: 'red',   text: `${label} is over budget (${Math.round(spent/budget*100)}%).` });
+      else if (spent / budget >= 0.9) list.push({ tone: 'amber', text: `${label} at ${Math.round(spent/budget*100)}% of budget.` });
+    };
+    test('Labor', laborSpent, laborBudget);
+    test('Materials', matSpent, matBudget);
+    return list;
+  })();
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3 mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">Invoices</h2>
+        {canEdit && (
+          <button onClick={onAdd} className="text-sm font-medium px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white">
+            + Log Invoice
+          </button>
+        )}
+      </div>
+
+      {banner.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {banner.map((b, i) => (
+            <div key={i} className={`text-sm rounded-lg px-3 py-2 ring-1 ring-inset ${b.tone === 'red' ? 'bg-red-50 text-red-700 ring-red-600/20' : 'bg-amber-50 text-amber-700 ring-amber-600/20'}`}>
+              {b.tone === 'red' ? '🚨 ' : '⚠️ '}{b.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Card>
+        <div className="p-3 border-b border-gray-100 flex flex-wrap items-center gap-2 text-xs">
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="border border-gray-200 rounded px-2 py-1">
+            <option value="all">All categories</option>
+            {INVOICE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+          <select value={filterPhase} onChange={e => setFilterPhase(e.target.value)} className="border border-gray-200 rounded px-2 py-1">
+            <option value="all">All phases</option>
+            <option value="none">No phase</option>
+            {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="border border-gray-200 rounded px-2 py-1" />
+          <span className="text-gray-400">to</span>
+          <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="border border-gray-200 rounded px-2 py-1" />
+          {(filterCat !== 'all' || filterPhase !== 'all' || filterFrom || filterTo) && (
+            <button onClick={() => { setFilterCat('all'); setFilterPhase('all'); setFilterFrom(''); setFilterTo(''); }}
+              className="text-gray-500 hover:text-gray-700 px-2">Clear</button>
+          )}
+        </div>
+
+        {filtered.length === 0 ? (
+          <EmptyState icon="🧾" title="No invoices logged"
+            description="Log invoices to track real spend against your project budget."
+            action={canEdit ? '+ Log Invoice' : null} onAction={onAdd} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-gray-200 text-left">
+                <th className="px-4 py-2 font-medium text-gray-500">Date</th>
+                <th className="px-4 py-2 font-medium text-gray-500">Vendor</th>
+                <th className="px-4 py-2 font-medium text-gray-500">Invoice #</th>
+                <th className="px-4 py-2 font-medium text-gray-500">Category</th>
+                <th className="px-4 py-2 font-medium text-gray-500">Phase</th>
+                <th className="px-4 py-2 font-medium text-gray-500 text-right">Amount</th>
+                <th className="px-4 py-2 font-medium text-gray-500 text-right">File</th>
+                {canEdit && <th className="px-2 py-2"></th>}
+              </tr></thead>
+              <tbody>
+                {filtered.map(i => (
+                  <tr key={i.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-600">{fmtDate(i.invoice_date || i.created_at)}</td>
+                    <td className="px-4 py-2 font-medium text-gray-900">{i.vendor || '—'}</td>
+                    <td className="px-4 py-2 text-gray-600">{i.invoice_number || '—'}</td>
+                    <td className="px-4 py-2 text-gray-600">{invCatLabel(i.category)}</td>
+                    <td className="px-4 py-2 text-gray-600">{i.construction_phases?.name || '—'}</td>
+                    <td className="px-4 py-2 text-right font-medium text-gray-900">{fmtUsd(i.amount)}</td>
+                    <td className="px-4 py-2 text-right">
+                      {i.file_url ? <a href={i.file_url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">View</a> : <span className="text-gray-300">—</span>}
+                    </td>
+                    {canEdit && (
+                      <td className="px-2 py-2 text-right whitespace-nowrap">
+                        <button onClick={() => onEdit(i)} className="text-xs text-gray-500 hover:text-primary-600 px-1">Edit</button>
+                        <button onClick={() => onDelete(i)} className="text-xs text-gray-500 hover:text-danger-600 px-1">Delete</button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                <tr className="bg-gray-50 font-medium">
+                  <td className="px-4 py-2 text-gray-700" colSpan={5}>Totals · Labor {fmtUsd(totalLabor)} · Materials {fmtUsd(totalMats)} · Other {fmtUsd(totalOther)}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{fmtUsd(totalLabor + totalMats + totalOther)}</td>
+                  <td colSpan={canEdit ? 2 : 1} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function InvoiceFormModal({ projectId, accountId, phases, invoice, onClose, onSaved }) {
+  const isEdit = !!invoice?.id;
+  const [form, setForm] = useState({
+    vendor: invoice?.vendor || '',
+    amount: invoice?.amount ?? '',
+    invoice_date: invoice?.invoice_date ? invoice.invoice_date.split('T')[0] : new Date().toISOString().split('T')[0],
+    invoice_number: invoice?.invoice_number || '',
+    category: invoice?.category || 'labor',
+    phase_id: invoice?.phase_id || '',
+    notes: invoice?.notes || '',
+    file_url: invoice?.file_url || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file) return;
+    if (!accountId) { toast.error('Account not loaded'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const path = `${accountId}/${projectId}/invoices/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('project-documents').upload(path, file, { upsert: false });
+      if (error) throw error;
+      const { data: signed, error: sErr } = await supabase.storage.from('project-documents').createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+      if (sErr) throw sErr;
+      set('file_url', signed.signedUrl);
+      toast.success('File uploaded');
+    } catch (err) { toast.error(err?.message || 'Upload failed'); }
+    setUploading(false);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form, phase_id: form.phase_id || null };
+      if (isEdit) await api.put(`/projects/invoices/${invoice.id}`, payload);
+      else await api.post(`/projects/${projectId}/invoices`, payload);
+      await onSaved();
+    } catch (err) { toast.error(err?.response?.data?.error || 'Save failed'); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{isEdit ? 'Edit Invoice' : 'Log Invoice'}</h3>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Vendor" required>
+              <input value={form.vendor} onChange={e => set('vendor', e.target.value)} required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </FormField>
+            <FormField label="Amount" required>
+              <input type="number" min="0" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Invoice Date">
+              <input type="date" value={form.invoice_date} onChange={e => set('invoice_date', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </FormField>
+            <FormField label="Invoice #">
+              <input value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Category" required>
+              <select value={form.category} onChange={e => set('category', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                {INVOICE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Phase">
+              <select value={form.phase_id} onChange={e => set('phase_id', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                <option value="">— None —</option>
+                {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </FormField>
+          </div>
+          <FormField label="Notes">
+            <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+          </FormField>
+          <FormField label="File (PDF/JPG/PNG)">
+            <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
+              {form.file_url ? (
+                <>
+                  <a href={form.file_url} target="_blank" rel="noreferrer" className="text-sm text-primary-600 hover:underline flex-1 truncate">View uploaded file</a>
+                  <button type="button" onClick={() => set('file_url', '')} className="text-xs text-gray-500 hover:text-danger-600">Remove</button>
+                </>
+              ) : (
+                <label className="cursor-pointer text-sm text-primary-600 hover:underline flex-1">
+                  {uploading ? 'Uploading…' : 'Upload file'}
+                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+                </label>
+              )}
+            </div>
+          </FormField>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+            <button type="submit" disabled={saving || uploading}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50">
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Log Invoice'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Addendums ───────────────────────────────────────────────────────────────
+
+function addendumStatusBadge(status) {
+  if (status === 'approved') return 'bg-green-50 text-green-700 ring-green-600/20';
+  if (status === 'rejected') return 'bg-red-50 text-red-700 ring-red-600/20';
+  return 'bg-amber-50 text-amber-700 ring-amber-600/20';
+}
+
+function AddendumsSection({ addendums, canEdit, canApprove, onAdd, onReview }) {
+  const [expanded, setExpanded] = useState(new Set());
+  const toggle = (id) => setExpanded(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const pending = addendums.filter(a => a.status === 'pending').length;
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3 mt-8">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">Addendums</h2>
+          {pending > 0 && (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-600/20">
+              {pending} pending
+            </span>
+          )}
+        </div>
+        {canEdit && (
+          <button onClick={onAdd} className="text-sm font-medium px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white">
+            + Request Addendum
+          </button>
+        )}
+      </div>
+
+      {addendums.length === 0 ? (
+        <Card><EmptyState icon="📑" title="No addendums"
+          description="Submit a formal change request when scope, budget, or timeline needs to shift."
+          action={canEdit ? '+ Request Addendum' : null} onAction={onAdd} /></Card>
+      ) : (
+        <div className="space-y-2 mb-6">
+          {addendums.map(a => {
+            const isOpen = expanded.has(a.id);
+            return (
+              <Card key={a.id}>
+                <div className="p-4 cursor-pointer hover:bg-gray-50" onClick={() => toggle(a.id)}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-gray-900">{a.title}</span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset capitalize ${addendumStatusBadge(a.status)}`}>
+                          {a.status}
+                        </span>
+                        {(a.change_types || []).map(t => (
+                          <span key={t} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-500/10 capitalize">{t}</span>
+                        ))}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Requested {fmtDate(a.request_date || a.created_at)}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {a.status === 'pending' && canApprove && (
+                        <button onClick={(e) => { e.stopPropagation(); onReview(a); }}
+                          className="text-xs font-medium px-3 py-1 rounded-lg bg-primary-500 hover:bg-primary-600 text-white">
+                          Review
+                        </button>
+                      )}
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50 text-sm text-gray-700 space-y-2">
+                    {a.description && <p className="whitespace-pre-wrap">{a.description}</p>}
+                    {(Number(a.budget_delta_labor) || Number(a.budget_delta_materials)) ? (
+                      <p className="text-xs text-gray-600">
+                        Budget Δ: Labor {Number(a.budget_delta_labor) >= 0 ? '+' : ''}{fmtUsd(a.budget_delta_labor)} · Materials {Number(a.budget_delta_materials) >= 0 ? '+' : ''}{fmtUsd(a.budget_delta_materials)}
+                      </p>
+                    ) : null}
+                    {a.proposed_delivery_date && <p className="text-xs text-gray-600">Proposed delivery: {fmtDate(a.proposed_delivery_date)}</p>}
+                    {a.document_url && <p><a href={a.document_url} target="_blank" rel="noreferrer" className="text-xs text-primary-600 hover:underline">View signed document</a></p>}
+                    {a.status !== 'pending' && (
+                      <p className="text-xs text-gray-500">
+                        {a.status === 'approved' ? 'Approved' : 'Rejected'} {fmtDate(a.review_date)}{a.review_comment ? ` — "${a.review_comment}"` : ''}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function AddendumFormModal({ projectId, accountId, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    title: '', description: '',
+    change_types: [],
+    budget_delta_labor: '', budget_delta_materials: '',
+    proposed_delivery_date: '', document_url: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const toggleType = (t) => setForm(f => ({ ...f, change_types: f.change_types.includes(t) ? f.change_types.filter(x => x !== t) : [...f.change_types, t] }));
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file) return;
+    if (!accountId) { toast.error('Account not loaded'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'pdf';
+      const path = `${accountId}/${projectId}/addendums/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('project-documents').upload(path, file, { upsert: false });
+      if (error) throw error;
+      const { data: signed, error: sErr } = await supabase.storage.from('project-documents').createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+      if (sErr) throw sErr;
+      set('document_url', signed.signedUrl);
+      toast.success('Document uploaded');
+    } catch (err) { toast.error(err?.message || 'Upload failed'); }
+    setUploading(false);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post('/addendums', { ...form, project_id: projectId });
+      await onSaved();
+    } catch (err) { toast.error(err?.response?.data?.error || 'Save failed'); }
+    setSaving(false);
+  };
+
+  const includesBudget = form.change_types.includes('budget');
+  const includesTimeline = form.change_types.includes('timeline');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Request Addendum</h3>
+        <form onSubmit={submit} className="space-y-3">
+          <FormField label="Title" required>
+            <input value={form.title} onChange={e => set('title', e.target.value)} required
+              placeholder="e.g. Add bathroom renovation"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+          </FormField>
+          <FormField label="Description">
+            <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3}
+              placeholder="Reason and details for this change…"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+          </FormField>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Change Types</label>
+            <div className="flex flex-wrap gap-2">
+              {ADDENDUM_CHANGE_TYPES.map(t => (
+                <label key={t.value}
+                  className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm cursor-pointer ${form.change_types.includes(t.value) ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+                  <input type="checkbox" checked={form.change_types.includes(t.value)} onChange={() => toggleType(t.value)} className="rounded border-gray-300 text-primary-500 focus:ring-primary-500" />
+                  {t.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          {includesBudget && (
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Labor Budget Δ ($)">
+                <input type="number" step="0.01" value={form.budget_delta_labor} onChange={e => set('budget_delta_labor', e.target.value)}
+                  placeholder="e.g. 5000 or -2500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </FormField>
+              <FormField label="Materials Budget Δ ($)">
+                <input type="number" step="0.01" value={form.budget_delta_materials} onChange={e => set('budget_delta_materials', e.target.value)}
+                  placeholder="e.g. 1500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+              </FormField>
+            </div>
+          )}
+          {includesTimeline && (
+            <FormField label="Proposed New Delivery Date">
+              <input type="date" value={form.proposed_delivery_date} onChange={e => set('proposed_delivery_date', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </FormField>
+          )}
+          <FormField label="Signed Document">
+            <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2">
+              {form.document_url ? (
+                <>
+                  <a href={form.document_url} target="_blank" rel="noreferrer" className="text-sm text-primary-600 hover:underline flex-1 truncate">View uploaded document</a>
+                  <button type="button" onClick={() => set('document_url', '')} className="text-xs text-gray-500 hover:text-danger-600">Remove</button>
+                </>
+              ) : (
+                <label className="cursor-pointer text-sm text-primary-600 hover:underline flex-1">
+                  {uploading ? 'Uploading…' : 'Upload document'}
+                  <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+                </label>
+              )}
+            </div>
+          </FormField>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+            <button type="submit" disabled={saving || uploading}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50">
+              {saving ? 'Submitting…' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddendumReviewModal({ addendum, canApprove, onClose, onReviewed }) {
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const review = async (action) => {
+    setBusy(true);
+    try {
+      await api.post(`/addendums/${addendum.id}/review`, { action, comment });
+      toast.success(action === 'approve' ? 'Addendum approved' : 'Addendum rejected');
+      await onReviewed();
+    } catch (err) { toast.error(err?.response?.data?.error || 'Review failed'); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Review Addendum</h3>
+        <p className="font-medium text-gray-900">{addendum.title}</p>
+        {addendum.description && <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{addendum.description}</p>}
+        <div className="mt-3 text-sm text-gray-700 space-y-1">
+          <p>Change types: {(addendum.change_types || []).join(', ') || '—'}</p>
+          {(Number(addendum.budget_delta_labor) || Number(addendum.budget_delta_materials)) ? (
+            <p>Budget Δ: Labor {fmtUsd(addendum.budget_delta_labor)} · Materials {fmtUsd(addendum.budget_delta_materials)}</p>
+          ) : null}
+          {addendum.proposed_delivery_date && <p>New delivery: {fmtDate(addendum.proposed_delivery_date)}</p>}
+          {addendum.document_url && <p><a href={addendum.document_url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">View signed document</a></p>}
+        </div>
+        {canApprove ? (
+          <>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Review Comment (required for rejection)</label>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500" />
+            </div>
+            <p className="mt-3 text-xs text-gray-500">Approving will apply the budget and timeline changes to the project automatically.</p>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button type="button" disabled={busy || !comment.trim()} onClick={() => review('reject')}
+                className="px-4 py-2 text-sm font-medium text-danger-600 hover:bg-danger-50 rounded-lg disabled:opacity-50">
+                Reject
+              </button>
+              <button type="button" disabled={busy} onClick={() => review('approve')}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50">
+                {busy ? 'Working…' : 'Approve'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-end pt-4 border-t border-gray-100 mt-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg">Close</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
