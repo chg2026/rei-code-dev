@@ -198,7 +198,7 @@ router.post('/', requireEdit, async (req, res) => {
     const { phases, ...rawFields } = req.body || {}
     const projectFields = cleanProject(rawFields)
     if (!projectFields.name) return res.status(400).json({ error: 'Project name is required.' })
-    projectFields.account_id = req.user.account_id
+    projectFields.account_id = req.account_filter || req.user.account_id
     if (req.user?.id) projectFields.created_by = req.user.id
 
     const fkErr = await verifyProjectFKs(projectFields, req.account_filter)
