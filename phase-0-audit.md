@@ -336,7 +336,7 @@ Ordered by what blocks Phase 1 first, then by severity.
 
 ---
 
-## 9. Status of Phase 0 subtasks
+## 9. Status of Phase 0 subtasks (snapshot at time of audit — 2026-04-23)
 
 | Task | Status |
 |---|---|
