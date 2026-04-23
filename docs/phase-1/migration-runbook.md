@@ -26,17 +26,32 @@ All must be TRUE before starting:
 
 ## Phase A — Rehearse on staging (no prod risk)
 
-### Step A1 — Clone prod schema + data into staging
+### Step A1 — Build pre-Phase-1 state on staging (no prod data copy)
 
-**In the Supabase dashboard** for prod (`kspwxeqtxmshdhmsnmng`):
+We deliberately do NOT copy prod customer data to staging. Reasons:
+- Staging is free-tier (weaker controls); copying PII doubles attack surface
+- The migration's correctness depends on *schema shape*, not on specific customer rows
+- Most production-grade teams avoid real-customer data in staging
 
-1. Database → Backups → **Create a new backup** (labeled `pre-phase-1-rehearsal`)
-2. Wait for the backup to complete (usually ~1 min)
+Instead, we rebuild prod's pre-Phase-1 shape from the dev SQL files, then seed 3 fake accounts with varied plan tiers so backfill logic has something to exercise.
 
-**Nicole, ask Claude at this point** to guide you through the prod → staging clone. Options:
-- **Option 1 (easiest):** use `pg_dump` / `pg_restore` via Supabase's database URL (Claude provides commands)
-- **Option 2:** use Supabase's "Database Restore" if they support cross-project restore (they may not on all tiers)
-- **Option 3 (acceptable fallback):** run the CHG `schema.sql`, `saas-migration.sql`, `construction-migration.sql`, `fix-trigger.sql` on staging in order to simulate pre-Phase-1 state. Then seed one or two fake accounts so we can see backfill work. Use this option if Options 1/2 are blocked.
+**In staging SQL editor (`cmlfnhzjfhuynzuleyxt`)**, paste and run these files in order:
+
+1. [`apps/chg/scripts/schema.sql`](../../apps/chg/scripts/schema.sql) — base business tables
+2. [`apps/chg/scripts/saas-migration.sql`](../../apps/chg/scripts/saas-migration.sql) — multi-tenant layer (accounts, roles, RLS)
+3. [`apps/chg/scripts/construction-migration.sql`](../../apps/chg/scripts/construction-migration.sql) — units, master_phases, addendums
+4. [`apps/chg/scripts/fix-trigger.sql`](../../apps/chg/scripts/fix-trigger.sql) — NULL-safety fix prod already has
+5. [`apps/chg/scripts/phase-1-staging-seed.sql`](../../apps/chg/scripts/phase-1-staging-seed.sql) — 3 fake accounts + roles + data
+
+Each file should run in <5s and return "Success. No rows returned." If any file errors, STOP and paste the error to Claude.
+
+After step 5, run the sanity check query from the bottom of the seed file:
+- accounts: 3
+- roles: 5
+- role_permissions: 18
+- properties: 4
+- contractors: 2
+- construction_projects: 2
 
 ### Step A2 — Apply the migration on staging
 
