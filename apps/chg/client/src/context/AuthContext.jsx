@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [permissions, setPermissions] = useState({});
+  const [entitlements, setEntitlements] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId) => {
@@ -16,10 +17,12 @@ export function AuthProvider({ children }) {
       const { data } = await api.get(`/auth/me`);
       setProfile(data.profile);
       setPermissions(data.permissions || {});
+      setEntitlements(data.entitlements || []);
       return data;
     } catch {
       setProfile(null);
       setPermissions({});
+      setEntitlements([]);
       return null;
     }
   }, []);
@@ -37,7 +40,7 @@ export function AuthProvider({ children }) {
         setSession(s);
         setUser(s?.user ?? null);
         if (s?.user) await fetchProfile(s.user.id);
-        else { setProfile(null); setPermissions({}); }
+        else { setProfile(null); setPermissions({}); setEntitlements([]); }
       }
     );
 
@@ -56,6 +59,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setPermissions({});
+    setEntitlements([]);
   };
 
   const resetPassword = async (email) => {
@@ -83,16 +87,23 @@ export function AuthProvider({ children }) {
     return permissions[dept] === 'edit';
   };
 
+  const hasProductAccess = (code) => {
+    if (isSuperAdmin) return true;
+    return entitlements.some((e) => e.code === code && e.status === 'active');
+  };
+
   const value = {
     session,
     user,
     profile,
     permissions,
+    entitlements,
     loading,
     isSuperAdmin,
     isAccountAdmin,
     hasDepartmentAccess,
     canEditDepartment,
+    hasProductAccess,
     signIn,
     signOut,
     resetPassword,
