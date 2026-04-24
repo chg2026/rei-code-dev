@@ -20,6 +20,10 @@ args = "npm install"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
+args = "npm run build:client"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
 args = "npm run dev --workspace=server"
 waitForPort = 5000
 
