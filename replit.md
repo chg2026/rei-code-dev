@@ -15,8 +15,12 @@ deployments, one dev environment.
 | `packages/api-client/` | (stub)                                     | —          | Reserved for typed shared API client.                                                                                |
 
 `apps/*` and `packages/*` and `server` are all npm workspaces declared in
-the root `package.json`. There is **one root lockfile** — never commit a
-nested per-workspace `package-lock.json`.
+the root `package.json`. The repo currently keeps **one root lockfile plus
+two legacy nested lockfiles** (`apps/deallink/package-lock.json` and
+`apps/crm/client/package-lock.json`) that pre-date the workspace conversion.
+Treat the root lockfile as authoritative — do not introduce any **new**
+nested lockfiles in workspaces that don't already have one. The two legacy
+ones can be removed when their workspaces are next refactored.
 
 ## Two deployments, one repo
 
