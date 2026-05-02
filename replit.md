@@ -85,6 +85,26 @@ will be reconciled when the platform-level Atlassian-style admin is built
 
 Configured timeout: 5 minutes (`[postMerge]` in `.replit`).
 
+## Per-company seed scripts
+
+CHG Rehab's main `prisma/seed.ts` operates on a single hard-coded demo
+company (`seed-company-chg` / "Cleveland Holding Group"). Real users sign
+up via OIDC and get their own `Company` row, which starts with **no**
+warehouse departments, subcategories, items, or templates — so `/warehouse`
+renders empty until seeded.
+
+To seed the warehouse for an arbitrary company:
+
+```bash
+node_modules/.bin/tsx apps/chg-rehab/scripts/seed-warehouse-for-company.ts <companyId>
+```
+
+Idempotent and non-destructive — upserts 8 departments and 24 subcategories
+by code, seeds the ~195 prototype items **only into subcategories that are
+currently empty** (so user-added items are never wiped), and adds 3 system
+templates if missing. Pass `--reset` to force a wipe + re-insert of items
+across all subcategories (matches the original `prisma/seed.ts` behaviour).
+
 ## Conventions and constraints
 
 - **Plain `npm`** — no Turborepo, no Nx, no pnpm.
