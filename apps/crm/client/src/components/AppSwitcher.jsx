@@ -40,7 +40,10 @@ const PRODUCTS = [
   },
 ];
 
-// In Replit dev, port 3000 is reachable at https://3000-<dev-hostname>.
+// In Replit dev, ports declared in .replit are reachable at the same
+// hostname with the externalPort as a port suffix (e.g. https://<host>:3000).
+// The "<port>-<host>" subdomain form is NOT served by the dev edge proxy.
+//
 // In production we want the entitlement's brand_domain (or, eventually,
 // a deployed REACT_APP_CHG_REHAB_URL). This helper computes a safe URL
 // for the dev environment and returns null otherwise.
@@ -49,7 +52,7 @@ function devCrossPortUrl(port) {
   const host = window.location.hostname;
   // Match the standard Replit dev domain shape: <id>.<region>.replit.dev
   if (/\.replit\.dev$/.test(host)) {
-    return `https://${port}-${host}`;
+    return `https://${host}:${port}`;
   }
   return null;
 }
@@ -108,7 +111,6 @@ export default function AppSwitcher({ currentProduct = 'chg' }) {
           <div className="py-1">
             {PRODUCTS.map((product) => {
               const entitlement = entitlementFor(product.code);
-              const entitled = hasProductAccess(product.code);
               const isCurrent = product.code === currentProduct;
               const brandDomain = entitlement?.brand_domain;
               const devUrl = devCrossPortUrl(product.devPort);
