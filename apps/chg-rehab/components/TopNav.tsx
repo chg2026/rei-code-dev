@@ -5,6 +5,7 @@ import type { SessionUser } from "@/lib/session";
 import NotificationBell from "./NotificationBell";
 import BillingNavIndicator from "./BillingNavIndicator";
 import BillingNavBadge from "./BillingNavBadge";
+import AppSwitcher from "./AppSwitcher";
 
 const MODULES: { href: string; label: string }[] = [
   { href: "/pipeline", label: "Pipeline" },
@@ -51,6 +52,7 @@ export default function TopNav({ user }: { user: SessionUser }) {
       <div className="topbar-right">
         {user.role === "Admin" ? <BillingNavIndicator /> : <BillingNavBadge />}
         <NotificationBell />
+        <AppSwitcher currentProduct="chg-rehab" />
         <Link
           href="/account"
           className="user-pill"

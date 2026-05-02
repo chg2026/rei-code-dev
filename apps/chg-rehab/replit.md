@@ -584,3 +584,16 @@ as `-b "$(cat /tmp/cookie.txt)"` to test as `seed-user-roey` /
     healthy→unhealthy and a one-time recovery alert on unhealthy→healthy.
     `invoice.payment_failed` additionally fires when the sub is already
     unhealthy (per-invoice retries that don't generate a new sub-status webhook).
+
+## Cross-app navigation — 9-dot AppSwitcher
+
+- `components/AppSwitcher.tsx` is the Next.js port of the CHG CRM
+  switcher (`apps/crm/client/src/components/AppSwitcher.jsx`). It lives
+  in `TopNav.tsx` between `NotificationBell` and the user pill, with
+  `currentProduct="chg-rehab"` so the Rehab tile is marked Current.
+- Tiles: CHG (port 5000), Deal Link (Coming soon), CHG Rehab (Current).
+  In Replit dev, cross-port URLs resolve via `https://<host>:<port>` and
+  open in a new tab (`target="_blank"`, `rel="noopener noreferrer"`).
+- No shared UI package yet — when `packages/ui` graduates from a stub,
+  the two switcher implementations should consolidate into one shared
+  component consumed by both apps.
