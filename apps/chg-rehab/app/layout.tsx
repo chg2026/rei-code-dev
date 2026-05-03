@@ -3,6 +3,7 @@ import "./globals.css";
 import TopNav from "@/components/TopNav";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import BillingNoticeForTeammates from "@/components/BillingNoticeForTeammates";
+import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body>
         <div className="top-stack">
+          <ProfileCompletionBanner score={user.profileScore} />
           <TopNav user={user} />
           {isAdmin ? <BillingStatusBanner /> : <BillingNoticeForTeammates />}
         </div>

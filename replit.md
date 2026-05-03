@@ -10,7 +10,7 @@ deployments, one dev environment.
 | `server/`           | Express 5 + Supabase JS + node-cron           | 5000       | Shared API for CHG CRM and Deal Link. Serves `apps/crm/client/build` as a SPA when present.                          |
 | `apps/crm/`         | React 19 (CRA) + Supabase                     | 5000 (via server) | The CHG CRM front-end. Workspace was previously `apps/chg/` — renamed to `apps/crm` when CHG Rehab joined the repo. |
 | `apps/deallink/`    | React 18 + Vite + Supabase                    | 3001       | Linktree-style wholesaler app. Live as the second Gold Bridge product (Phase 5). Persists to Supabase via `/api/deallink/*` on the shared Express server. |
-| `apps/chg-rehab/`   | Next.js 15 + React 19 + Prisma 6 + iron-session + Stripe | 3000 | Standalone CHG Rehab SaaS. Replit OIDC login. Replit Postgres. Replit Object Storage.                                |
+| `apps/chg-rehab/`   | Next.js 15 + React 19 + Prisma 6 + iron-session + Stripe | 3000 | Standalone CHG Rehab SaaS. Supabase auth (Phase 1) + tabbed `/account` Profile + Notifications (Phase 2). Replit Postgres. Replit Object Storage. |
 | `packages/ui/`      | (stub)                                        | —          | Reserved for shared UI primitives.                                                                                   |
 | `packages/api-client/` | (stub)                                     | —          | Reserved for typed shared API client.                                                                                |
 

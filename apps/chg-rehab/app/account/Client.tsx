@@ -76,6 +76,7 @@ export default function AccountClient({
   companyDefaults,
   initialOverrides,
   initialQuiet,
+  hideHeader = false,
 }: {
   userName: string;
   userEmail: string | null;
@@ -83,6 +84,10 @@ export default function AccountClient({
   companyDefaults: CompanyDefaults;
   initialOverrides: Partial<Record<NotifyEvent, EventOverride>>;
   initialQuiet: QuietOverride;
+  /** When true, render the bare notifications panel without the page-level
+   *  Account header — used inside the tabbed /account page so the tabs
+   *  client owns the chrome and we don't get a duplicate header. */
+  hideHeader?: boolean;
 }) {
   const [overrides, setOverrides] = useState(() => {
     const o: Record<NotifyEvent, EventOverride> = {} as Record<
@@ -232,14 +237,8 @@ export default function AccountClient({
     [overrides, companyDefaults]
   );
 
-  return (
-    <div className="admin-wrap" style={{ padding: 24, maxWidth: 980 }}>
-      <h1 style={{ margin: "0 0 4px", fontSize: 22 }}>Account</h1>
-      <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18 }}>
-        {userName}
-        {userEmail ? ` · ${userEmail}` : ""} · {role}
-      </div>
-
+  const body = (
+    <>
       <div className="admin-panel active">
         <div className="admin-group">
           <div className="admin-group-title">Notification preferences</div>
@@ -500,6 +499,21 @@ export default function AccountClient({
           {toast}
         </div>
       )}
+    </>
+  );
+
+  if (hideHeader) {
+    return body;
+  }
+
+  return (
+    <div className="admin-wrap" style={{ padding: 24, maxWidth: 980 }}>
+      <h1 style={{ margin: "0 0 4px", fontSize: 22 }}>Account</h1>
+      <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18 }}>
+        {userName}
+        {userEmail ? ` · ${userEmail}` : ""} · {role}
+      </div>
+      {body}
     </div>
   );
 }

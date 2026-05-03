@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanySettings } from "@/lib/companySettings";
+import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import {
   NOTIFY_EVENT_KEYS,
   type EventChannels,
@@ -12,6 +13,8 @@ import AccountClient, {
   type EventOverride,
   type QuietOverride,
 } from "./Client";
+import AccountTabsClient, { type AccountTab } from "./AccountTabsClient";
+import ProfileTab, { type ProfileTabInitial } from "./profile/ProfileTab";
 
 export const dynamic = "force-dynamic";
 
@@ -44,11 +47,61 @@ function readCompanyQuietHours(meta: unknown): { start: string; end: string } {
   };
 }
 
-export default async function AccountPage() {
+type ProfileRow = {
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  profile_score: number | null;
+  accounts:
+    | { name: string | null; plan_tier: string | null }
+    | { name: string | null; plan_tier: string | null }[]
+    | null;
+};
+
+async function loadProfileInitial(
+  userId: string,
+  fallbackEmail: string | null,
+  role: string
+): Promise<ProfileTabInitial> {
+  const admin = getSupabaseAdminClient();
+  const { data } = await admin
+    .from("user_profiles")
+    .select("full_name, phone, email, profile_score, accounts ( name, plan_tier )")
+    .eq("id", userId)
+    .maybeSingle<ProfileRow>();
+  const account = Array.isArray(data?.accounts)
+    ? data?.accounts?.[0] ?? null
+    : data?.accounts ?? null;
+  return {
+    fullName: data?.full_name ?? "",
+    phone: data?.phone ?? "",
+    email: data?.email ?? fallbackEmail,
+    accountName: account?.name ?? null,
+    planTier: account?.plan_tier ?? null,
+    role,
+    profileScore: data?.profile_score ?? null,
+  };
+}
+
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [settings, prefs, dbUser] = await Promise.all([
+  const sp = (await searchParams) || {};
+  const tab: AccountTab = sp.tab === "notifications" ? "notifications" : "profile";
+
+  const userName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.email ||
+    "Your account";
+
+  // Notifications data is always loaded so a fast tab switch doesn't fetch
+  // again — the notifications fetch is dirt cheap (two indexed reads).
+  const [settings, prefs, dbUser, profileInitial] = await Promise.all([
     getCompanySettings(user.companyId),
     prisma.userNotificationPreference.findMany({
       where: { userId: user.id },
@@ -62,11 +115,11 @@ export default async function AccountPage() {
         notifyQuietEnd: true,
       },
     }),
+    loadProfileInitial(user.id, user.email ?? null, user.role),
   ]);
 
   const companyChannels = readCompanyChannels(settings.meta);
   const companyQuiet = readCompanyQuietHours(settings.meta);
-
   const companyDefaults: CompanyDefaults = {
     channels: companyChannels,
     quiet: companyQuiet,
@@ -88,17 +141,25 @@ export default async function AccountPage() {
   };
 
   return (
-    <AccountClient
-      userName={
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.email ||
-        "Your account"
-      }
+    <AccountTabsClient
+      active={tab}
+      userName={userName}
       userEmail={user.email ?? null}
       role={user.role}
-      companyDefaults={companyDefaults}
-      initialOverrides={initialOverrides}
-      initialQuiet={initialQuiet}
-    />
+    >
+      {tab === "profile" ? (
+        <ProfileTab initial={profileInitial} />
+      ) : (
+        <AccountClient
+          userName={userName}
+          userEmail={user.email ?? null}
+          role={user.role}
+          companyDefaults={companyDefaults}
+          initialOverrides={initialOverrides}
+          initialQuiet={initialQuiet}
+          hideHeader
+        />
+      )}
+    </AccountTabsClient>
   );
 }

@@ -82,7 +82,7 @@ export async function getSessionFromCookies(): Promise<IronSession<AppSession>> 
  * Map a Prisma User row into the SessionUser shape the rest of the app
  * (TopNav, /api/auth/user, all `getCurrentUser()` callers) consumes.
  */
-function toSessionUser(u: User): SessionUser {
+function toSessionUser(u: User, profileScore: number | null = null): SessionUser {
   return {
     id: u.id,
     email: u.email,
@@ -91,6 +91,7 @@ function toSessionUser(u: User): SessionUser {
     profileImageUrl: u.profileImageUrl,
     role: u.role,
     companyId: u.companyId,
+    profileScore,
   };
 }
 
@@ -163,10 +164,11 @@ async function syncSupabaseUser(
     // array depending on whether it inferred a 1-1 vs 1-N FK; we coerce
     // to the union here and normalise below.
     accounts: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
+    profile_score: number | null;
   };
   const { data: profile, error } = await admin
     .from("user_profiles")
-    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, status, accounts ( id, name )")
+    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, status, profile_score, accounts ( id, name )")
     .eq("id", authUserId)
     .maybeSingle<UserProfileRow>();
   if (error) {
@@ -297,7 +299,7 @@ async function syncSupabaseUser(
     });
   });
 
-  return toSessionUser(created);
+  return toSessionUser(created, profile.profile_score ?? null);
 }
 
 /**
@@ -314,7 +316,7 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
   const admin = getSupabaseAdminClient();
   const { data: profile } = await admin
     .from("user_profiles")
-    .select("email, full_name, avatar_url, status")
+    .select("email, full_name, avatar_url, status, profile_score")
     .eq("id", existing.id)
     .maybeSingle();
 
@@ -344,8 +346,8 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
         profileImageUrl: nextImg,
       },
     });
-    return toSessionUser(updated);
+    return toSessionUser(updated, profile?.profile_score ?? null);
   }
 
-  return toSessionUser(existing);
+  return toSessionUser(existing, profile?.profile_score ?? null);
 }

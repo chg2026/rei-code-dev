@@ -13,6 +13,12 @@ export interface SessionUser {
   profileImageUrl?: string | null;
   role: string;
   companyId: string;
+  /**
+   * Supabase `user_profiles.profile_score` (0–100). Surfaced on the session
+   * so the global ProfileCompletionBanner can render without an extra
+   * round-trip on every layout.
+   */
+  profileScore?: number | null;
 }
 
 /**
