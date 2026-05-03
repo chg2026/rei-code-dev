@@ -3,16 +3,17 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
- * Investor signup — wired up in Phase 2 once invite tokens land. Phase 1
- * stub returns 501 with a clear message.
+ * Investor signup is invite-only. Operators provision investors directly
+ * (via the operator portal / seed script); investors cannot self-register.
+ * This endpoint always rejects so any stray client cannot bypass that.
  */
 export async function POST() {
   return NextResponse.json(
     {
-      error: "not_implemented",
+      error: "invite_only",
       message:
-        "Investor signup is not yet enabled. Phase 2 will accept invite tokens here.",
+        "Investor accounts are invite-only. Please use the invite link your operator sent you.",
     },
-    { status: 501 }
+    { status: 403 }
   );
 }
