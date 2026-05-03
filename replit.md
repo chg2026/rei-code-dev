@@ -11,6 +11,7 @@ independent deployments, one dev environment.
 | `apps/deallink/`    | React 18 + Vite + Supabase                    | 3001       | Linktree-style wholesaler app. Live as the second Gold Bridge product. Persists to Supabase via `/api/deallink/*` on the shared Express server. |
 | `apps/chg-rehab/`   | Next.js 15 + React 19 + Prisma 6 + Supabase auth + Stripe | 3000 | The CHG Platform. Supabase auth (CHG Phase 1) + tabbed `/account` Profile (Phase 2) + `/super-admin` (Phase 3, proxies to Express `/api/admin/*`) + Investor Portal back-office under `/admin?tab={investors,deals,fundraising,finance}` (Investor Portal Phase 2 / Task #6). Replit Postgres. Replit Object Storage. |
 | `apps/investor-portal/` | Next.js 15 + React 19 (shares chg-rehab Prisma client) + Supabase auth | 3002 | Investor-facing portal. Shares the chg-rehab Prisma schema (`InvestorSubscription`, `Offering`, `Distribution`, etc.) and Supabase auth users (`is_investor=true` on `user_profiles`). Pages: `/login`, `/signup` (invite-token only), `/(portal)/{dashboard,investments,distributions,documents,updates,activity,analytics}`. Investor data is scoped per-user via `lib/portfolio.ts`. |
+| `apps/contractor-portal/` | Next.js 15 + React 19 (shares chg-rehab Prisma client) + Supabase auth | 3003 | Contractor-facing portal (Task #23). Three-tier model: L1 = chg-rehab `Company` (operator), L2 = `CpAccount` (contractor signing in here), L3 = `CpAccount` invited by an L2. Roles derived from `CpOperatorEdge` graph. `is_contractor=true` on `user_profiles`. Pages: `/login`, `/signup?token=…`, `/(portal)/{dashboard,jobs,bids,quotes,quotes/new,photos,invoices,docs,messages,operator/*}`. Free tier = 3 external quotes/month tracked via `CpQuotaUsage`. |
 | `archive/apps-crm/` | (retired)                                     | —          | Legacy React 19 (CRA) CHG CRM. Archived 2026-05 after the chg-rehab cutover; retained read-only for reference, not built or served. |
 | `packages/ui/`      | (stub)                                        | —          | Reserved for shared UI primitives.                                                                                   |
 | `packages/api-client/` | (stub)                                     | —          | Reserved for typed shared API client.                                                                                |
@@ -44,6 +45,12 @@ same git repo:
    Run = `npm run start --workspace=apps/investor-portal`. Listens on port 3002.
    Shares `DATABASE_URL` (chg-rehab Prisma schema) and Supabase auth
    secrets with chg-rehab.
+5. **Contractor Portal** — a fifth autoscale deployment (Task #23).
+   Build = `npm install && npm run db:generate --workspace=apps/chg-rehab && npm run build --workspace=apps/contractor-portal`.
+   Run = `npm run start --workspace=apps/contractor-portal`. Listens on port 3003.
+   Shares `DATABASE_URL`, Supabase auth secrets, and the Prisma client
+   with chg-rehab. Requires the `is_contractor` column on
+   `public.user_profiles` (see `supabase/migrations/20260301000000_user_profiles_is_contractor.sql`).
 
 The user creates secondary deployments from the Deployments pane (the
 agent cannot create them). Deal Link's `/api/deallink/*` calls and the

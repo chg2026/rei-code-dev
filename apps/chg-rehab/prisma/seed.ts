@@ -1609,6 +1609,10 @@ async function main() {
   // ── Investor portal seed (shared module) ────────────────────────────
   await _seedInvestorPortal(prisma, company.id);
 
+  // ── Contractor portal seed (Task 23) ───────────────────────────────
+  const { seedContractorPortal } = await import("./seed-contractor-shared");
+  await seedContractorPortal(prisma);
+
   console.log("[seed] done");
 }
 

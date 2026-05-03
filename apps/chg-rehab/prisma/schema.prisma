@@ -45,6 +45,13 @@ model Company {
   offerings            Offering[]
   investorDocuments    InvestorDocument[]
   investorInvites      InvestorInvite[]
+  cpOperatorEdges      CpOperatorEdge[]      @relation("CpEdgeLayer1")
+  cpJobsAwarded        CpJob[]               @relation("CpJobAwardedBy")
+  cpQuotesReceived     CpQuote[]             @relation("CpQuoteToCompany")
+  cpInvoicesReceived   CpInvoice[]           @relation("CpInvoiceToCompany")
+  cpThreads            CpMessageThread[]     @relation("CpThreadL1")
+  cpBidInvitations     CpBidInvitation[]     @relation("CpBidInvFromCompany")
+  cpOnboardingInvites  CpOnboardingInvite[]  @relation("CpOnboardingInvCompany")
 }
 
 model User {
@@ -1134,4 +1141,322 @@ model InvestorInvite {
 
   @@index([companyId])
   @@index([email])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Contractor Portal (apps/contractor-portal) — three-tier model.
+//   Layer 1: CHG operator (chg-rehab Company; surfaced via OperatorEdge.layer1CompanyId)
+//   Layer 2: contractor (CpAccount; signs into apps/contractor-portal)
+//   Layer 3: subs / clients invited by an L2 contractor (also CpAccount)
+// Roles are derived from the OperatorEdge graph, not stored on the account.
+// ─────────────────────────────────────────────────────────────────────────
+
+model CpAccount {
+  id                 String     @id // Supabase auth uid
+  email              String     @unique
+  contactName        String
+  companyName        String
+  phone              String?
+  trade              String?
+  licenseNumber      String?
+  planTier           String     @default("free") // free | pro
+  status             String     @default("Active") // Active | Suspended
+  contractorPortalEnabled Boolean @default(true)
+  messagingEnabled   Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @default(now()) @updatedAt
+  lastLoginAt        DateTime?
+
+  // Relations
+  operatorOf         CpOperatorEdge[] @relation("CpEdgeOperator")
+  invitedBy          CpOperatorEdge[] @relation("CpEdgeContractor")
+  jobsAsContractor   CpJob[]    @relation("CpJobContractor")
+  jobsAwardedByMe    CpJob[]    @relation("CpJobAwardedByAccount")
+  quotesSent         CpQuote[]  @relation("CpQuoteFrom")
+  quotesReceived     CpQuote[]  @relation("CpQuoteToContractor")
+  invoicesSent       CpInvoice[] @relation("CpInvoiceFrom")
+  invoicesReceived   CpInvoice[] @relation("CpInvoiceToContractor")
+  complianceDocs     CpComplianceDoc[]
+  messagesSent       CpMessage[]
+  threadsAsA         CpMessageThread[] @relation("CpThreadA")
+  threadsAsB         CpMessageThread[] @relation("CpThreadB")
+  bidsInvited        CpBidInvitation[] @relation("CpBidInvited")
+  bidProposals       CpBidProposal[]
+  onboardingInvites  CpOnboardingInvite[] @relation("CpOnboardingInviter")
+  quotaUsage         CpQuotaUsage[]
+  sentMessageLog     CpSentMessage[]   @relation("CpSentMessageRecipient")
+}
+
+// The relationship graph: who can see whom.
+// operatorId references the Layer-1 company (chg-rehab Company.id) when
+// `layer1CompanyId` is set, OR a Layer-2 CpAccount.id when an L2 invited
+// an L3. `contractorId` is always the CpAccount on the receiving end.
+model CpOperatorEdge {
+  id              String     @id @default(cuid())
+  contractorId    String
+  inviterAccountId String?   // Set if invited by an L2 CpAccount (so contractorId is L3)
+  layer1CompanyId String?    // Set if invited by an L1 chg-rehab Company (so contractorId is L2)
+  source          String     @default("invite") // invite | manual | import
+  createdAt       DateTime   @default(now())
+
+  contractor      CpAccount  @relation("CpEdgeContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  inviter         CpAccount? @relation("CpEdgeOperator", fields: [inviterAccountId], references: [id], onDelete: SetNull)
+  layer1Company   Company?   @relation("CpEdgeLayer1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
+
+  @@unique([contractorId, inviterAccountId, layer1CompanyId])
+  @@index([contractorId])
+  @@index([layer1CompanyId])
+  @@index([inviterAccountId])
+}
+
+model CpJob {
+  id             String      @id @default(cuid())
+  contractorId   String
+  name           String
+  subtitle       String?
+  trade          String?
+  contractAmount Decimal     @default(0) @db.Decimal(14, 2)
+  invoicedAmount Decimal     @default(0) @db.Decimal(14, 2)
+  paidAmount     Decimal     @default(0) @db.Decimal(14, 2)
+  progressPct    Int         @default(0)
+  dueDate        String?     // free-form per prototype
+  status         String      @default("upcoming") // bid | upcoming | active | complete
+  photoRequested Boolean     @default(false)
+  // The party who awarded the job — either an L1 Company or an L2 CpAccount.
+  awardedByCompanyId  String?
+  awardedByAccountId  String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
+
+  contractor     CpAccount   @relation("CpJobContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  awardedByCompany Company?  @relation("CpJobAwardedBy", fields: [awardedByCompanyId], references: [id], onDelete: SetNull)
+  awardedByAccount CpAccount? @relation("CpJobAwardedByAccount", fields: [awardedByAccountId], references: [id], onDelete: SetNull, map: "CpJob_awardedByAccountId_fkey")
+  quotes         CpQuote[]
+  invoices       CpInvoice[]
+  photos         CpJobPhoto[]
+  threads        CpMessageThread[]
+
+  @@index([contractorId, status])
+}
+
+model CpQuote {
+  id              String     @id @default(cuid())
+  number          String     @unique
+  fromAccountId   String     // contractor sending the quote
+  jobId           String?
+  jobName         String     // free-form description
+  recipientType   String     // operator | contractor (L1 or L2/L3)
+  toCompanyId     String?    // if to L1 operator
+  toAccountId     String?    // if to L2/L3 contractor
+  totalAmount     Decimal    @db.Decimal(14, 2)
+  notes           String?
+  status          String     @default("pending") // pending | accepted | declined
+  viewed          Boolean    @default(false)
+  sentAt          DateTime   @default(now())
+  respondedAt     DateTime?
+  isExternal      Boolean    @default(false) // true → counts toward free-tier quota
+  createdAt       DateTime   @default(now())
+
+  fromAccount     CpAccount  @relation("CpQuoteFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toCompany       Company?   @relation("CpQuoteToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
+  toAccount       CpAccount? @relation("CpQuoteToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
+  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  lineItems       CpQuoteLineItem[]
+
+  @@index([fromAccountId, status])
+  @@index([toCompanyId, status])
+  @@index([toAccountId, status])
+}
+
+model CpQuoteLineItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  description String
+  qty         Decimal  @default(1) @db.Decimal(14, 4)
+  unitPrice   Decimal  @default(0) @db.Decimal(14, 2)
+  ord         Int      @default(0)
+
+  quote       CpQuote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+}
+
+model CpInvoice {
+  id              String     @id @default(cuid())
+  number          String     @unique
+  fromAccountId   String
+  jobId           String?
+  jobName         String
+  description     String?
+  totalAmount     Decimal    @db.Decimal(14, 2)
+  status          String     @default("pending") // pending | approved | paid | rejected
+  toCompanyId     String?
+  toAccountId     String?
+  submittedAt     DateTime   @default(now())
+  approvedAt      DateTime?
+  paidAt          DateTime?
+
+  fromAccount     CpAccount  @relation("CpInvoiceFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toCompany       Company?   @relation("CpInvoiceToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
+  toAccount       CpAccount? @relation("CpInvoiceToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
+  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([fromAccountId, status])
+  @@index([toCompanyId, status])
+}
+
+model CpComplianceDoc {
+  id            String     @id @default(cuid())
+  accountId     String
+  name          String
+  docType       String     // compliance | tax | contract | other
+  fileName      String?
+  expiresAt     DateTime?
+  status        String     @default("current") // current | expiring | expired | missing
+  uploadedAt    DateTime   @default(now())
+
+  account       CpAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, docType])
+}
+
+model CpJobPhoto {
+  id          String   @id @default(cuid())
+  jobId       String
+  phase       String
+  caption     String?
+  objectPath  String?
+  createdAt   DateTime @default(now())
+
+  job         CpJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+model CpMessageThread {
+  id              String     @id @default(cuid())
+  jobId           String?
+  subject         String
+  // Two participants: A is the contractor account; B can be either an
+  // operator (L1 chg-rehab Company) or another contractor (L2/L3).
+  contractorAId   String
+  contractorBId   String?
+  layer1CompanyId String?
+  lastMessageAt   DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+
+  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  contractorA     CpAccount  @relation("CpThreadA", fields: [contractorAId], references: [id], onDelete: Cascade)
+  contractorB     CpAccount? @relation("CpThreadB", fields: [contractorBId], references: [id], onDelete: SetNull)
+  layer1Company   Company?   @relation("CpThreadL1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
+  messages        CpMessage[]
+
+  @@index([contractorAId])
+  @@index([contractorBId])
+  @@index([layer1CompanyId])
+}
+
+model CpMessage {
+  id          String           @id @default(cuid())
+  threadId    String
+  senderAccountId String?      // null when sender is an L1 operator user
+  senderCompanyId String?      // set when L1 operator
+  senderName  String
+  body        String
+  unread      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+
+  thread      CpMessageThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender      CpAccount?       @relation(fields: [senderAccountId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+}
+
+model CpBidInvitation {
+  id              String     @id @default(cuid())
+  invitedAccountId String
+  jobName         String
+  jobLocation     String?
+  trade           String?
+  scopeRangeLow   Decimal?   @db.Decimal(14, 2)
+  scopeRangeHigh  Decimal?   @db.Decimal(14, 2)
+  bidDueAt        DateTime?
+  fromCompanyId   String?
+  fromAccountId   String?
+  status          String     @default("open") // open | submitted | awarded | closed
+  createdAt       DateTime   @default(now())
+
+  invitedAccount  CpAccount  @relation("CpBidInvited", fields: [invitedAccountId], references: [id], onDelete: Cascade)
+  fromCompany     Company?   @relation("CpBidInvFromCompany", fields: [fromCompanyId], references: [id], onDelete: SetNull)
+  proposals       CpBidProposal[]
+
+  @@index([invitedAccountId, status])
+}
+
+model CpBidProposal {
+  id              String     @id @default(cuid())
+  invitationId    String
+  fromAccountId   String
+  amount          Decimal    @db.Decimal(14, 2)
+  durationDays    Int?
+  notes           String?
+  status          String     @default("submitted") // submitted | awarded | declined
+  submittedAt     DateTime   @default(now())
+
+  invitation      CpBidInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  fromAccount     CpAccount       @relation(fields: [fromAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, fromAccountId])
+}
+
+model CpOnboardingInvite {
+  id              String     @id @default(cuid())
+  email           String
+  companyName     String?
+  contactName     String?
+  trade           String?
+  token           String     @unique
+  // Inviter is either an L1 company (CHG operator user) or an L2 contractor.
+  inviterCompanyId String?
+  inviterAccountId String?
+  consumedAt      DateTime?
+  consumedById    String?
+  expiresAt       DateTime
+  createdAt       DateTime   @default(now())
+
+  inviterCompany  Company?   @relation("CpOnboardingInvCompany", fields: [inviterCompanyId], references: [id], onDelete: SetNull)
+  inviterAccount  CpAccount? @relation("CpOnboardingInviter", fields: [inviterAccountId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([inviterCompanyId])
+  @@index([inviterAccountId])
+}
+
+model CpQuotaUsage {
+  id          String   @id @default(cuid())
+  accountId   String
+  yearMonth   String   // YYYY-MM
+  quotesUsed  Int      @default(0)
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  account     CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, yearMonth])
+}
+
+// Stub notification log — magic-link emails / SMS land here in dev.
+model CpSentMessage {
+  id          String   @id @default(cuid())
+  channel     String   // email | sms
+  toAddress   String
+  toAccountId String?
+  subject     String?
+  body        String
+  meta        Json?
+  sentAt      DateTime @default(now())
+
+  toAccount   CpAccount? @relation("CpSentMessageRecipient", fields: [toAccountId], references: [id], onDelete: SetNull)
+
+  @@index([toAddress])
+  @@index([sentAt])
 }

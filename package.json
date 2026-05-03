@@ -27,6 +27,9 @@
     "supabase:migrate": "node scripts/apply-supabase-migrations.mjs",
     "rehab:db:seed-investor": "npm run db:seed-investor --workspace=apps/chg-rehab",
     "start:investor": "npm run start --workspace=apps/investor-portal",
+    "dev:contractor": "npm run dev --workspace=apps/contractor-portal",
+    "start:contractor": "npm run start --workspace=apps/contractor-portal",
+    "build:contractor": "npm run build --workspace=apps/contractor-portal",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"

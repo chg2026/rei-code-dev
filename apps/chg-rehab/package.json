@@ -11,6 +11,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-investor": "tsx scripts/seed-investor.ts",
     "db:seed:investor": "tsx prisma/seed-investor.ts",
+    "db:seed-contractor": "tsx prisma/seed-contractor.ts",
+    "db:seed:contractor": "tsx prisma/seed-contractor.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "test": "vitest run",
     "cron:notifications-sweep": "tsx scripts/notification-sweep.ts"

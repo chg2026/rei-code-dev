@@ -43,6 +43,10 @@ args = "Deal Link"
 task = "workflow.run"
 args = "Investor Portal"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Contractor Portal"
+
 [[workflows.workflow]]
 name = "CHG Rehab"
 author = "agent"
@@ -79,6 +83,18 @@ waitForPort = 3002
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Contractor Portal"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && npm run db:generate --workspace=apps/chg-rehab && npm run dev --workspace=apps/contractor-portal"
+waitForPort = 3003
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
@@ -90,6 +106,10 @@ externalPort = 3001
 [[ports]]
 localPort = 3002
 externalPort = 3002
+
+[[ports]]
+localPort = 3003
+externalPort = 3003
 
 [[ports]]
 localPort = 5000

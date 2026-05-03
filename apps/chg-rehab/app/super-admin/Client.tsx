@@ -1,24 +1,34 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-type TabId = "overview" | "accounts" | "users" | "roles" | "products";
+type TabId = "overview" | "accounts" | "users" | "roles" | "products" | "contractor-portal";
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "accounts", label: "Accounts" },
   { id: "users", label: "Users" },
   { id: "roles", label: "Roles & Permissions" },
   { id: "products", label: "Products" },
+  { id: "contractor-portal", label: "Contractor Portal" },
 ];
 
 const PLANS_BY_PRODUCT: Record<string, string[]> = {
   chg: ["starter", "professional", "enterprise"],
   deallink: ["free", "pro"],
+  "investor-portal": ["standard"],
+  "contractor-portal": ["free", "pro"],
 };
 const PRODUCT_LABEL: Record<string, string> = {
   chg: "CHG CRM",
   deallink: "Deal Link",
+  "investor-portal": "Investor Portal",
+  "contractor-portal": "Contractor Portal",
 };
-const PRODUCT_SHORT: Record<string, string> = { chg: "CHG", deallink: "Deal Link" };
+const PRODUCT_SHORT: Record<string, string> = {
+  chg: "CHG",
+  deallink: "Deal Link",
+  "investor-portal": "Investor",
+  "contractor-portal": "Contractor",
+};
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 function useToast() {
@@ -110,6 +120,7 @@ export default function SuperAdminClient({ currentUserId }: { currentUserId: str
       {tab === "users" && <UsersTab onOk={toast.ok} onError={toast.err} />}
       {tab === "roles" && <RolesTab onOk={toast.ok} onError={toast.err} />}
       {tab === "products" && <ProductsTab onOk={toast.ok} onError={toast.err} />}
+      {tab === "contractor-portal" && <ContractorPortalTab onError={toast.err} />}
 
       {toast.node}
     </div>
@@ -1725,5 +1736,269 @@ function ProductsTab({ onOk, onError }: { onOk: (t: string) => void; onError: (t
         blank to fall back to the dev cross-port URL or &quot;Coming soon&quot;.
       </p>
     </Card>
+  );
+}
+
+// ── Contractor Portal tab (Task #23) ───────────────────────────────────────
+type CpRow = {
+  id: string; email: string; contactName: string; companyName: string;
+  trade: string | null; planTier: string; status: string;
+  createdAt: string; lastLoginAt: string | null;
+  upstream: string[]; downstream: string[]; tier: string;
+  quotes: number; quotesAmount: number; invoices: number; invoicesAmount: number;
+  jobs: number; invitesSent: number;
+};
+type CpEdge = { id: string; kind: string; upstream: string; contractor: string; createdAt: string };
+type CpQuoteRow = { id: string; number: string; jobName: string; from: string; to: string; amount: number; status: string; sentAt: string };
+type CpInvoiceRow = { id: string; number: string; from: string; to: string; amount: number; status: string; submittedAt: string; paidAt: string | null };
+type CpJobRow = { id: string; name: string; contractor: string; status: string; createdAt: string };
+type CpData = {
+  totals: {
+    accounts: number; edges: number; layer1Edges: number; layer2Edges: number;
+    pendingQuoteCount: number; pendingQuoteAmount: number;
+    pendingInvoiceCount: number; pendingInvoiceAmount: number;
+    activeJobs: number;
+  };
+  accounts: CpRow[];
+  edges: CpEdge[];
+  quotes: CpQuoteRow[];
+  invoices: CpInvoiceRow[];
+  jobs: CpJobRow[];
+};
+
+function ContractorPortalTab({ onError }: { onError: (t: string) => void }) {
+  const [data, setData] = useState<CpData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "L2" | "L3" | "sole">("all");
+  const [search, setSearch] = useState("");
+  const [section, setSection] = useState<"accounts" | "edges" | "quotes" | "invoices" | "jobs">("accounts");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const d = await apiFetch<CpData>("/api/super-admin/contractor-portal");
+        if (!cancelled) setData(d);
+      } catch (e) {
+        if (!cancelled) onError(`Load failed: ${(e as Error).message}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onError]);
+
+  const fmt = (n: number) => "$" + Math.round(n).toLocaleString();
+  const rows = useMemo(() => {
+    if (!data) return [];
+    const q = search.trim().toLowerCase();
+    return data.accounts.filter((a) => {
+      if (filter !== "all" && a.tier !== filter) return false;
+      if (!q) return true;
+      return [a.companyName, a.contactName, a.email, a.trade || ""].some((v) => v.toLowerCase().includes(q));
+    });
+  }, [data, filter, search]);
+
+  if (loading) return <div style={{ padding: 24, color: "#6b7280" }}>Loading contractor portal data…</div>;
+  if (!data) return <div style={{ padding: 24, color: "#b91c1c" }}>Failed to load.</div>;
+
+  const Stat = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 14 }}>
+      <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+      {sub ? <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{sub}</div> : null}
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", marginBottom: 14 }}>
+        Platform-wide read-out of every contractor account, the OperatorEdge graph, and rolled-up
+        transactional totals across all CHG operator tenants.
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 18 }}>
+        <Stat label="Contractor accounts" value={String(data.totals.accounts)} />
+        <Stat label="Operator edges" value={String(data.totals.edges)} sub={`${data.totals.layer1Edges} L1→L2 · ${data.totals.layer2Edges} L2→L3`} />
+        <Stat label="Active jobs" value={String(data.totals.activeJobs)} />
+        <Stat label="Pending quotes" value={`${data.totals.pendingQuoteCount} · ${fmt(data.totals.pendingQuoteAmount)}`} />
+        <Stat label="Pending invoices" value={`${data.totals.pendingInvoiceCount} · ${fmt(data.totals.pendingInvoiceAmount)}`} />
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, borderBottom: "1px solid #e5e7eb" }}>
+        {([
+          ["accounts", `Accounts (${data.accounts.length})`],
+          ["edges", `Operator edges (${data.edges.length})`],
+          ["quotes", `Quotes (${data.quotes.length})`],
+          ["invoices", `Invoices (${data.invoices.length})`],
+          ["jobs", `Jobs (${data.jobs.length})`],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setSection(k)}
+            style={{
+              background: "transparent", border: 0, cursor: "pointer",
+              padding: "8px 12px", fontSize: 12, fontWeight: section === k ? 700 : 500,
+              color: section === k ? "#111827" : "#6b7280",
+              borderBottom: section === k ? "2px solid #D85A30" : "2px solid transparent",
+            }}
+          >{label}</button>
+        ))}
+      </div>
+
+      {section === "accounts" ? (
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Search company, contact, email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ padding: "6px 10px", fontSize: 12, border: "1px solid #d1d5db", borderRadius: 6, minWidth: 280 }}
+        />
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as typeof filter)}
+          style={{ padding: "6px 8px", fontSize: 12, border: "1px solid #d1d5db", borderRadius: 6 }}
+        >
+          <option value="all">All tiers</option>
+          <option value="L2">L2 (under a CHG operator)</option>
+          <option value="L3">L3 (sub of an L2)</option>
+          <option value="sole">Sole (no inviter)</option>
+        </select>
+        <span style={{ fontSize: 11, color: "#6b7280" }}>{rows.length} of {data.accounts.length}</span>
+      </div>
+      ) : null}
+
+      {section === "accounts" ? (
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#fafafa" }}>
+              {["Account", "Tier", "Plan", "Upstream", "Downstream", "Jobs", "Quotes", "Invoices", "Invites", "Last login"].map((h) => (
+                <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((a) => (
+              <tr key={a.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>
+                  <div style={{ fontWeight: 600 }}>{a.companyName}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>{a.contactName} · {a.email}</div>
+                  {a.trade ? <div style={{ fontSize: 11, color: "#9ca3af" }}>{a.trade}</div> : null}
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>
+                  <span style={{ display: "inline-block", padding: "2px 7px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: a.tier === "L2" ? "#dbeafe" : a.tier === "L3" ? "#e0e7ff" : "#f3f4f6", color: a.tier === "L2" ? "#1e40af" : a.tier === "L3" ? "#3730a3" : "#374151" }}>{a.tier}</span>
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{a.planTier}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#374151" }}>{a.upstream.length === 0 ? "—" : a.upstream.map((u, i) => <div key={i}>{u}</div>)}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#374151" }}>{a.downstream.length === 0 ? "—" : `${a.downstream.length} sub${a.downstream.length === 1 ? "" : "s"}`}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{a.jobs}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{a.quotes} <span style={{ color: "#6b7280", fontSize: 11 }}>({fmt(a.quotesAmount)})</span></td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{a.invoices} <span style={{ color: "#6b7280", fontSize: 11 }}>({fmt(a.invoicesAmount)})</span></td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{a.invitesSent}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleDateString() : "never"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 ? (
+              <tr><td colSpan={10} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No contractor accounts match.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      ) : null}
+
+      {section === "edges" ? (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: "#fafafa" }}>{["Kind", "Upstream", "Contractor", "Created"].map((h) => (
+              <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>
+              {data.edges.map((e) => (
+                <tr key={e.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{e.kind}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{e.upstream}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{e.contractor}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{new Date(e.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+              {data.edges.length === 0 ? <tr><td colSpan={4} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No operator edges yet.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {section === "quotes" ? (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: "#fafafa" }}>{["#", "Job", "From", "To", "Amount", "Status", "Sent"].map((h) => (
+              <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>
+              {data.quotes.map((q) => (
+                <tr key={q.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{q.number}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{q.jobName}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{q.from}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{q.to}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{fmt(q.amount)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{q.status}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{new Date(q.sentAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+              {data.quotes.length === 0 ? <tr><td colSpan={7} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No quotes yet.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {section === "invoices" ? (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: "#fafafa" }}>{["#", "From", "To", "Amount", "Status", "Submitted", "Paid"].map((h) => (
+              <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>
+              {data.invoices.map((i) => (
+                <tr key={i.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{i.number}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{i.from}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{i.to}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{fmt(i.amount)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{i.status}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{new Date(i.submittedAt).toLocaleDateString()}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{i.paidAt ? new Date(i.paidAt).toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}
+              {data.invoices.length === 0 ? <tr><td colSpan={7} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No invoices yet.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {section === "jobs" ? (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr style={{ background: "#fafafa" }}>{["Job", "Contractor", "Status", "Created"].map((h) => (
+              <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+            ))}</tr></thead>
+            <tbody>
+              {data.jobs.map((j) => (
+                <tr key={j.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{j.name}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{j.contractor}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 12 }}>{j.status}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{new Date(j.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+              {data.jobs.length === 0 ? <tr><td colSpan={4} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No jobs yet.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -171,10 +171,11 @@ async function syncSupabaseUser(
     // to the union here and normalise below.
     accounts: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
     profile_score: number | null;
+    is_contractor?: boolean | null;
   };
   const { data: profile, error } = await admin
     .from("user_profiles")
-    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, is_investor, status, profile_score, accounts ( id, name )")
+    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, is_investor, is_contractor, status, profile_score, accounts ( id, name )")
     .eq("id", authUserId)
     .maybeSingle<UserProfileRow>();
   if (error) {
@@ -196,6 +197,12 @@ async function syncSupabaseUser(
   // if they somehow get past middleware (e.g. SUPABASE_SERVICE_ROLE_KEY
   // missing). Fail closed here.
   if (profile.is_investor) {
+    return null;
+  }
+  // Same fail-closed behaviour for contractor-portal accounts (Task 23).
+  // The column is now in the SELECT above, so this gate is fully effective
+  // even when the contractor profile happens to also carry an `account_id`.
+  if (profile.is_contractor) {
     return null;
   }
 
