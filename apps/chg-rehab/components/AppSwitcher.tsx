@@ -19,14 +19,18 @@ type Product = {
   brandDomain?: string;
 };
 
+// Phase 4 cutover: the "CHG Platform" tile (code: 'chg') now points at the
+// chg-rehab Next.js app, which is the new home for CHG operations. The
+// legacy CRM at apps/crm is still reachable by direct URL during the
+// fallback window but is no longer a destination from the switcher.
 const PRODUCTS: Product[] = [
   {
     code: "chg",
-    name: "CHG",
-    tagline: "Real Estate CRM",
+    name: "CHG Platform",
+    tagline: "Operations platform",
     color: "#0C447C",
     initial: "C",
-    devBareHost: true,
+    devPort: 3000,
   },
   {
     code: "deallink",
@@ -34,14 +38,6 @@ const PRODUCTS: Product[] = [
     tagline: "Wholesaler deal links",
     color: "#16A34A",
     initial: "D",
-  },
-  {
-    code: "chg-rehab",
-    name: "CHG Rehab",
-    tagline: "Rehab project management",
-    color: "#D97706",
-    initial: "R",
-    devPort: 3000,
   },
 ];
 
@@ -62,7 +58,7 @@ function devUrlFor(product: Product): string | null {
 }
 
 export default function AppSwitcher({
-  currentProduct = "chg-rehab",
+  currentProduct = "chg",
 }: {
   currentProduct?: string;
 }) {

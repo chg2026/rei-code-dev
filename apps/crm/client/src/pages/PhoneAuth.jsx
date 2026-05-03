@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import NameModal from '../components/NameModal';
+import { resolveChgPlatformUrl } from '../lib/chgPlatformUrl';
 
 const PHONE_RE = /^\+1[2-9]\d{9}$/;
 
@@ -84,6 +85,11 @@ export default function PhoneAuth() {
       if (data.isNewUser) {
         setShowNameModal(true);
       } else {
+        const target = await resolveChgPlatformUrl();
+        if (target) {
+          window.location.href = target;
+          return;
+        }
         navigate('/');
       }
     } catch (err) {
@@ -94,7 +100,18 @@ export default function PhoneAuth() {
   };
 
   if (showNameModal) {
-    return <NameModal onComplete={() => navigate('/')} />;
+    return (
+      <NameModal
+        onComplete={async () => {
+          const target = await resolveChgPlatformUrl();
+          if (target) {
+            window.location.href = target;
+            return;
+          }
+          navigate('/');
+        }}
+      />
+    );
   }
 
   return (

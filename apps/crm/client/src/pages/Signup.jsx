@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
+import { resolveChgPlatformUrl } from '../lib/chgPlatformUrl';
 
 export default function Signup() {
   const { signIn } = useAuth();
@@ -23,6 +24,11 @@ export default function Signup() {
     try {
       await api.post('/auth/signup', form);
       await signIn(form.email, form.password);
+      const target = await resolveChgPlatformUrl();
+      if (target) {
+        window.location.href = target;
+        return;
+      }
       navigate('/');
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Failed to create account';

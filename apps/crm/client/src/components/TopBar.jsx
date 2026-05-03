@@ -25,7 +25,7 @@ export default function TopBar({ title }) {
           </svg>
         </button>
 
-        <AppSwitcher currentProduct="chg" />
+        <AppSwitcher currentProduct="chg-legacy" />
 
         <div className="relative" ref={ref}>
           <button onClick={() => setOpen(!open)} className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-2 py-1.5 transition-colors">

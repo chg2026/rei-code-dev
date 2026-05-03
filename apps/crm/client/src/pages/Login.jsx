@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { resolveChgPlatformUrl } from '../lib/chgPlatformUrl';
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -17,6 +18,11 @@ export default function Login() {
     setLoading(true);
     try {
       await signIn(email, password);
+      const target = await resolveChgPlatformUrl();
+      if (target) {
+        window.location.href = target;
+        return;
+      }
       navigate('/');
     } catch (err) {
       setError(err.message || 'Invalid credentials');

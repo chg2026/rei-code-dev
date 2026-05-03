@@ -58,7 +58,7 @@ export default function TopNav({ user }: { user: SessionUser }) {
       <div className="topbar-right">
         {user.role === "Admin" ? <BillingNavIndicator /> : <BillingNavBadge />}
         <NotificationBell />
-        <AppSwitcher currentProduct="chg-rehab" />
+        <AppSwitcher currentProduct="chg" />
         <Link
           href="/account"
           className="user-pill"

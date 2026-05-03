@@ -13,13 +13,18 @@ import { useAuth } from '../context/AuthContext';
 //
 // Adding a fourth product later: add a row here AND give the user an
 // entitlement server-side. The switcher will light it up automatically.
+// Phase 4 cutover: the "CHG Platform" tile (code: 'chg') now points at the
+// chg-rehab Next.js app on port 3000. This legacy CRM SPA is still reachable
+// via direct URL during the fallback window but is no longer a switcher
+// destination — clicking the CHG Platform tile from here jumps to chg-rehab.
 const PRODUCTS = [
   {
     code: 'chg',
-    name: 'CHG',
-    tagline: 'Real Estate CRM',
+    name: 'CHG Platform',
+    tagline: 'Operations platform',
     color: 'bg-primary-500',
     initial: 'C',
+    devPort: 3000,
   },
   {
     code: 'deallink',
@@ -28,14 +33,6 @@ const PRODUCTS = [
     color: 'bg-success-500',
     initial: 'D',
     devPort: 3001,
-  },
-  {
-    code: 'chg-rehab',
-    name: 'CHG Rehab',
-    tagline: 'Rehab project management',
-    color: 'bg-warning-500',
-    initial: 'R',
-    devPort: 3000,
   },
 ];
 
