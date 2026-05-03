@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { createClient as createPlainClient } from "@supabase/supabase-js";
+import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
@@ -49,29 +49,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 
-  // Cross-app gate: must be an investor.
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  if (!serviceKey || !supabaseUrl) {
-    return NextResponse.json({ error: "service_unconfigured" }, { status: 500 });
-  }
-  const admin = createPlainClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("is_investor")
-    .eq("id", data.user.id)
-    .maybeSingle<{ is_investor: boolean | null }>();
-
-  if (!profile?.is_investor) {
-    // Roll back the just-issued Supabase session so the operator account
-    // doesn't end up with cookies pointed at this app.
-    await supabase.auth.signOut();
-    return NextResponse.json(
-      { error: "This account is not an investor account." },
-      { status: 403 }
-    );
+  // Confirm investor role.
+  try {
+    const admin = getSupabaseAdminClient();
+    const { data: profile } = await admin
+      .from("user_profiles")
+      .select("is_investor")
+      .eq("id", data.user.id)
+      .maybeSingle<{ is_investor: boolean | null }>();
+    if (!profile?.is_investor) {
+      await supabase.auth.signOut().catch(() => undefined);
+      return NextResponse.json(
+        { error: "wrong_role", message: "This account is not an investor account." },
+        { status: 403 }
+      );
+    }
+  } catch (err) {
+    console.error("[auth/login] role check failed", err);
+    return NextResponse.json({ error: "Login failed." }, { status: 500 });
   }
 
   const final = NextResponse.json({

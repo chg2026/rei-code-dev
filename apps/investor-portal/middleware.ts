@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { createClient as createPlainClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -8,6 +8,8 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/logout",
+  "/api/auth/user",
+  "/api/logout",
   "/api/health",
 ];
 
@@ -24,7 +26,6 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname.startsWith("/api/auth/user") ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
   ) {
     return NextResponse.next();
@@ -60,40 +61,35 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Cross-app role check via service role (bypasses RLS). Always derive
-  // is_investor from the canonical user_profiles row, never trust client.
+  // Verify is_investor server-side via service role.
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  if (!serviceKey || !supabaseUrl) {
-    console.error("[investor-portal middleware] service role key missing — denying");
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "service_unconfigured" }, { status: 500 });
-    }
-    return NextResponse.redirect(new URL("/login?error=service_unconfigured", req.url));
-  }
+  if (serviceKey) {
+    const admin = createClient(
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      serviceKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: profile } = await admin
+      .from("user_profiles")
+      .select("is_investor")
+      .eq("id", user.id)
+      .maybeSingle<{ is_investor: boolean | null }>();
 
-  const admin = createPlainClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("is_investor")
-    .eq("id", user.id)
-    .maybeSingle<{ is_investor: boolean | null }>();
-
-  if (!profile?.is_investor) {
-    // Not an investor — bounce to chg-rehab login (preferred) or local login.
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "not_an_investor" }, { status: 403 });
+    if (!profile?.is_investor) {
+      // Operator (or unknown) trying to use the investor portal — kick out.
+      await supabase.auth.signOut().catch(() => undefined);
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: "wrong_role", message: "This account is not an investor account." },
+          { status: 403 }
+        );
+      }
+      // Redirect to chg-rehab login if we know its URL, otherwise back to /login here.
+      const target = CHG_REHAB_BASE_URL
+        ? `${CHG_REHAB_BASE_URL.replace(/\/+$/, "")}/login?error=${encodeURIComponent("Use the operator portal")}`
+        : `/login?error=${encodeURIComponent("This account is not an investor account.")}`;
+      return NextResponse.redirect(target);
     }
-    if (CHG_REHAB_BASE_URL) {
-      const url = new URL("/login", CHG_REHAB_BASE_URL);
-      url.searchParams.set("error", "Use the operator login at chg-rehab.");
-      return NextResponse.redirect(url);
-    }
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("error", "This account is not an investor.");
-    return NextResponse.redirect(loginUrl);
   }
 
   return res;

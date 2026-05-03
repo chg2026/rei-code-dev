@@ -9,6 +9,7 @@ export interface SessionInvestor {
   email?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
   companyId: string;
   status: string;
   accreditedStatus: string;
@@ -17,7 +18,7 @@ export interface SessionInvestor {
 /**
  * Iron-session payload. Reserved for invite-token bridging in Phase 2.
  */
-export interface InvestorAppSession {
+export interface AppSession {
   pendingInviteToken?: string;
 }
 

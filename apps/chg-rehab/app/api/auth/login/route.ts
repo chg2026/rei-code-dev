@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,35 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.session) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+  }
+
+  // Reject investor accounts — they belong on the investor portal.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supaUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  if (serviceKey && supaUrl) {
+    try {
+      const admin = createClient(supaUrl, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("is_investor")
+        .eq("id", data.user.id)
+        .maybeSingle<{ is_investor: boolean | null }>();
+      if (profile?.is_investor) {
+        await supabase.auth.signOut().catch(() => undefined);
+        return NextResponse.json(
+          {
+            error: "wrong_role",
+            message: "This account is an investor account. Please log in via the investor portal.",
+            redirect: process.env.INVESTOR_PORTAL_BASE_URL || "/",
+          },
+          { status: 403 }
+        );
+      }
+    } catch (err) {
+      console.error("[auth/login] investor role check failed", err);
+    }
   }
 
   const final = NextResponse.json({

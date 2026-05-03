@@ -1,8 +1,51 @@
 import { headers } from "next/headers";
+import type { NextRequest } from "next/server";
 import { prisma } from "./prisma";
 import { getSupabaseServerClient, getSupabaseAdminClient } from "./supabaseServer";
 import type { SessionInvestor } from "./session";
 import type { Investor } from "@prisma/client";
+
+export function publicOrigin(req: NextRequest | { headers: Headers }): string {
+  const override = process.env.INVESTOR_PORTAL_BASE_URL?.trim() || process.env.APP_BASE_URL?.trim();
+  if (override) return override.replace(/\/+$/, "");
+
+  const xfHost = req.headers.get("x-forwarded-host");
+  const hostHeader = xfHost || req.headers.get("host") || "";
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    (hostHeader.includes("localhost") ||
+    hostHeader.startsWith("0.") ||
+    hostHeader.startsWith("127.")
+      ? "http"
+      : "https");
+
+  if (/:\d+$/.test(hostHeader)) return `${proto}://${hostHeader}`;
+
+  const xfPort = req.headers.get("x-forwarded-port");
+  const xfPortNum = xfPort ? Number(xfPort) : NaN;
+  const xfIsDefault =
+    (proto === "https" && xfPortNum === 443) ||
+    (proto === "http" && xfPortNum === 80);
+  if (xfPort && !Number.isNaN(xfPortNum) && !xfIsDefault) {
+    return `${proto}://${hostHeader}:${xfPort}`;
+  }
+
+  const devDomain = process.env.REPLIT_DEV_DOMAIN?.trim();
+  if (devDomain && process.env.NODE_ENV !== "production") {
+    const port = Number(process.env.PORT) || 3002;
+    return port !== 443 && port !== 80
+      ? `https://${devDomain}:${port}`
+      : `https://${devDomain}`;
+  }
+
+  return `${proto}://${hostHeader}`;
+}
+
+export function publicUrl(req: NextRequest | { headers: Headers }, path: string): string {
+  const origin = publicOrigin(req);
+  if (!path.startsWith("/")) path = `/${path}`;
+  return `${origin}${path}`;
+}
 
 /**
  * Resolve the current investor from the Supabase session cookie, ensuring a
@@ -64,6 +107,7 @@ async function resolveCurrentInvestor(): Promise<SessionInvestor | null> {
 
   const existing = await prisma.investor.findUnique({ where: { id: supaUser.id } });
   if (existing) {
+    if (existing.status === "Inactive") return null;
     // Refresh trivial drift (email/name/phone) and bump portalLastLoginAt.
     const fullName = (profile.full_name || "").trim();
     const [firstName, ...rest] = fullName ? fullName.split(/\s+/) : [];
@@ -86,15 +130,24 @@ async function resolveCurrentInvestor(): Promise<SessionInvestor | null> {
   const fullName = (profile.full_name || "").trim();
   const [firstName, ...rest] = fullName ? fullName.split(/\s+/) : [];
   const lastName = rest.length ? rest.join(" ") : null;
+  const email = profile.email || supaUser.email || "";
+
+  // Make sure the chg-rehab Company exists for this account_id (it should,
+  // since chg-rehab created it on first operator login — but be defensive).
+  await prisma.company.upsert({
+    where: { id: accountId },
+    update: {},
+    create: { id: accountId, name: fullName || email || "Investor account" },
+  });
 
   const created = await prisma.investor.create({
     data: {
       id: supaUser.id,
       companyId: accountId,
-      email: profile.email ?? supaUser.email ?? null,
+      email: email || null,
       firstName: firstName || null,
       lastName,
-      phone: profile.phone ?? null,
+      phone: profile.phone ?? supaUser.phone ?? null,
       portalLastLoginAt: new Date(),
     },
   });
@@ -107,6 +160,7 @@ function toSessionInvestor(i: Investor): SessionInvestor {
     email: i.email,
     firstName: i.firstName,
     lastName: i.lastName,
+    phone: i.phone,
     companyId: i.companyId,
     status: i.status,
     accreditedStatus: i.accreditedStatus,

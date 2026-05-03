@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { createClient as createPlainClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
 const INVESTOR_PORTAL_BASE_URL = process.env.INVESTOR_PORTAL_BASE_URL || "";
 
@@ -90,7 +90,7 @@ export async function middleware(req: NextRequest) {
       { status: 503 }
     );
   }
-  const admin = createPlainClient(supabaseUrl, serviceKey, {
+  const admin = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { data: profile, error: profileErr } = await admin

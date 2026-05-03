@@ -10,8 +10,8 @@ export default function LoginClient({
   next: string;
   initialError: string;
 }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("james.wilson@vestry-demo.com");
+  const [password, setPassword] = useState("password123");
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
 
@@ -37,14 +37,15 @@ export default function LoginClient({
         await supabase.auth.signOut();
         const body = await verify.json().catch(() => ({}));
         throw new Error(
-          body?.error === "not_an_investor"
+          body?.error === "not_an_investor" || body?.error === "wrong_role"
             ? "This account is not an investor account."
-            : body?.error || "Sign-in failed. Please try again."
+            : body?.message || body?.error || "Sign-in failed. Please try again."
         );
       }
       window.location.href = next || "/dashboard";
-    } catch (err: any) {
-      setError(err?.message || "Sign-in failed. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sign-in failed. Please try again.";
+      setError(msg);
       setLoading(false);
     }
   }
@@ -122,7 +123,7 @@ export default function LoginClient({
           </form>
 
           <div className="login-helper">
-            Need access? Request an invite from your operator.
+            Demo: <strong>james.wilson@vestry-demo.com</strong> / <strong>password123</strong>
           </div>
         </div>
       </div>

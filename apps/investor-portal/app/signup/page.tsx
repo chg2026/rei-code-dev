@@ -31,7 +31,11 @@ export default async function SignupPage({
               ? "Your invite token has been received. Check back shortly."
               : "Use the invite link your operator sent you."}
           </div>
-          <a href="/login" className="login-cta" style={{ display: "block" }}>
+          <a
+            href="/login"
+            className="btn btn-p"
+            style={{ display: "inline-block", marginTop: 10, padding: "8px 14px" }}
+          >
             Back to sign in
           </a>
         </div>

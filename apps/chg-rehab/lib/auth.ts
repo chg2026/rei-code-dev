@@ -192,8 +192,9 @@ async function syncSupabaseUser(
   if (profile.status === "suspended") {
     return null;
   }
-  // Cross-app boundary: investors live on apps/investor-portal. Surface them
-  // here as "logged out" — middleware redirects them to the right login.
+  // Investor-portal accounts must NOT resolve to a chg-rehab session, even
+  // if they somehow get past middleware (e.g. SUPABASE_SERVICE_ROLE_KEY
+  // missing). Fail closed here.
   if (profile.is_investor) {
     return null;
   }

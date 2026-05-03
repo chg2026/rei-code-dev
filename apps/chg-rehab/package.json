@@ -10,6 +10,7 @@
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-investor": "tsx scripts/seed-investor.ts",
+    "db:seed:investor": "tsx prisma/seed-investor.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "test": "vitest run",
     "cron:notifications-sweep": "tsx scripts/notification-sweep.ts"

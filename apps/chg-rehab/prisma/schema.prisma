@@ -62,7 +62,7 @@ model User {
   notifyQuietEnd           String?
   notifyQuietOverride      Boolean                       @default(false)
   createdAt                DateTime                      @default(now())
-  updatedAt                DateTime                      @updatedAt
+  updatedAt                DateTime                      @default(now()) @updatedAt
   activityEntries          ActivityLogEntry[]
   uploadedDocuments        Document[]                    @relation("DocUploader")
   approvedDraws            Draw[]                        @relation("DrawApprover")
@@ -82,7 +82,7 @@ model UserNotificationPreference {
   email     Boolean
   inApp     Boolean
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -153,7 +153,7 @@ model PipelineDeal {
   meta         Json?
   closedAt     DateTime?
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  updatedAt    DateTime  @default(now()) @updatedAt
   company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property     Property? @relation(fields: [propertyId], references: [id])
 
@@ -173,7 +173,7 @@ model Project {
   currentPhase          Int?
   meta                  Json?
   createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  updatedAt             DateTime               @default(now()) @updatedAt
 
   company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property              Property               @relation(fields: [propertyId], references: [id])
@@ -556,7 +556,7 @@ model Subscription {
   paymentMethodExpMonth    Int?
   paymentMethodExpYear     Int?
   createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  updatedAt                DateTime  @default(now()) @updatedAt
   company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
@@ -697,7 +697,7 @@ model NotificationState {
   lastManualSweepAt        DateTime?
   lastManualSweepByUserId  String?
   lastManualSweepByName    String?
-  updatedAt                DateTime  @updatedAt
+  updatedAt                DateTime  @default(now()) @updatedAt
 
   company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
@@ -765,7 +765,7 @@ model Investor {
   status              InvestorStatus                  @default(Lead)
   portalLastLoginAt   DateTime?
   createdAt           DateTime                        @default(now())
-  updatedAt           DateTime                        @updatedAt
+  updatedAt           DateTime                        @default(now()) @updatedAt
 
   company             Company                         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   subscriptions       InvestorSubscription[]
@@ -800,7 +800,7 @@ model Offering {
   status          OfferingStatus        @default(Active)
   coverImageUrl   String?
   createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  updatedAt       DateTime              @default(now()) @updatedAt
 
   company         Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property        Property?             @relation(fields: [propertyId], references: [id])
@@ -832,7 +832,7 @@ model InvestorSubscription {
   cocToDate             Decimal?                     @db.Decimal(6, 2)
   status                InvestorSubscriptionStatus   @default(Pending)
   createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
+  updatedAt             DateTime                     @default(now()) @updatedAt
 
   investor              Investor                     @relation(fields: [investorId], references: [id], onDelete: Cascade)
   offering              Offering                     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
@@ -853,7 +853,7 @@ model CapitalCall {
   issuedAt      DateTime?
   memo          String?
   createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  updatedAt     DateTime                @default(now()) @updatedAt
 
   offering      Offering                @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   allocations   CapitalCallAllocation[]
@@ -887,7 +887,7 @@ model Distribution {
   paidOn          DateTime?
   status          DistributionStatus      @default(Pending)
   createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  updatedAt       DateTime                @default(now()) @updatedAt
 
   offering        Offering                @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   allocations     DistributionAllocation[]
@@ -1002,7 +1002,7 @@ model InvestorNotificationPreference {
   email       Boolean   @default(true)
   inApp       Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
