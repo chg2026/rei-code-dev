@@ -36,7 +36,12 @@ export default function Login() {
           '',
           window.location.pathname + window.location.search,
         );
-        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        supabase.auth
+          .setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.warn('[deallink] SSO setSession failed — user will need to log in manually:', err?.message);
+          });
       }
     }
   }, []);
