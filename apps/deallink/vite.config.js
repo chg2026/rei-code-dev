@@ -15,12 +15,24 @@ const effectiveApiBaseUrl =
   process.env.VITE_API_BASE_URL ||
   (REPLIT_DEV_DOMAIN ? `https://${REPLIT_DEV_DOMAIN}:${SERVER_PORT}` : '');
 
+// Supabase client env vars. Vite only exposes VITE_-prefixed vars to the
+// browser bundle. Replit workspace secrets are named SUPABASE_URL /
+// SUPABASE_ANON_KEY (no prefix). Map both names so the app works whether the
+// secret is called VITE_SUPABASE_URL or SUPABASE_URL (same as how
+// apps/chg-rehab/next.config.js maps SUPABASE_URL → NEXT_PUBLIC_SUPABASE_URL).
+const supabaseUrl =
+  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseAnonKey =
+  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+
 export default defineConfig({
   plugins: [react()],
-  // Inject the resolved API base URL so import.meta.env.VITE_API_BASE_URL is
-  // always concrete at build/serve time — even when the .env file leaves it blank.
+  // Inject resolved values so import.meta.env.VITE_* is always concrete at
+  // build/serve time — even when the .env file leaves them blank.
   define: {
     'import.meta.env.VITE_API_BASE_URL': JSON.stringify(effectiveApiBaseUrl),
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
   },
   server: {
     host: '0.0.0.0',

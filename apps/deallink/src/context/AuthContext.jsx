@@ -16,6 +16,14 @@ export function AuthProvider({ children }) {
   const [entitlements, setEntitlements] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Captured synchronously during the render phase — BEFORE any child effects
+  // run (React runs child effects before parent effects, so we cannot safely
+  // read window.location.hash inside useEffect: Login.jsx's effect strips the
+  // hash first). useState initializer runs at first render, before any effects.
+  const [ssoIncoming] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash.includes('access_token='),
+  );
+
   const fetchMe = useCallback(async () => {
     try {
       const { data } = await api.get('/auth/me');
@@ -30,39 +38,66 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    let settled = false;
-    const safety = setTimeout(() => { if (!settled) setLoading(false); }, 8000);
+    // Safety valve: if auth doesn't resolve within 8 s, unblock the UI.
+    const safety = setTimeout(() => setLoading(false), 8000);
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user || null);
-      if (s?.user) {
-        fetchMe().finally(() => { settled = true; clearTimeout(safety); setLoading(false); });
+    // Track whether the initial auth state has been resolved. Only after this
+    // do we respond to subsequent events (SIGNED_IN, SIGNED_OUT, etc.).
+    let initialResolved = false;
+
+    function resolveInitial(sessionUser) {
+      if (initialResolved) return;
+      initialResolved = true;
+      clearTimeout(safety);
+      if (sessionUser) {
+        fetchMe().finally(() => setLoading(false));
       } else {
-        settled = true; clearTimeout(safety); setLoading(false);
+        setProfile(null);
+        setEntitlements([]);
+        setLoading(false);
       }
-    }).catch(() => { settled = true; clearTimeout(safety); setLoading(false); });
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((evt, s) => {
       setSession(s);
       setUser(s?.user || null);
+
+      if (evt === 'INITIAL_SESSION') {
+        if (s?.user) {
+          resolveInitial(s.user);
+        } else if (!ssoIncoming) {
+          // No user and no hash tokens → definitively logged out.
+          resolveInitial(null);
+        }
+        // ssoIncoming + no session: keep loading=true; SIGNED_IN arrives next.
+        return;
+      }
+
+      if (!initialResolved) {
+        // SIGNED_IN arrived before (or instead of) INITIAL_SESSION resolving —
+        // this is the normal SSO hash path when INITIAL_SESSION had no session.
+        if (s?.user) resolveInitial(s.user);
+        else resolveInitial(null);
+        return;
+      }
+
+      // ── Post-initial events ────────────────────────────────────────────
       if (s?.user) {
         // TOKEN_REFRESHED only rotates the access token — profile and
-        // entitlements don't change, so skip the /auth/me round-trip.
-        // Re-fetching on every token refresh causes a loading flash every
-        // ~hour (and immediately after SSO) that makes the UI blink.
+        // entitlements don't change, skip the /auth/me round-trip to avoid
+        // the loading flash that would otherwise occur every ~hour.
         if (evt === 'TOKEN_REFRESHED') return;
         setLoading(true);
-        // Don't await — see CRM AuthContext for the deadlock note.
-        fetchMe().finally(() => { setLoading(false); });
+        fetchMe().finally(() => setLoading(false));
       } else {
         setProfile(null);
         setEntitlements([]);
         setLoading(false);
       }
     });
+
     return () => { clearTimeout(safety); subscription.unsubscribe(); };
-  }, [fetchMe]);
+  }, [fetchMe, ssoIncoming]);
 
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
