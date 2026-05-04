@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 type Product = {
   code: string;
@@ -8,20 +9,14 @@ type Product = {
   tagline: string;
   color: string;
   initial: string;
-  // External Replit port for cross-port dev URLs (`https://<host>:<port>`).
-  // Use this for products whose .replit `externalPort` is the same as their
-  // `localPort` (e.g. CHG Rehab — 3000:3000).
   devPort?: number;
-  // For products served at the Replit bare host (externalPort 80/443 — e.g.
-  // the CHG CRM at localPort 5000 → externalPort 80). Cross-port URLs do
-  // NOT work for these; the dev edge proxy serves them on the root domain.
   devBareHost?: boolean;
   brandDomain?: string;
+  // When true: on click the current Supabase session is forwarded as a URL
+  // hash fragment so the target app can hydrate without a separate login.
+  ssoEnabled?: boolean;
 };
 
-// Phase 5 cutover: the "CHG Platform" tile (code: 'chg') points at the
-// chg-rehab Next.js app, which is now the sole home for CHG operations.
-// The legacy CRM (apps/crm) has been retired and archived.
 const PRODUCTS: Product[] = [
   {
     code: "chg",
@@ -38,6 +33,7 @@ const PRODUCTS: Product[] = [
     color: "#16A34A",
     initial: "D",
     devPort: 3001,
+    ssoEnabled: true,
   },
 ];
 
@@ -45,9 +41,6 @@ function devUrlFor(product: Product): string | null {
   if (typeof window === "undefined") return null;
   const host = window.location.hostname;
   if (!/\.replit\.dev$/.test(host)) return null;
-  // CHG Rehab is currently the host on this domain — strip the dev suffix
-  // so we resolve to the same Replit project, just at a different port.
-  // window.location.hostname here is the chg-rehab dev domain.
   if (product.devBareHost) {
     return `https://${host}`;
   }
@@ -55,6 +48,42 @@ function devUrlFor(product: Product): string | null {
     return `https://${host}:${product.devPort}`;
   }
   return null;
+}
+
+/**
+ * Builds the navigation URL for an SSO-enabled product. Opens a blank window
+ * synchronously (within the user-gesture handler) so popup blockers don't
+ * interfere, then sets the location to the target after fetching the session.
+ */
+async function openWithSso(baseHref: string): Promise<void> {
+  // Open the window synchronously while still in the click handler.
+  const win = window.open("", "_blank", "noopener,noreferrer");
+  if (!win) {
+    // Popup blocked — fall back to same-tab navigation without SSO.
+    window.location.href = baseHref;
+    return;
+  }
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token && session?.refresh_token) {
+      const params = new URLSearchParams([
+        ["access_token", session.access_token],
+        ["refresh_token", session.refresh_token],
+        ["token_type", "bearer"],
+        ["expires_in", String(session.expires_in ?? 3600)],
+      ]);
+      // Route to /login with the session fragment — Deal Link's Login page
+      // will auto-redirect to /admin once AuthContext hydrates the session.
+      win.location.href = `${baseHref}/login#${params.toString()}`;
+    } else {
+      win.location.href = baseHref;
+    }
+  } catch {
+    win.location.href = baseHref;
+  }
 }
 
 export default function AppSwitcher({
@@ -243,7 +272,13 @@ export default function AppSwitcher({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => setOpen(false)}
+                    onClick={(e) => {
+                      setOpen(false);
+                      if (product.ssoEnabled) {
+                        e.preventDefault();
+                        openWithSso(href!);
+                      }
+                    }}
                     style={{
                       display: "block",
                       margin: "0 4px",
