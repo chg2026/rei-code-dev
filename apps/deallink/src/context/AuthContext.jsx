@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase.js';
 import api from '../lib/api.js';
 
@@ -23,6 +23,11 @@ export function AuthProvider({ children }) {
   const [ssoIncoming] = useState(() =>
     typeof window !== 'undefined' && window.location.hash.includes('access_token='),
   );
+
+  // Tracks which user ID was last fully resolved (profile + entitlements loaded).
+  // Used to skip setLoading(true) when Supabase re-fires SIGNED_IN for the same
+  // user (e.g. React StrictMode double-effect, detectSessionInUrl re-emission).
+  const resolvedUserIdRef = useRef(undefined);
 
   const fetchMe = useCallback(async () => {
     try {
@@ -50,8 +55,10 @@ export function AuthProvider({ children }) {
       initialResolved = true;
       clearTimeout(safety);
       if (sessionUser) {
+        resolvedUserIdRef.current = sessionUser.id;
         fetchMe().finally(() => setLoading(false));
       } else {
+        resolvedUserIdRef.current = null;
         setProfile(null);
         setEntitlements([]);
         setLoading(false);
@@ -87,6 +94,13 @@ export function AuthProvider({ children }) {
         // entitlements don't change, skip the /auth/me round-trip to avoid
         // the loading flash that would otherwise occur every ~hour.
         if (evt === 'TOKEN_REFRESHED') return;
+        // Same user re-firing SIGNED_IN (StrictMode double-effect, or
+        // detectSessionInUrl re-emission) — refresh silently, no loading flash.
+        if (s.user.id === resolvedUserIdRef.current) {
+          fetchMe();
+          return;
+        }
+        resolvedUserIdRef.current = s.user.id;
         setLoading(true);
         fetchMe().finally(() => setLoading(false));
       } else {
