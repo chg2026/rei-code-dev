@@ -12,7 +12,10 @@ type Product = {
   devPort?: number;
   devBareHost?: boolean;
   brandDomain?: string;
-  // When true: on click the current Supabase session is forwarded as a URL
+  // Production URL baked in at Next.js build time via NEXT_PUBLIC_<PRODUCT>_URL.
+  // Takes precedence over the dev Replit port heuristic when set.
+  productionUrl?: string;
+  // When true: on click, the current Supabase session is forwarded as a URL
   // hash fragment so the target app can hydrate without a separate login.
   ssoEnabled?: boolean;
 };
@@ -25,6 +28,7 @@ const PRODUCTS: Product[] = [
     color: "#0C447C",
     initial: "C",
     devBareHost: true,
+    productionUrl: (process.env.NEXT_PUBLIC_CHG_URL || "").replace(/\/$/, "") || undefined,
   },
   {
     code: "deallink",
@@ -34,19 +38,24 @@ const PRODUCTS: Product[] = [
     initial: "D",
     devPort: 3001,
     ssoEnabled: true,
+    // Set NEXT_PUBLIC_DEALLINK_URL in the CHG Rehab deployment secrets to make
+    // this tile clickable when running outside of a .replit.dev preview domain.
+    productionUrl: (process.env.NEXT_PUBLIC_DEALLINK_URL || "").replace(/\/$/, "") || undefined,
   },
 ];
 
-function devUrlFor(product: Product): string | null {
+/**
+ * Resolves the navigation URL for a product:
+ * 1. If productionUrl is set (baked in at build time from NEXT_PUBLIC_*), use it.
+ * 2. Otherwise fall back to the Replit dev-preview URL heuristic.
+ */
+function resolveUrl(product: Product): string | null {
+  if (product.productionUrl) return product.productionUrl;
   if (typeof window === "undefined") return null;
   const host = window.location.hostname;
   if (!/\.replit\.dev$/.test(host)) return null;
-  if (product.devBareHost) {
-    return `https://${host}`;
-  }
-  if (product.devPort) {
-    return `https://${host}:${product.devPort}`;
-  }
+  if (product.devBareHost) return `https://${host}`;
+  if (product.devPort) return `https://${host}:${product.devPort}`;
   return null;
 }
 
@@ -177,10 +186,10 @@ export default function AppSwitcher({
           <div style={{ padding: "4px 0" }}>
             {PRODUCTS.map((product) => {
               const isCurrent = product.code === currentProduct;
-              const devUrl = devUrlFor(product);
+              const resolvedHref = resolveUrl(product);
               const href = product.brandDomain
                 ? `https://${product.brandDomain}`
-                : devUrl || undefined;
+                : resolvedHref || undefined;
               const clickable = !isCurrent && !!href;
               const showComingSoon = !isCurrent && !href;
 
