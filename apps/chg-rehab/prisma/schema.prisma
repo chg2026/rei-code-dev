@@ -772,6 +772,7 @@ model Investor {
   accreditedStatus    InvestorAccreditedStatus        @default(Unverified)
   status              InvestorStatus                  @default(Lead)
   portalLastLoginAt   DateTime?
+  bannerDismissedAt   Json?                           // { [bannerKey]: ISO datetime }
   createdAt           DateTime                        @default(now())
   updatedAt           DateTime                        @default(now()) @updatedAt
 
@@ -809,6 +810,7 @@ model Offering {
   coverImageUrl   String?
   coverImageObjectPath String?
   documentObjectPaths  String[]         @default([])
+  wireInstructions     Json?            // { bankName, routingNumber, accountNumber, beneficiary, swift?, memo? }
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @default(now()) @updatedAt
 
@@ -848,9 +850,34 @@ model InvestorSubscription {
   offering              Offering                     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   callAllocations       CapitalCallAllocation[]
   distributionAllocations DistributionAllocation[]
+  documents             SubscriptionDocument[]
 
   @@unique([investorId, offeringId])
   @@index([offeringId, status])
+}
+
+// E-sign / receipt envelopes generated when an investor commits via the
+// portal. The `kind` discriminates Receipt (auto-generated PDF) from
+// Subscription (the legal sub doc, future). `signedAt` populated when the
+// investor checks the e-sign disclaimer; `signedName` is the typed name.
+model SubscriptionDocument {
+  id              String                @id @default(cuid())
+  subscriptionId  String
+  kind            SubscriptionDocKind   @default(Receipt)
+  objectPath      String?
+  signedAt        DateTime?
+  signedName      String?
+  signedIp        String?
+  createdAt       DateTime              @default(now())
+
+  subscription    InvestorSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+}
+
+enum SubscriptionDocKind {
+  Receipt
+  Subscription
 }
 
 model CapitalCall {

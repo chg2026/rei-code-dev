@@ -10,6 +10,7 @@ import {
   centsToDollars,
   dollarsToCents,
 } from "@/lib/investorAllocate";
+import { notifyInvestor } from "@/lib/notifyInvestor";
 
 export const dynamic = "force-dynamic";
 
@@ -86,20 +87,23 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-    // Notify investors via activity feed.
-    for (const s of eligible) {
-      await tx.investorActivity.create({
-        data: {
-          investorId: s.investorId,
-          eventType: InvestorActivityType.CapitalCall,
-          title: `Capital call issued — ${offering.name}`,
-          description: `Notice ${noticeNumber}: $${totalAmount.toLocaleString()} total`,
-          relatedSubscriptionId: s.id,
-        },
-      });
-    }
     return created;
   });
+
+  // Notify investors (activity row + email per pref). Best-effort.
+  await Promise.all(
+    eligible.map((s) =>
+      notifyInvestor({
+        investorId: s.investorId,
+        event: "capitalcall",
+        eventType: InvestorActivityType.CapitalCall,
+        title: `Capital call issued — ${offering.name}`,
+        description: `Notice ${noticeNumber}: $${totalAmount.toLocaleString()} total${dueDate ? ` — due ${dueDate.toLocaleDateString()}` : ""}`,
+        link: `/capital-calls/${call.id}`,
+        relatedSubscriptionId: s.id,
+      })
+    )
+  );
 
   await prisma.activityLogEntry.create({
     data: {

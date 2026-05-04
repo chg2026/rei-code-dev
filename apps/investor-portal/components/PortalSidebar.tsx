@@ -6,9 +6,11 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 const NAV: { href: string; label: string; dot: string }[] = [
   { href: "/dashboard", label: "Dashboard", dot: "#1D9E75" },
+  { href: "/marketplace", label: "Marketplace", dot: "#7F77DD" },
   { href: "/investments", label: "My investments", dot: "#378ADD" },
   { href: "/distributions", label: "Distributions", dot: "#1D9E75" },
   { href: "/documents", label: "Documents", dot: "#7F77DD" },
+  { href: "/documents/tax", label: "K-1 Tax Center", dot: "#BA7517" },
   { href: "/updates", label: "Reports & updates", dot: "#BA7517" },
   { href: "/activity", label: "Activity feed", dot: "#D85A30" },
   { href: "/analytics", label: "Analytics", dot: "#639922" },

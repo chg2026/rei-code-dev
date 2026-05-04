@@ -1,6 +1,13 @@
 // Resend-backed outbound email for arbitrary recipients.
 // Config: RESEND_API_KEY + EMAIL_FROM. Falls back to a logged noop when unset.
 
+export type OutboundEmailAttachment = {
+  filename: string;
+  /** Base64-encoded file contents. */
+  content: string;
+  contentType?: string;
+};
+
 export type OutboundEmailMessage = {
   to: string;
   subject: string;
@@ -14,6 +21,8 @@ export type OutboundEmailMessage = {
    * external-contact emails.
    */
   headers?: Record<string, string>;
+  /** File attachments forwarded to Resend (per https://resend.com/docs). */
+  attachments?: OutboundEmailAttachment[];
 };
 
 export type OutboundEmailResult = {
@@ -63,6 +72,14 @@ export async function sendOutboundEmail(
         reply_to: msg.replyTo && isLikelyValidEmail(msg.replyTo) ? msg.replyTo : undefined,
         headers:
           msg.headers && Object.keys(msg.headers).length > 0 ? msg.headers : undefined,
+        attachments:
+          msg.attachments && msg.attachments.length > 0
+            ? msg.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                content_type: a.contentType,
+              }))
+            : undefined,
       }),
     });
 

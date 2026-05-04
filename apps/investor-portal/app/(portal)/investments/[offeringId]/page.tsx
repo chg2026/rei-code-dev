@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PortalPage from "@/components/PortalPage";
+import SubscribeButton from "@/components/SubscribeButton";
 import { getCurrentInvestor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fmtMoney, fmtPct, fmtDate, num } from "@/lib/portfolio";
@@ -119,15 +120,26 @@ export default async function DealDetailPage({
         <Link href={`/updates?deal=${offering.id}`} className="btn btn-sm">
           View updates
         </Link>
-        <button
-          type="button"
-          className="btn btn-sm btn-disabled"
-          disabled
-          style={{ marginLeft: "auto" }}
-          title="Subscribe flow lands in Phase 4"
-        >
-          + Subscribe to deal
-        </button>
+        {sub ? (
+          <Link
+            href={`/investments/${offering.id}/funding`}
+            className="btn btn-sm"
+            style={{ marginLeft: "auto" }}
+          >
+            Funding instructions →
+          </Link>
+        ) : null}
+        {inMarketplace ? (
+          <span style={{ marginLeft: sub ? 0 : "auto" }}>
+            <SubscribeButton
+              offeringId={offering.id}
+              offeringName={offering.name}
+              minInvestment={offering.minInvestment ? num(offering.minInvestment) : null}
+              wireInstructions={(offering.wireInstructions as Record<string, unknown> | null) ?? null}
+              label={sub ? "Adjust commitment" : "+ Subscribe to deal"}
+            />
+          </span>
+        ) : null}
       </div>
 
       {sub ? (

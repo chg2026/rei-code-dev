@@ -97,12 +97,8 @@ export default async function InvestmentsPage() {
                 <span className="card-sub">
                   {t.totalCount} {t.totalCount === 1 ? "subscription" : "subscriptions"}
                 </span>
-                <Link
-                  href="/marketplace"
-                  className="btn btn-sm"
-                  title="Marketplace placeholder — full subscribe flow lands in Phase 4"
-                >
-                  + Subscribe to deal
+                <Link href="/marketplace" className="btn btn-sm btn-p">
+                  Browse marketplace
                 </Link>
               </div>
             </div>

@@ -133,6 +133,8 @@ export default async function AdminPage({
       coverImageUrl: o.coverImageUrl,
       coverImageObjectPath: o.coverImageObjectPath,
       documentObjectPaths: o.documentObjectPaths,
+      wireInstructions:
+        (o.wireInstructions as Record<string, string> | null) ?? null,
       subscriptions: o.subscriptions.map((s) => ({
         id: s.id,
         investorId: s.investorId,

@@ -399,12 +399,79 @@ function DealDrawer({
               {fmtMoney(offering.subscriptions.reduce((s, x) => s + x.committedAmount, 0))} committed
             </div>
           </Row>
+          <WireInstructionsCard offering={offering} save={save} />
           {busy && (
             <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Saving…</div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function WireInstructionsCard({
+  offering,
+  save,
+}: {
+  offering: OfferingRow;
+  save: (patch: Record<string, unknown>) => Promise<void>;
+}) {
+  const wi = offering.wireInstructions || {};
+  const [draft, setDraft] = useState({
+    bankName: wi.bankName || "",
+    routingNumber: wi.routingNumber || "",
+    accountNumber: wi.accountNumber || "",
+    beneficiary: wi.beneficiary || "",
+    swift: wi.swift || "",
+    memo: wi.memo || "",
+  });
+  const set = (k: keyof typeof draft, v: string) =>
+    setDraft((d) => ({ ...d, [k]: v }));
+  return (
+    <Row label="Wire / ACH instructions">
+      <div
+        style={{
+          background: "var(--bg-secondary)",
+          border: "0.5px solid var(--border-lo)",
+          borderRadius: 5,
+          padding: 8,
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        <input className="admin-input" placeholder="Bank name" value={draft.bankName} onChange={(e) => set("bankName", e.target.value)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <input className="admin-input" placeholder="Routing #" value={draft.routingNumber} onChange={(e) => set("routingNumber", e.target.value)} />
+          <input className="admin-input" placeholder="Account #" value={draft.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} />
+        </div>
+        <input className="admin-input" placeholder="Beneficiary / FBO" value={draft.beneficiary} onChange={(e) => set("beneficiary", e.target.value)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 6 }}>
+          <input className="admin-input" placeholder="SWIFT (optional)" value={draft.swift} onChange={(e) => set("swift", e.target.value)} />
+          <input className="admin-input" placeholder="Reference / memo" value={draft.memo} onChange={(e) => set("memo", e.target.value)} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+            Investors see these on the funding page after they commit.
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => save({ wireInstructions: null })}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-p"
+              onClick={() => save({ wireInstructions: draft })}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </Row>
   );
 }
 

@@ -33,6 +33,14 @@ export type OfferingRow = {
   coverImageUrl: string | null;
   coverImageObjectPath: string | null;
   documentObjectPaths: string[];
+  wireInstructions: {
+    bankName?: string;
+    routingNumber?: string;
+    accountNumber?: string;
+    beneficiary?: string;
+    swift?: string;
+    memo?: string;
+  } | null;
   subscriptions: {
     id: string;
     investorId: string;

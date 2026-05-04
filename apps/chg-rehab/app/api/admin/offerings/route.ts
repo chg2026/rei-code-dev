@@ -59,6 +59,7 @@ export async function GET() {
       coverImageUrl: o.coverImageUrl,
       coverImageObjectPath: o.coverImageObjectPath,
       documentObjectPaths: o.documentObjectPaths,
+      wireInstructions: o.wireInstructions ?? null,
       subscriptions: o.subscriptions.map((s) => ({
         id: s.id,
         committedAmount: Number(s.committedAmount),

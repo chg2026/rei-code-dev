@@ -73,6 +73,25 @@ export async function PATCH(
     data.documentObjectPaths = (body.documentObjectPaths as unknown[]).filter(
       (s): s is string => typeof s === "string"
     );
+  if ("wireInstructions" in body) {
+    const w = body.wireInstructions;
+    if (w === null || w === "") {
+      data.wireInstructions = null;
+    } else if (typeof w === "object" && w !== null) {
+      const wi = w as Record<string, unknown>;
+      const cleaned = {
+        bankName: typeof wi.bankName === "string" ? wi.bankName : "",
+        routingNumber: typeof wi.routingNumber === "string" ? wi.routingNumber : "",
+        accountNumber: typeof wi.accountNumber === "string" ? wi.accountNumber : "",
+        beneficiary: typeof wi.beneficiary === "string" ? wi.beneficiary : "",
+        swift: typeof wi.swift === "string" ? wi.swift : "",
+        memo: typeof wi.memo === "string" ? wi.memo : "",
+      };
+      // Treat all-empty as null so we don't store a noise blob.
+      const anyVal = Object.values(cleaned).some((v) => v && String(v).trim());
+      data.wireInstructions = anyVal ? cleaned : null;
+    }
+  }
 
   if (Object.keys(data).length === 0)
     return NextResponse.json({ error: "No valid fields" }, { status: 400 });
