@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { supabase } from '../lib/supabase.js';
 import { Kicker, Field } from '../components/UI.jsx';
 
 // Real Supabase email/password sign-in. Replaces the prototype "any email +
@@ -14,6 +15,31 @@ export default function Login() {
   const [password, setPassword] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState(null);
+
+  // SSO ingestion: when CHG Rehab's AppSwitcher opens Deal Link, it appends
+  // Supabase session tokens as a URL hash fragment:
+  //   /login#access_token=...&refresh_token=...&token_type=bearer
+  // Supabase's createClient detects this automatically via detectSessionInUrl
+  // (default: true), but we call setSession explicitly here as belt-and-
+  // suspenders — ensuring the session is applied even if timing or browser
+  // quirks delay the built-in detection. We also immediately strip the tokens
+  // from the URL so they don't persist in browser history.
+  React.useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.slice(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken && refreshToken) {
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname + window.location.search,
+        );
+        supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!auth.loading && auth.user) {
