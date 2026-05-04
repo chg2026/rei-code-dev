@@ -73,6 +73,7 @@ export default function DocumentsClient({
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openedIds, setOpenedIds] = useState<Set<string>>(() => new Set());
+  const [preview, setPreview] = useState<{ id: string; name: string; url: string } | null>(null);
   const focusRef = useRef<HTMLTableRowElement | null>(null);
   const [pulseId, setPulseId] = useState<string | null>(focusDocId || null);
 
@@ -157,21 +158,53 @@ export default function DocumentsClient({
     }
   }, [typeFilter, types]);
 
-  async function handleDownload(id: string) {
+  function isPdf(name: string): boolean {
+    return /\.pdf$/i.test(name.trim());
+  }
+
+  async function fetchSignedUrl(id: string): Promise<string> {
+    const res = await fetch(`/api/documents/${id}/url`, { method: "GET" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `request failed (${res.status})`);
+    }
+    const { url } = (await res.json()) as { url: string };
+    return url;
+  }
+
+  function markOpened(id: string) {
+    setOpenedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  async function handleOpen(doc: DocRow) {
     setError(null);
-    setDownloadingId(id);
+    setDownloadingId(doc.id);
     try {
-      const res = await fetch(`/api/documents/${id}/url`, { method: "GET" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `download failed (${res.status})`);
+      const url = await fetchSignedUrl(doc.id);
+      markOpened(doc.id);
+      if (isPdf(doc.name)) {
+        setPreview({ id: doc.id, name: doc.name, url });
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
       }
-      const { url } = (await res.json()) as { url: string };
-      setOpenedIds((prev) => {
-        const next = new Set(prev);
-        next.add(id);
-        return next;
-      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "open failed");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  async function handleDownload(doc: DocRow) {
+    setError(null);
+    setDownloadingId(doc.id);
+    try {
+      const url = await fetchSignedUrl(doc.id);
+      markOpened(doc.id);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (e) {
       setError(e instanceof Error ? e.message : "download failed");
@@ -268,6 +301,57 @@ export default function DocumentsClient({
           </div>
         ) : null}
 
+        {preview ? (
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              marginBottom: 12,
+              background: "var(--surface, #fff)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--surface-2, #f7f7f8)",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {preview.name}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <a
+                  className="btn btn-sm"
+                  href={preview.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in new tab
+                </a>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setPreview(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <iframe
+              key={preview.url}
+              src={preview.url}
+              title={preview.name}
+              style={{ width: "100%", height: "70vh", border: 0, display: "block", background: "#525659" }}
+            />
+          </div>
+        ) : null}
+
         {filtered.length === 0 ? (
           <div className="empty-state">No documents match those filters.</div>
         ) : (
@@ -286,12 +370,13 @@ export default function DocumentsClient({
               {filtered.map((d) => {
                 const isNew = d.isNew && !openedIds.has(d.id);
                 const isFocused = d.id === focusDocId;
+                const pdf = isPdf(d.name);
                 return (
                   <tr
                     key={d.id}
                     ref={isFocused ? focusRef : undefined}
-                    className={`clickable${isFocused && pulseId === d.id ? " row-pulse" : ""}`}
-                    onClick={() => handleDownload(d.id)}
+                    className={`clickable${isFocused && pulseId === d.id ? " row-pulse" : ""}${preview?.id === d.id ? " selected" : ""}`}
+                    onClick={() => handleOpen(d)}
                   >
                     <td>
                       <div className="row-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -315,10 +400,10 @@ export default function DocumentsClient({
                         disabled={downloadingId === d.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDownload(d.id);
+                          handleDownload(d);
                         }}
                       >
-                        {downloadingId === d.id ? "…" : "Download"}
+                        {downloadingId === d.id ? "…" : pdf ? "Download" : "Open"}
                       </button>
                     </td>
                   </tr>
@@ -328,8 +413,8 @@ export default function DocumentsClient({
           </table>
         )}
         <div style={{ marginTop: 12, fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          Download links are signed and expire in 5 minutes. Click <strong>Download</strong>
-          again any time to mint a fresh link.
+          PDFs preview inline; other files open in a new tab. Signed links expire in
+          5 minutes — click a row again any time to mint a fresh one.
         </div>
       </div>
     </div>
