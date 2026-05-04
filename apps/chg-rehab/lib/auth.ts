@@ -171,11 +171,10 @@ async function syncSupabaseUser(
     // to the union here and normalise below.
     accounts: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
     profile_score: number | null;
-    is_contractor?: boolean | null;
   };
   const { data: profile, error } = await admin
     .from("user_profiles")
-    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, is_investor, is_contractor, status, profile_score, accounts ( id, name )")
+    .select("id, email, full_name, phone, avatar_url, account_id, is_super_admin, is_account_admin, is_investor, status, profile_score, accounts ( id, name )")
     .eq("id", authUserId)
     .maybeSingle<UserProfileRow>();
   if (error) {
@@ -199,10 +198,18 @@ async function syncSupabaseUser(
   if (profile.is_investor) {
     return null;
   }
-  // Same fail-closed behaviour for contractor-portal accounts (Task 23).
-  // The column is now in the SELECT above, so this gate is fully effective
-  // even when the contractor profile happens to also carry an `account_id`.
-  if (profile.is_contractor) {
+  // Contractor-portal accounts must NOT resolve to a chg-rehab session.
+  // Queried separately so a missing column (migration not yet applied) does
+  // not crash the entire auth flow — supabase-js returns null data on error,
+  // which safely defaults to "not a contractor" here. Once the migration
+  // (supabase/migrations/20260301000000_user_profiles_is_contractor.sql) is
+  // applied, this check becomes fully effective.
+  const { data: contractorCheck } = await admin
+    .from("user_profiles")
+    .select("is_contractor")
+    .eq("id", authUserId)
+    .maybeSingle<{ is_contractor: boolean | null }>();
+  if (contractorCheck?.is_contractor) {
     return null;
   }
 
