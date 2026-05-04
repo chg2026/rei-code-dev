@@ -25,6 +25,17 @@ export interface SessionUser {
    * `/api/super-admin/*` route.
    */
   isSuperAdmin?: boolean;
+  /**
+   * Mirrors `user_profiles.is_investor`. When true, the Investor Portal tile
+   * is shown in the app switcher so dual-role users can navigate there
+   * without re-authenticating.
+   */
+  isInvestor?: boolean;
+  /**
+   * Mirrors `user_profiles.is_contractor`. When true, the Contractor Portal
+   * tile is shown in the app switcher for dual-role users.
+   */
+  isContractor?: boolean;
 }
 
 /**

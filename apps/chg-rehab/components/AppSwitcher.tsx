@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
+type RoleFlag = "isInvestor" | "isContractor";
+
 type Product = {
   code: string;
   name: string;
@@ -18,6 +20,9 @@ type Product = {
   // When true: on click, the current Supabase session is forwarded as a URL
   // hash fragment so the target app can hydrate without a separate login.
   ssoEnabled?: boolean;
+  // When set, this tile is only shown to users who have the matching boolean
+  // flag on their session (isInvestor or isContractor).
+  requiredFlag?: RoleFlag;
 };
 
 const PRODUCTS: Product[] = [
@@ -38,9 +43,29 @@ const PRODUCTS: Product[] = [
     initial: "D",
     devPort: 3001,
     ssoEnabled: true,
-    // Set NEXT_PUBLIC_DEALLINK_URL in the CHG Rehab deployment secrets to make
-    // this tile clickable when running outside of a .replit.dev preview domain.
     productionUrl: (process.env.NEXT_PUBLIC_DEALLINK_URL || "").replace(/\/$/, "") || undefined,
+  },
+  {
+    code: "investor",
+    name: "Investor Portal",
+    tagline: "Dashboard & returns",
+    color: "#7C3AED",
+    initial: "I",
+    devPort: 3002,
+    ssoEnabled: true,
+    requiredFlag: "isInvestor",
+    productionUrl: (process.env.NEXT_PUBLIC_INVESTOR_URL || "").replace(/\/$/, "") || undefined,
+  },
+  {
+    code: "contractor",
+    name: "Contractor Portal",
+    tagline: "Job tracking & invoices",
+    color: "#D97706",
+    initial: "W",
+    devPort: 3003,
+    ssoEnabled: true,
+    requiredFlag: "isContractor",
+    productionUrl: (process.env.NEXT_PUBLIC_CONTRACTOR_URL || "").replace(/\/$/, "") || undefined,
   },
 ];
 
@@ -65,10 +90,8 @@ function resolveUrl(product: Product): string | null {
  * interfere, then sets the location to the target after fetching the session.
  */
 async function openWithSso(baseHref: string): Promise<void> {
-  // Open the window synchronously while still in the click handler.
   const win = window.open("", "_blank", "noopener,noreferrer");
   if (!win) {
-    // Popup blocked — fall back to same-tab navigation without SSO.
     window.location.href = baseHref;
     return;
   }
@@ -84,8 +107,6 @@ async function openWithSso(baseHref: string): Promise<void> {
         ["token_type", "bearer"],
         ["expires_in", String(session.expires_in ?? 3600)],
       ]);
-      // Route to /login with the session fragment — Deal Link's Login page
-      // will auto-redirect to /admin once AuthContext hydrates the session.
       win.location.href = `${baseHref}/login#${params.toString()}`;
     } else {
       win.location.href = baseHref;
@@ -97,8 +118,12 @@ async function openWithSso(baseHref: string): Promise<void> {
 
 export default function AppSwitcher({
   currentProduct = "chg",
+  isInvestor = false,
+  isContractor = false,
 }: {
   currentProduct?: string;
+  isInvestor?: boolean;
+  isContractor?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -110,6 +135,14 @@ export default function AppSwitcher({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const roleFlags: Record<RoleFlag, boolean> = { isInvestor, isContractor };
+
+  // Only show products that have no requiredFlag (visible to all) or whose
+  // requiredFlag matches the current user's session flags.
+  const visibleProducts = PRODUCTS.filter(
+    (p) => !p.requiredFlag || roleFlags[p.requiredFlag],
+  );
 
   return (
     <div style={{ position: "relative" }} ref={ref}>
@@ -184,7 +217,7 @@ export default function AppSwitcher({
           </div>
 
           <div style={{ padding: "4px 0" }}>
-            {PRODUCTS.map((product) => {
+            {visibleProducts.map((product) => {
               const isCurrent = product.code === currentProduct;
               const resolvedHref = resolveUrl(product);
               const href = product.brandDomain

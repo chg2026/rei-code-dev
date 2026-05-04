@@ -85,7 +85,9 @@ export async function getSessionFromCookies(): Promise<IronSession<AppSession>> 
 function toSessionUser(
   u: User,
   profileScore: number | null = null,
-  isSuperAdmin = false
+  isSuperAdmin = false,
+  isInvestor = false,
+  isContractor = false,
 ): SessionUser {
   return {
     id: u.id,
@@ -97,6 +99,8 @@ function toSessionUser(
     companyId: u.companyId,
     profileScore,
     isSuperAdmin,
+    isInvestor,
+    isContractor,
   };
 }
 
@@ -331,7 +335,9 @@ async function syncSupabaseUser(
     });
   });
 
-  return toSessionUser(created, profile.profile_score ?? null, !!profile.is_super_admin);
+  // Users that reach this point passed both is_investor and is_contractor
+  // fail-closed checks above, so both flags are known-false for new accounts.
+  return toSessionUser(created, profile.profile_score ?? null, !!profile.is_super_admin, false, false);
 }
 
 /**
@@ -348,7 +354,7 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
   const admin = getSupabaseAdminClient();
   const { data: profile } = await admin
     .from("user_profiles")
-    .select("email, full_name, avatar_url, status, profile_score, is_super_admin")
+    .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
     .eq("id", existing.id)
     .maybeSingle();
 
@@ -378,8 +384,20 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
         profileImageUrl: nextImg,
       },
     });
-    return toSessionUser(updated, profile?.profile_score ?? null, !!profile?.is_super_admin);
+    return toSessionUser(
+      updated,
+      profile?.profile_score ?? null,
+      !!profile?.is_super_admin,
+      !!profile?.is_investor,
+      !!(profile as any)?.is_contractor,
+    );
   }
 
-  return toSessionUser(existing, profile?.profile_score ?? null, !!profile?.is_super_admin);
+  return toSessionUser(
+    existing,
+    profile?.profile_score ?? null,
+    !!profile?.is_super_admin,
+    !!profile?.is_investor,
+    !!(profile as any)?.is_contractor,
+  );
 }
