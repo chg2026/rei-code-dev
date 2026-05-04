@@ -61,7 +61,7 @@ const PRODUCTS: Product[] = [
     name: "Contractor Portal",
     tagline: "Job tracking & invoices",
     color: "#D97706",
-    initial: "W",
+    initial: "C",
     devPort: 3003,
     ssoEnabled: true,
     requiredFlag: "isContractor",
