@@ -6,6 +6,7 @@ import {
   SubscriptionCommitmentType,
 } from "@prisma/client";
 import { recomputeOfferingRaised } from "@/lib/investorPortalRecompute";
+import { dispatchInvestorNotification } from "@/lib/notifications/investor";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,13 @@ export async function POST(req: NextRequest) {
   if (!investor || !offering)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Track whether this is a brand-new subscription so we only fire the
+  // `newdeal` investor notification on first allocation, not on edits.
+  const existing = await prisma.investorSubscription.findUnique({
+    where: { investorId_offeringId: { investorId, offeringId } },
+    select: { id: true },
+  });
+
   const sub = await prisma.investorSubscription.upsert({
     where: { investorId_offeringId: { investorId, offeringId } },
     create: {
@@ -68,6 +76,16 @@ export async function POST(req: NextRequest) {
   });
 
   await recomputeOfferingRaised(offeringId);
+
+  if (!existing) {
+    await dispatchInvestorNotification({
+      investorId,
+      event: "newdeal",
+      title: `Added to a new deal — ${offering.name}`,
+      description: `Commitment: $${committed.toLocaleString()}`,
+      relatedSubscriptionId: sub.id,
+    });
+  }
 
   await prisma.activityLogEntry.create({
     data: {

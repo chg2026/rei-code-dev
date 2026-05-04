@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  CapitalCallStatus,
-  InvestorActivityType,
-} from "@prisma/client";
+import { CapitalCallStatus, InvestorActivityType } from "@prisma/client";
 import {
   allocateProRataCents,
   centsToDollars,
