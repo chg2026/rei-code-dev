@@ -43,10 +43,15 @@ export function AuthProvider({ children }) {
       }
     }).catch(() => { settled = true; clearTimeout(safety); setLoading(false); });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((evt, s) => {
       setSession(s);
       setUser(s?.user || null);
       if (s?.user) {
+        // TOKEN_REFRESHED only rotates the access token — profile and
+        // entitlements don't change, so skip the /auth/me round-trip.
+        // Re-fetching on every token refresh causes a loading flash every
+        // ~hour (and immediately after SSO) that makes the UI blink.
+        if (evt === 'TOKEN_REFRESHED') return;
         setLoading(true);
         // Don't await — see CRM AuthContext for the deadlock note.
         fetchMe().finally(() => { setLoading(false); });

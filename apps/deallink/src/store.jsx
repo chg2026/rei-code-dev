@@ -95,6 +95,12 @@ export function StoreProvider({ children }) {
   const [reload, setReload] = useState(0);
   const errorRef = useRef(null);
 
+  // Stable primitives derived from auth — used as dep-array values below so
+  // the hydration effect doesn't re-run on every render caused by entitlements
+  // being a new array reference after each fetchMe() call.
+  const authUserId = auth.user?.id ?? null;
+  const deallinkAccess = auth.hasProductAccess('deallink');
+
   const handleError = useCallback((err, fallback = 'Something went wrong') => {
     const msg = err?.response?.data?.error || err?.message || fallback;
     errorRef.current = msg;
@@ -135,7 +141,7 @@ export function StoreProvider({ children }) {
 
     load();
     return () => { cancelled = true; };
-  }, [auth.loading, auth.user, auth.entitlements, reload, handleError]);
+  }, [auth.loading, authUserId, deallinkAccess, reload, handleError]);
 
   const refetchDeals = useCallback(async () => {
     try {
