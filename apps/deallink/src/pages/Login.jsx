@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Kicker, Field } from '../components/UI.jsx';
 
@@ -21,21 +21,29 @@ export default function Login() {
   // Supabase's createClient handles this automatically via detectSessionInUrl
   // (default: true) — it parses the hash and fires onAuthStateChange('SIGNED_IN').
   // We only need to clean the tokens from the URL so they don't persist in
-  // browser history. Calling setSession() explicitly is WRONG here: it fires
-  // a second SIGNED_IN event on top of the one detectSessionInUrl already fired,
-  // causing a double fetchMe() and the loading blink.
+  // browser history.
   React.useEffect(() => {
     if (window.location.hash.includes('access_token=')) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
   }, []);
 
-  React.useEffect(() => {
-    if (!auth.loading && auth.user) {
-      const dest = (loc.state && loc.state.from) || '/admin';
-      nav(dest, { replace: true });
-    }
-  }, [auth.loading, auth.user, nav, loc.state]);
+  // ── Declarative redirect — no paint-then-navigate blink ──────────────────
+  // Render a spinner while auth resolves so the login form never flashes for
+  // an already-authenticated user. Once resolved, redirect immediately via
+  // <Navigate> rather than inside a useEffect (effects run after paint).
+  if (auth.loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--mute)', fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: 1 }}>
+        Loading…
+      </div>
+    );
+  }
+
+  if (auth.user) {
+    const dest = (loc.state && loc.state.from) || '/admin';
+    return <Navigate to={dest} replace />;
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -47,8 +55,8 @@ export default function Login() {
     setSubmitting(true);
     try {
       await auth.signIn(email.trim(), password);
-      // AuthContext.onAuthStateChange will flip auth.user; the effect
-      // above handles the redirect once profile + entitlements are loaded.
+      // AuthContext.onAuthStateChange will set auth.user; this component will
+      // re-render and the auth.user guard above will trigger <Navigate>.
     } catch (err) {
       setError(err?.message || 'Sign-in failed.');
     } finally {
