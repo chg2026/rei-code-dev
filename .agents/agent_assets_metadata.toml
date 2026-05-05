@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "47Df_BePzwqr4za6tqJLf"
+uri = "file://attached_assets/screenshots/55031650-e5ed-482c-a9c9-d08962a0ea5e-00-2duhxu703xlzu_riker_replit_dev_3001_login.png"
+type = "image"
+title = "Deal Link /login — live after fix"
