@@ -46,24 +46,49 @@ async function syncEntitlement(accountId, productCode, plan) {
     console.warn(`[admin] Product '${productCode}' not found — entitlement sync skipped`)
     return { error: `product '${productCode}' not found` }
   }
-  const { data, error } = await supabaseAdmin
+
+  // Check whether a row already exists for this (account, product) pair.
+  // We do an explicit select-then-update-or-insert instead of upsert with
+  // onConflict because the live account_products table is missing the UNIQUE
+  // constraint on (account_id, product_id) — the Phase 1 migration used
+  // CREATE TABLE IF NOT EXISTS so the inline UNIQUE clause was skipped when
+  // the table already existed. The constraint is added by migration
+  // 20260506000001_account_products_unique_constraint.sql; this code path
+  // works correctly whether or not the constraint has been applied.
+  const { data: existing } = await supabaseAdmin
     .from('account_products')
-    .upsert(
-      {
-        account_id: accountId,
-        product_id: product.id,
-        plan,
-        status: 'active',
-        started_at: new Date().toISOString(),
-        // Re-granting a previously disabled entitlement clears the audit fields
-        // so they reflect the CURRENT lifecycle, not a stale revocation.
-        disabled_at: null,
-        disabled_by: null,
-      },
-      { onConflict: 'account_id,product_id' }
-    )
-    .select('account_id, product_id, plan, status, started_at')
-    .single()
+    .select('account_id, product_id, plan, status')
+    .eq('account_id', accountId)
+    .eq('product_id', product.id)
+    .maybeSingle()
+
+  const fields = {
+    plan,
+    status: 'active',
+    started_at: new Date().toISOString(),
+    disabled_at: null,
+    disabled_by: null,
+  }
+
+  let data, error
+  if (existing) {
+    // Row exists — update in place (re-grant or plan change)
+    ;({ data, error } = await supabaseAdmin
+      .from('account_products')
+      .update(fields)
+      .eq('account_id', accountId)
+      .eq('product_id', product.id)
+      .select('account_id, product_id, plan, status, started_at')
+      .single())
+  } else {
+    // No row — fresh insert
+    ;({ data, error } = await supabaseAdmin
+      .from('account_products')
+      .insert({ account_id: accountId, product_id: product.id, ...fields })
+      .select('account_id, product_id, plan, status, started_at')
+      .single())
+  }
+
   if (error) console.error('[admin] Entitlement sync error:', error.message)
   return { data, error, product }
 }
