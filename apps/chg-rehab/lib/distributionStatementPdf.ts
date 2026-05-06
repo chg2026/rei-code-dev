@@ -37,7 +37,7 @@ export async function buildDistributionStatementPdf(
     x: 40, y: 766, size: 16, font: bold, color: rgb(1, 1, 1),
   });
 
-  page.drawText("Vestry Capital — Investor Portal", {
+  page.drawText("CHG — Investor Portal", {
     x: 40, y: 720, size: 11, font, color: muted,
   });
   page.drawText(`Statement: ${i.statementId}`, {
@@ -84,7 +84,7 @@ export async function buildDistributionStatementPdf(
     ly -= 13;
   }
 
-  page.drawText("Vestry Capital · investor-portal", {
+  page.drawText("CHG · investor-portal", {
     x: 40, y: 40, size: 9, font, color: muted,
   });
   page.drawText("Generated automatically — keep for your records.", {

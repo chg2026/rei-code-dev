@@ -218,7 +218,7 @@ export default function AppSwitcher({
               letterSpacing: "0.05em",
             }}
           >
-            Gold Bridge apps
+            CHG apps
           </div>
 
           <div style={{ padding: "4px 0" }}>
