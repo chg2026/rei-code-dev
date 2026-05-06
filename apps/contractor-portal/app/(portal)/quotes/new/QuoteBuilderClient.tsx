@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { fmtCDec } from "@/lib/format";
 
 type Recipient = { kind: "operator" | "contractor"; id: string; name: string; isExternal: boolean };
-type Line = { id: number; desc: string; qty: number; unit: number };
+type Line = { id: number; desc: string; qty: number; unitType: string; unit: number };
+
+const UNIT_TYPES = ["ea", "hr", "sqft", "lft", "day", "ls"];
 
 export default function QuoteBuilderClient({
   recipients, quotaUsed, quotaMax,
@@ -20,7 +22,7 @@ export default function QuoteBuilderClient({
   const [externalName, setExternalName] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([
-    { id: 1, desc: "Labor — install", qty: 1, unit: 0 },
+    { id: 1, desc: "Labor — install", qty: 1, unitType: "hr", unit: 0 },
   ]);
   const [nextId, setNextId] = useState(2);
   const [busy, setBusy] = useState(false);
@@ -30,13 +32,29 @@ export default function QuoteBuilderClient({
   const blocked = recipientChoice === "external" && quotaMax !== null && quotaUsed >= quotaMax;
 
   function add() {
-    setLines((l) => [...l, { id: nextId, desc: "", qty: 1, unit: 0 }]);
+    setLines((l) => [...l, { id: nextId, desc: "", qty: 1, unitType: "ea", unit: 0 }]);
     setNextId((n) => n + 1);
   }
   function update(id: number, patch: Partial<Line>) {
     setLines((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   }
   function remove(id: number) { setLines((l) => l.filter((x) => x.id !== id)); }
+  function moveUp(index: number) {
+    if (index === 0) return;
+    setLines((l) => {
+      const next = [...l];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  }
+  function moveDown(index: number) {
+    setLines((l) => {
+      if (index === l.length - 1) return l;
+      const next = [...l];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+  }
 
   async function send() {
     setBusy(true); setMsg(null);
@@ -67,7 +85,7 @@ export default function QuoteBuilderClient({
       return;
     }
     setMsg(`Quote ${json.number} sent successfully.`);
-    setLines([{ id: 1, desc: "Labor — install", qty: 1, unit: 0 }]);
+    setLines([{ id: 1, desc: "Labor — install", qty: 1, unitType: "hr", unit: 0 }]);
     setJobName("");
   }
 
@@ -102,14 +120,41 @@ export default function QuoteBuilderClient({
           )}
         </div>
 
-        <div className="ctitle" style={{ marginTop: 8, marginBottom: 8 }}>Line items</div>
-        {lines.map((l) => (
-          <div key={l.id} style={{ display: "grid", gridTemplateColumns: "2.5fr .7fr 1fr 1fr 28px", gap: 6, marginBottom: 6, alignItems: "center" }}>
+        <div className="ctitle" style={{ marginTop: 8, marginBottom: 4 }}>Line items</div>
+        <div style={{ display: "grid", gridTemplateColumns: "2.5fr .6fr .7fr 1fr 1fr 52px", gap: 6, marginBottom: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Description</span>
+          <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Qty</span>
+          <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Unit</span>
+          <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Unit $</span>
+          <span style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Total</span>
+          <span />
+        </div>
+        {lines.map((l, idx) => (
+          <div key={l.id} style={{ display: "grid", gridTemplateColumns: "2.5fr .6fr .7fr 1fr 1fr 52px", gap: 6, marginBottom: 6, alignItems: "center" }}>
             <input value={l.desc} onChange={(e) => update(l.id, { desc: e.target.value })} placeholder="Description" />
-            <input type="number" value={l.qty} onChange={(e) => update(l.id, { qty: Number(e.target.value) || 0 })} />
-            <input type="number" value={l.unit} onChange={(e) => update(l.id, { unit: Number(e.target.value) || 0 })} placeholder="Unit $" />
-            <div style={{ fontSize: 11, fontWeight: 500, padding: "0 8px" }}>{fmtCDec(l.qty * l.unit)}</div>
-            <button type="button" onClick={() => remove(l.id)} className="bg-red-light text-red" style={{ width: 24, height: 24, borderRadius: "50%", border: "none", cursor: "pointer" }}>×</button>
+            <input type="number" value={l.qty} min={0} onChange={(e) => update(l.id, { qty: Number(e.target.value) || 0 })} />
+            <select value={l.unitType} onChange={(e) => update(l.id, { unitType: e.target.value })} style={{ fontSize: 12 }}>
+              {UNIT_TYPES.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+            <input type="number" value={l.unit} min={0} onChange={(e) => update(l.id, { unit: Number(e.target.value) || 0 })} placeholder="0.00" />
+            <div style={{ fontSize: 11, fontWeight: 500, padding: "0 4px" }}>{fmtCDec(l.qty * l.unit)}</div>
+            <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => moveUp(idx)}
+                disabled={idx === 0}
+                title="Move up"
+                style={{ width: 20, height: 20, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-secondary)", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, fontSize: 10, lineHeight: 1 }}
+              >↑</button>
+              <button
+                type="button"
+                onClick={() => moveDown(idx)}
+                disabled={idx === lines.length - 1}
+                title="Move down"
+                style={{ width: 20, height: 20, border: "1px solid var(--border)", borderRadius: 4, background: "var(--bg-secondary)", cursor: idx === lines.length - 1 ? "default" : "pointer", opacity: idx === lines.length - 1 ? 0.3 : 1, fontSize: 10, lineHeight: 1 }}
+              >↓</button>
+              <button type="button" onClick={() => remove(l.id)} className="bg-red-light text-red" style={{ width: 20, height: 20, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 12, lineHeight: 1 }}>×</button>
+            </div>
           </div>
         ))}
         <button type="button" className="btn btn-sm" onClick={add}>+ Add line</button>
@@ -138,10 +183,24 @@ export default function QuoteBuilderClient({
           <div style={{ fontSize: 13, fontWeight: 600 }}>{jobName || "—"}</div>
         </div>
         <table className="tbl" style={{ marginBottom: 14 }}>
-          <thead><tr><th>Description</th><th style={{ textAlign: "right" }}>Qty</th><th style={{ textAlign: "right" }}>Unit</th><th style={{ textAlign: "right" }}>Total</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style={{ textAlign: "right" }}>Qty</th>
+              <th style={{ textAlign: "right" }}>Unit</th>
+              <th style={{ textAlign: "right" }}>Rate</th>
+              <th style={{ textAlign: "right" }}>Total</th>
+            </tr>
+          </thead>
           <tbody>
             {lines.map((l) => (
-              <tr key={l.id}><td>{l.desc || "—"}</td><td style={{ textAlign: "right" }}>{l.qty}</td><td style={{ textAlign: "right" }}>{fmtCDec(l.unit)}</td><td style={{ textAlign: "right", fontWeight: 600 }}>{fmtCDec(l.qty * l.unit)}</td></tr>
+              <tr key={l.id}>
+                <td>{l.desc || "—"}</td>
+                <td style={{ textAlign: "right" }}>{l.qty}</td>
+                <td style={{ textAlign: "right", color: "#6b6a66" }}>{l.unitType}</td>
+                <td style={{ textAlign: "right" }}>{fmtCDec(l.unit)}</td>
+                <td style={{ textAlign: "right", fontWeight: 600 }}>{fmtCDec(l.qty * l.unit)}</td>
+              </tr>
             ))}
           </tbody>
         </table>
