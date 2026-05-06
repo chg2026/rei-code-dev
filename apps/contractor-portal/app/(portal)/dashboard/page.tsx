@@ -1,4 +1,5 @@
 import PortalPage from "@/components/PortalPage";
+import EmptyState from "@/components/EmptyState";
 import { getCurrentContractor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fmtC } from "@/lib/format";
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
       <div className="g2">
         <div className="card">
           <div className="chd"><div className="ctitle">Active &amp; upcoming jobs</div><a className="btn btn-sm" href="/jobs">View all</a></div>
-          {jobs.filter(j=>j.status==="active"||j.status==="upcoming").length === 0 ? <div className="empty-state">No active jobs yet.</div> : jobs.filter(j=>j.status==="active"||j.status==="upcoming").map((j) => (
+          {jobs.filter(j=>j.status==="active"||j.status==="upcoming").length === 0 ? <EmptyState icon="🏗️" title="No active jobs" description="You have no active or upcoming jobs right now." /> : jobs.filter(j=>j.status==="active"||j.status==="upcoming").map((j) => (
             <div key={j.id} className="fi">
               <div style={{ flex: 1 }}>
                 <div className="fi-title">{j.name}</div>
@@ -50,7 +51,7 @@ export default async function DashboardPage() {
         </div>
         <div className="card">
           <div className="chd"><div className="ctitle">Recent quotes</div><a className="btn btn-sm" href="/quotes">View all</a></div>
-          {quotes.length === 0 ? <div className="empty-state">No quotes yet.</div> : quotes.map((q) => (
+          {quotes.length === 0 ? <EmptyState icon="📄" title="No quotes sent" description="Build your first quote to send to an operator or client." action={{ label: "+ Build a quote", href: "/quotes/new" }} /> : quotes.map((q) => (
             <div key={q.id} className="fi">
               <div style={{ flex: 1 }}>
                 <div className="fi-title">{q.number} — {q.jobName}</div>
@@ -64,7 +65,7 @@ export default async function DashboardPage() {
 
       <div className="card">
         <div className="chd"><div className="ctitle">Compliance status</div><a className="btn btn-sm" href="/docs">Manage docs</a></div>
-        {docs.length === 0 ? <div className="empty-state">No compliance docs uploaded yet.</div> : docs.map((d) => (
+        {docs.length === 0 ? <EmptyState icon="🗂️" title="No documents" description="Upload your COI, W-9, and licenses to stay compliant." action={{ label: "Upload documents", href: "/docs" }} /> : docs.map((d) => (
           <div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "var(--bl)" }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 500 }}>{d.name}</div>

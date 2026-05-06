@@ -34,14 +34,6 @@ export default async function PortalTopBar({
         myCount={{ jobs: myJobs, quotes: myQuotes }}
         operatorCount={{ jobs: opJobs, quotes: opQuotes }}
       />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "var(--t2)" }}>
-        <span className={`pill ${planTier === "free" ? "p-amber" : "p-teal"}`}>
-          {planTier === "free" ? "Free plan" : "Pro plan"}
-        </span>
-        {planTier === "free" ? (
-          <a href="/account/upgrade" className="btn btn-sm btn-p">Upgrade</a>
-        ) : null}
-      </div>
     </div>
   );
 }

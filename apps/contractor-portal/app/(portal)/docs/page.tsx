@@ -1,4 +1,6 @@
 import PortalPage from "@/components/PortalPage";
+import EmptyState from "@/components/EmptyState";
+import FileUploadButton from "@/components/FileUploadButton";
 import { getCurrentContractor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fmtDate } from "@/lib/format";
@@ -12,7 +14,7 @@ export default async function DocsPage() {
   for (const d of docs) (groups[d.docType] ?? groups.other).push(d);
 
   return (
-    <PortalPage title="Documents" subtitle="Compliance, tax, and contract documents" actions={<button className="btn btn-p btn-sm">+ Upload document</button>}>
+    <PortalPage title="Documents" subtitle="Compliance, tax, and contract documents" actions={<FileUploadButton label="+ Upload document" accept=".pdf,.jpg,.jpeg,.png,.docx" multiple={false} />}>
       {(["compliance", "tax", "contract", "other"] as const).map((k) => groups[k].length > 0 && (
         <div className="card" key={k}>
           <div className="chd"><div className="ctitle" style={{ textTransform: "capitalize" }}>{k}</div></div>
@@ -31,7 +33,7 @@ export default async function DocsPage() {
           </table>
         </div>
       ))}
-      {docs.length === 0 && <div className="card"><div className="empty-state">No documents uploaded yet.</div></div>}
+      {docs.length === 0 && <div className="card"><EmptyState icon="🗂️" title="No documents yet" description="Upload your insurance certificates, W-9, licenses, and contracts to stay compliant." /></div>}
     </PortalPage>
   );
 }

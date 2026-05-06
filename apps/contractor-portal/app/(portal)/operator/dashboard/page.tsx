@@ -1,4 +1,5 @@
 import PortalPage from "@/components/PortalPage";
+import EmptyState from "@/components/EmptyState";
 import { getCurrentContractor } from "@/lib/auth";
 import { getInvitees } from "@/lib/scope";
 import { prisma } from "@/lib/prisma";
@@ -44,7 +45,7 @@ export default async function OperatorDashboardPage() {
               <span className="pill p-amber">pending</span>
             </div>
           ))}
-          {pendingQuotes.length === 0 && <div className="empty-state">No pending quotes.</div>}
+          {pendingQuotes.length === 0 && <EmptyState icon="📄" title="No pending quotes" description="Quotes submitted by your subs will appear here." />}
         </div>
         <div className="card">
           <div className="chd"><div className="ctitle">Open bid invitations</div><a className="btn btn-sm" href="/operator/bids">Manage</a></div>
@@ -54,7 +55,7 @@ export default async function OperatorDashboardPage() {
               <span className="pill p-blue">open</span>
             </div>
           ))}
-          {bidInvitations.filter(b => b.status === "open").length === 0 && <div className="empty-state">No open bids.</div>}
+          {bidInvitations.filter(b => b.status === "open").length === 0 && <EmptyState icon="🏷️" title="No open bids" description="Create bid invitations to request quotes from contractors in your network." />}
         </div>
       </div>
     </PortalPage>

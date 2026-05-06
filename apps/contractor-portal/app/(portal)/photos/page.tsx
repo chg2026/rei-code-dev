@@ -1,4 +1,6 @@
 import PortalPage from "@/components/PortalPage";
+import EmptyState from "@/components/EmptyState";
+import FileUploadButton from "@/components/FileUploadButton";
 import { getCurrentContractor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -24,16 +26,16 @@ export default async function PhotosPage() {
                 <div className="fi-title">{j.name}</div>
                 <div className="fi-sub">Operator requested progress photos</div>
               </div>
-              <button className="btn btn-p btn-sm">Upload photos</button>
+              <FileUploadButton label="Upload photos" accept="image/*" />
             </div>
           ))}
         </div>
       )}
       {jobs.map((j) => (
         <div key={j.id} className="card">
-          <div className="chd"><div className="ctitle">{j.name}</div><button className="btn btn-sm">+ Add photos</button></div>
+          <div className="chd"><div className="ctitle">{j.name}</div><FileUploadButton label="+ Add photos" accept="image/*" className="btn btn-sm" /></div>
           {j.photos.length === 0 ? (
-            <div className="empty-state" style={{ padding: 14 }}>No photos uploaded yet.</div>
+            <EmptyState icon="📷" title="No photos yet" description="Upload progress photos to keep your operator informed." />
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
               {j.photos.map((p) => (

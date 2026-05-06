@@ -39,7 +39,7 @@ export default function LoginClient({ next, initialError }: { next: string; init
       <div className="login-card">
         <div className="login-left">
           <div>
-            <div className="login-mark" />
+            <div className="login-mark">CP</div>
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>CHG Contractor Portal</div>
             <div className="login-headline">Run your trade business — without the spreadsheets.</div>
             <div className="login-tag">Quotes, invoices, jobs, compliance and payment status — all in one place, free for trades.</div>

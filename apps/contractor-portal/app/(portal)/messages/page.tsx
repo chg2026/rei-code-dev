@@ -1,4 +1,5 @@
 import PortalPage from "@/components/PortalPage";
+import EmptyState from "@/components/EmptyState";
 import { getCurrentContractor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fmtDate } from "@/lib/format";
@@ -22,7 +23,7 @@ export default async function MessagesPage() {
   return (
     <PortalPage title="Messages" subtitle="Conversations with operators, subs, and clients">
       <div className="card">
-        {threads.length === 0 ? <div className="empty-state">No messages yet.</div> : threads.map((t) => {
+        {threads.length === 0 ? <EmptyState icon="💬" title="No messages yet" description="Conversations with operators and other contractors will appear here." /> : threads.map((t) => {
           const last = t.messages[0];
           const otherName =
             t.layer1Company?.name ||

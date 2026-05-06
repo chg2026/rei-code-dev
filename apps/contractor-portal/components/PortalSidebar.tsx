@@ -81,7 +81,7 @@ export default function PortalSidebar({
   return (
     <div className="sidebar">
       <div className="sb-top">
-        <div className="sb-logo"><div className="sb-logo-inner" /></div>
+        <div className="sb-logo"><div className="sb-logo-inner">CP</div></div>
         <div>
           <div className="sb-brand">CHG Portal</div>
           <div className="sb-sub">{companyName}</div>

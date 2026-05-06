@@ -17,7 +17,7 @@ export default async function InvoicesPage() {
   const paid = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + Number(i.totalAmount), 0);
 
   return (
-    <PortalPage title="Invoices" subtitle="Track invoiced and collected revenue" actions={<button className="btn btn-p btn-sm">+ New invoice</button>}>
+    <PortalPage title="Invoices" subtitle="Track invoiced and collected revenue" actions={<a className="btn btn-p btn-sm" href="/invoices/new">+ New invoice</a>}>
       <div className="g4" style={{ marginBottom: 12 }}>
         <div className="kpi"><div className="kl">Pending</div><div className="kv amber">{fmtC(pending)}</div></div>
         <div className="kpi"><div className="kl">Approved</div><div className="kv">{fmtC(approved)}</div></div>
