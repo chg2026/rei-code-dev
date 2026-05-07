@@ -25,6 +25,12 @@ export default function LoginClient({
     setLoading(true);
     try {
       const supabase = getSupabaseBrowserClient();
+      // Purge any stale session/cookies before attempting a fresh sign-in.
+      // This prevents tokens left over from an old domain from shadowing the
+      // new session and causing an immediate redirect back to /login.
+      await supabase.auth.signOut().catch((err) => {
+        console.warn("[auth:diag] LoginClient | pre-signin signOut failed (non-fatal):", err?.message ?? err);
+      });
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,

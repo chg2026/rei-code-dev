@@ -80,7 +80,25 @@ export async function middleware(req: NextRequest) {
     }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirectRes = NextResponse.redirect(loginUrl);
+    // Expire every Supabase auth cookie (sb-*) and the role-cache cookie so
+    // stale tokens from an old domain can't shadow the fresh session the user
+    // is about to create at /login.
+    for (const cookie of req.cookies.getAll()) {
+      if (cookie.name.startsWith("sb-") || cookie.name === ROLE_CACHE_COOKIE) {
+        redirectRes.cookies.set(cookie.name, "", {
+          maxAge: 0,
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "lax",
+        });
+        console.log(
+          `[auth:diag] middleware | path=${pathname} | clearing_stale_cookie=${cookie.name}`
+        );
+      }
+    }
+    return redirectRes;
   }
 
   console.log(`[auth:diag] middleware | path=${pathname} | session=OK | user=${user.id}`);
