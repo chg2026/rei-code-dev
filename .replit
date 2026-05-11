@@ -128,3 +128,6 @@ timeoutMs = 300000
 [userenv]
 
 [userenv.development]
+[[deployment.rewrites]]
+from = "/*"
+to = "/index.html"
