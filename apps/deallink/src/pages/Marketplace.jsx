@@ -19,7 +19,12 @@ export default function Marketplace() {
   async function load() {
     setLoading(true); setError(null);
     try { const deals = await DealLinkAPI.listMarketplace(); setItems(deals); }
-    catch (e) { setError(e?.message || 'Failed to load marketplace'); }
+    catch (e) {
+      const status = e?.response?.status;
+      if (status === 404) setError("Marketplace isn't available yet on this server. Check back soon.");
+      else if (status === 401 || status === 403) setError("You don't have access to the marketplace. Sign in or contact your admin.");
+      else setError(e?.response?.data?.error || e?.message || 'Failed to load marketplace');
+    }
     finally { setLoading(false); }
   }
 
