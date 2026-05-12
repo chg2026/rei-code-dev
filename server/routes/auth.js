@@ -65,7 +65,9 @@ router.post('/signup', checkSignupRateLimit, async (req, res) => {
   let authUserId = null
 
   try {
-    const { email, password, full_name, company_name } = req.body
+    const { email, password, full_name, company_name, product_code: rawProductCode } = req.body
+    const product_code = (rawProductCode || 'chg').trim().toLowerCase()
+
     if (!email || !password || !company_name) {
       return res.status(400).json({ error: 'Email, password, and company name are required.' })
     }
@@ -79,33 +81,49 @@ router.post('/signup', checkSignupRateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Company name must be 100 characters or fewer.' })
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
     const sanitizedName = (full_name || '').slice(0, 100).trim()
     const sanitizedCompany = company_name.slice(0, 100).trim()
+
+    // Email duplicate check — runs before any rows are created so the cleanup
+    // block never has to fire for this case.
+    const { data: existingProfile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+    if (existingProfile) {
+      return res.status(409).json({
+        error: 'already_registered',
+        message: 'You already have a Gold Bridge account. Use your existing credentials to sign in.',
+      })
+    }
 
     accountId = crypto.randomUUID()
     roleId = crypto.randomUUID()
 
     // Phase 2.5: plan/seat metadata moved to account_products. The accounts
-    // row is just identity + status now; the CHG entitlement insert below
-    // carries the plan ('starter' for new signups).
+    // row is just identity + status now; the entitlement insert below carries
+    // the plan ('starter' for new signups).
     const { error: accountError } = await supabaseAdmin
       .from('accounts')
       .insert({
         id: accountId,
         name: sanitizedCompany,
         status: 'active',
-        billing_email: email.toLowerCase().trim(),
+        billing_email: normalizedEmail,
       })
     if (accountError) throw accountError
 
-    // Look up CHG product — we need its id for the role scope AND the entitlement.
-    const { data: chgProduct, error: productLookupError } = await supabaseAdmin
+    // Look up the requested product — callers pass product_code (defaults to
+    // 'chg'). The id is needed for role scope AND the entitlement grant.
+    const { data: product, error: productLookupError } = await supabaseAdmin
       .from('products')
       .select('id')
-      .eq('code', 'chg')
+      .eq('code', product_code)
       .single()
-    if (productLookupError || !chgProduct?.id) {
-      throw new Error('CHG product row missing — cannot complete signup')
+    if (productLookupError || !product?.id) {
+      throw new Error(`Product '${product_code}' not found — cannot complete signup`)
     }
 
     const { error: roleError } = await supabaseAdmin
@@ -115,31 +133,34 @@ router.post('/signup', checkSignupRateLimit, async (req, res) => {
         name: 'Admin',
         account_id: accountId,
         is_system: false,
-        product_id: chgProduct.id,
+        product_id: product.id,
       })
     if (roleError) throw roleError
 
-    const departments = ['acquisitions', 'construction', 'property_management', 'contractors', 'finance', 'tasks']
-    const { error: permError } = await supabaseAdmin
-      .from('role_permissions')
-      .insert(departments.map(dept => ({ role_id: roleId, department: dept, permission_level: 'edit', product_id: chgProduct.id })))
-    if (permError) throw permError
+    // Department permissions only apply to the CHG product. Other products
+    // (deallink, investor-portal, contractor-portal) use a different auth model
+    // and don't share this permission structure.
+    if (product_code === 'chg') {
+      const departments = ['acquisitions', 'construction', 'property_management', 'contractors', 'finance', 'tasks']
+      const { error: permError } = await supabaseAdmin
+        .from('role_permissions')
+        .insert(departments.map(dept => ({ role_id: roleId, department: dept, permission_level: 'edit', product_id: product.id })))
+      if (permError) throw permError
+    }
 
-    // Grant the CHG entitlement so requireProduct('chg') admits this account on
-    // first login. Without this, a brand-new signup would be locked out of every
-    // CHG business route.
+    // Grant the product entitlement so requireProduct() admits this account on
+    // first login. Without this row the account would be locked out of every
+    // product-gated route.
     const { error: entitlementError } = await supabaseAdmin
       .from('account_products')
       .insert({
         account_id: accountId,
-        product_id: chgProduct.id,
+        product_id: product.id,
         plan: 'starter',
         status: 'active',
         started_at: new Date().toISOString(),
       })
     if (entitlementError) throw entitlementError
-
-    const normalizedEmail = email.toLowerCase().trim()
 
     let authUser, authError
     const createResult = await supabaseAdmin.auth.admin.createUser({
