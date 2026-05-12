@@ -157,7 +157,7 @@ export default function AppSwitcher({
         style={{
           background: "transparent",
           border: "none",
-          color: "rgba(255,255,255,0.65)",
+          color: "#6b7280",
           cursor: "pointer",
           padding: 6,
           borderRadius: 6,
@@ -167,11 +167,11 @@ export default function AppSwitcher({
           transition: "all 0.15s",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#111827";
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.05)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.65)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#6b7280";
           (e.currentTarget as HTMLButtonElement).style.background = "transparent";
         }}
       >
