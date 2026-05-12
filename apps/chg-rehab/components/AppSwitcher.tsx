@@ -46,7 +46,7 @@ const PRODUCTS: Product[] = [
     productionUrl: (process.env.NEXT_PUBLIC_DEALLINK_URL || "").replace(/\/$/, "") || undefined,
   },
   {
-    code: "investor",
+    code: "investor-portal",
     name: "Investor Portal",
     tagline: "Dashboard & returns",
     color: "#7C3AED",
@@ -57,7 +57,7 @@ const PRODUCTS: Product[] = [
     productionUrl: (process.env.NEXT_PUBLIC_INVESTOR_URL || "").replace(/\/$/, "") || undefined,
   },
   {
-    code: "contractor",
+    code: "contractor-portal",
     name: "Contractor Portal",
     tagline: "Job tracking & invoices",
     color: "#D97706",
