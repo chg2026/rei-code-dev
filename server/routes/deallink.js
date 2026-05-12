@@ -96,6 +96,38 @@ router.get('/deals', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message })
   res.json({ deals: data || [] })
+
+  // GET /api/deallink/marketplace
+  // Returns deals from ANY account whose profile has marketplace_opt_in=true.
+  router.get('/marketplace', async (req, res) => {
+    const { data: optedProfiles, error: pErr } = await req.db
+      .from('deallink_profiles')
+      .select('account_id, handle, name, initials, city')
+      .eq('marketplace_opt_in', true)
+    if (pErr) return res.status(500).json({ error: pErr.message })
+    if (!optedProfiles?.length) return res.json({ deals: [] })
+
+    const accountIds = optedProfiles.map((p) => p.account_id)
+    const profileByAccount = Object.fromEntries(optedProfiles.map((p) => [p.account_id, p]))
+
+    const { data: deals, error: dErr } = await req.db
+      .from('deallink_deals')
+      .select('*')
+      .in('account_id', accountIds)
+      .in('status', ['New', 'Marketed'])
+      .order('created_at', { ascending: false })
+    if (dErr) return res.status(500).json({ error: dErr.message })
+
+    const out = (deals || []).map((d) => {
+      const seller = profileByAccount[d.account_id]
+      return {
+        ...d,
+        addr: d.hide_street ? String(d.addr || '').replace(/^\d+\s+/, '— ') : d.addr,
+        seller: seller ? { handle: seller.handle, name: seller.name, initials: seller.initials, city: seller.city } : null,
+      }
+    })
+    res.json({ deals: out })
+  })
 })
 
 router.post('/deals', async (req, res) => {
