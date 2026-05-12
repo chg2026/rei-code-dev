@@ -23,6 +23,7 @@ type Product = {
   // "contractor" internally. enabledProducts membership tests against any of
   // these aliases (plus the canonical code) so either form works.
   aliases?: string[];
+  hidden?: boolean;
 };
 
 const PRODUCTS: Product[] = [
@@ -56,6 +57,7 @@ const PRODUCTS: Product[] = [
     requiredFlag: "isInvestor",
     aliases: ["investor-portal"],
     productionUrl: (process.env.NEXT_PUBLIC_INVESTOR_URL || "").replace(/\/$/, "") || undefined,
+    hidden: true,
   },
   {
     code: "contractor",
@@ -194,6 +196,7 @@ export default function AppSwitcher({
   // entitlement list is provided) the tile must be enabled. The current
   // product is always shown so the user can see "where they are".
   const visibleProducts = PRODUCTS.filter((p) => {
+    if (p.hidden) return false;
     if (matchesCurrent(p, currentProduct)) return true;
     if (p.requiredFlag && !roleFlags[p.requiredFlag]) return false;
     if (!isEnabled(p, enabledProducts)) return false;
