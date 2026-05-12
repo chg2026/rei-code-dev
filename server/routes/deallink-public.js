@@ -60,8 +60,6 @@ function publicProfile(p) {
     bio: p.bio,
     city: p.city,
     featured_id: p.featured_id,
-    _debug_account_id: p.account_id,
-    _debug_created_at: p.created_at,
   }
 }
 
