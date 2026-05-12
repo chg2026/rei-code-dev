@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import Signup from './pages/Signup.jsx';
 import Onboarding from './pages/Onboarding.jsx';
 import PublicProfile from './pages/PublicProfile.jsx';
 import DealDetail from './pages/DealDetail.jsx';
@@ -44,6 +45,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/onboarding" element={<Admin><Onboarding /></Admin>} />
 
         <Route path="/dashboard" element={<Admin><Dashboard /></Admin>} />

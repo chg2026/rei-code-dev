@@ -60,7 +60,7 @@ export default function Login() {
             <Field label="Password"><Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} placeholder="••••••••" disabled={submitting} /></Field>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <Button type="submit" className="w-full" disabled={submitting}>{submitting ? 'Signing in…' : <>Sign in <ArrowRight className="w-4 h-4" /></>}</Button>
-            <p className="text-xs text-slate-400 text-center">Need an account? Sign up via <a href="https://goldbridgerei.com" className="text-amber-400 hover:underline">Gold Bridge</a> and ask your admin to enable Deal Link.</p>
+            <p className="text-xs text-slate-400 text-center">Need an account? <Link to="/signup" className="text-amber-400 hover:underline">Sign up</Link></p>
           </form>
         </div>
       </div>
