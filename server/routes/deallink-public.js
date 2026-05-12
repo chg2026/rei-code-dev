@@ -80,7 +80,6 @@ router.get('/:handle', async (req, res) => {
     .from('deallink_deals')
     .select('*')
     .eq('account_id', profile.account_id)
-    .in('status', ['New', 'Marketed', 'Under Contract'])
     .order('created_at', { ascending: false })
 
   if (dErr) return res.status(500).json({ error: dErr.message })
@@ -109,7 +108,6 @@ router.get('/:handle/:dealId', async (req, res) => {
     .select('*')
     .eq('account_id', profile.account_id)
     .eq('id', req.params.dealId)
-    .in('status', ['New', 'Marketed', 'Under Contract'])
     .maybeSingle()
 
   if (dErr) return res.status(500).json({ error: dErr.message })
