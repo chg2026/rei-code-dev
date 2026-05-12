@@ -199,3 +199,8 @@ across all subcategories (matches the original `prisma/seed.ts` behaviour).
 - `docs/phase-1/` — schema-migration runbooks for Gold Bridge.
 - `.local/tasks/merge-chg-rehab-workspace.md` — full plan for the merge that
   produced this layout.
+
+## Scope Rule — IMPORTANT
+Only edit files inside `apps/contractor-portal/`.
+Never modify files in `apps/chg-rehab/`, `apps/deallink/`, `apps/investor-portal/`, `server/`, `packages/`, or any root-level config files.
+If a change requires touching shared code, stop and ask the user first.

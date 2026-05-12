@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import AppSwitcher from "./AppSwitcher";
 
 interface NavItem { href: string; label: string; dot: string; badge?: string }
 
@@ -46,6 +47,7 @@ export default function PortalSidebar({
   quotaMax,
   showOperatorLens,
   inviteeCount,
+  accountProducts,
 }: {
   initials: string;
   displayName: string;
@@ -55,6 +57,7 @@ export default function PortalSidebar({
   quotaMax: number | null;
   showOperatorLens: boolean;
   inviteeCount: number;
+  accountProducts: string[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -102,10 +105,15 @@ export default function PortalSidebar({
     <div className="sidebar">
       <div className="sb-top">
         <div className="sb-logo"><div className="sb-logo-inner">CP</div></div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="sb-brand">CHG Portal</div>
           <div className="sb-sub">{companyName}</div>
         </div>
+        <AppSwitcher
+          currentProduct="contractor-portal"
+          enabledProducts={accountProducts ?? []}
+          isContractor={true}
+        />
       </div>
       <div style={{ flex: 1, overflowY: "auto" }}>
         <div className="nav-sec">My portal</div>
