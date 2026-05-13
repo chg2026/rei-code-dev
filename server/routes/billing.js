@@ -17,6 +17,13 @@ const { requireAuth, supabaseAdmin } = require('../middleware/auth')
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const stripe = STRIPE_SECRET_KEY ? require('stripe')(STRIPE_SECRET_KEY) : null
 
+// Per-product canonical domains for Stripe redirect URLs.
+const PRODUCT_DOMAINS = {
+  'chg':                'https://chg.neuroaios.ai',
+  'deallink':           'https://deallink.neuroaios.ai',
+  'contractor-portal':  'https://contractorportal.neuroaios.ai',
+}
+
 // Map product_code → plan → Stripe price ID (from env vars)
 const PRICE_MAP = {
   chg: {
@@ -122,7 +129,9 @@ router.post('/checkout', requireAuth, async (req, res) => {
         .eq('id', accountId)
     }
 
-    const domain = appDomain()
+    const domain = PRODUCT_DOMAINS[product_code]
+      || req.body.success_url?.split('/billing')[0]
+      || 'https://chg.neuroaios.ai'
 
     const session = await s.checkout.sessions.create({
       customer:      customerId,
@@ -176,25 +185,38 @@ router.post('/webhook', async (req, res) => {
 
   try {
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object
-      const { account_id, product_code, plan } = session.metadata || {}
+      const session  = event.data.object
+      const metadata = session.metadata || {}
+      console.log('[billing/webhook] checkout.session.completed metadata:', JSON.stringify(metadata))
+
+      const { account_id, product_code, plan } = metadata
 
       if (account_id && product_code && plan) {
-        const productId              = await getProductId(product_code)
+        console.log(`[billing/webhook] updating account_products for account_id=${account_id} plan=${plan}`)
+
         const { seat_limit, guest_limit } = planLimits(plan)
-        const { error } = await supabaseAdmin
+        const updatePayload = {
+          plan,
+          seat_limit,
+          guest_limit,
+          stripe_subscription_id: session.subscription || null,
+          status: 'active',
+        }
+        console.log('[billing/webhook] update payload:', JSON.stringify(updatePayload))
+
+        const { data: updateData, error: updateError } = await supabaseAdmin
           .from('account_products')
-          .update({
-            plan,
-            seat_limit,
-            guest_limit,
-            stripe_subscription_id: session.subscription || null,
-            status: 'active',
-          })
-          .eq('account_id', accountId)
-          .eq('product_id', productId)
-        if (error) throw error
-        console.log(`[billing/webhook] checkout.session.completed: account=${account_id} product=${product_code} plan=${plan}`)
+          .update(updatePayload)
+          .eq('account_id', account_id)
+          .eq('status', 'active')
+          .select()
+
+        console.log('[billing/webhook] update result — data:', JSON.stringify(updateData), 'error:', updateError?.message ?? null)
+
+        if (updateError) throw updateError
+        console.log(`[billing/webhook] checkout.session.completed done: account=${account_id} product=${product_code} plan=${plan} rows_updated=${updateData?.length ?? 0}`)
+      } else {
+        console.warn('[billing/webhook] checkout.session.completed missing metadata fields — skipping update:', JSON.stringify(metadata))
       }
 
     } else if (event.type === 'customer.subscription.updated') {
