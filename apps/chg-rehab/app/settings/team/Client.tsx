@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 const API_BASE = "https://rei-code-dev.replit.app";
 
@@ -43,14 +44,23 @@ type MeResponse = {
 };
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const authHeaders: Record<string, string> = session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {};
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
+    ...init,
     headers: {
       Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      "Content-Type": "application/json",
+      ...authHeaders,
       ...(init?.headers ?? {}),
     },
-    ...init,
   });
   if (!res.ok) {
     let detail = "";
