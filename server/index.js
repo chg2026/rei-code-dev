@@ -16,7 +16,16 @@ const { requireDepartment, requireProduct, scopeToAccount } = require('./middlew
 //   /api/auth    — signup (no auth) + /auth/me (powers App Switcher, needs all entitlements)
 //   /api/admin   — super-admin console; manages entitlements themselves
 //   /api/users   — self-service profile; every authenticated user needs it regardless of product
+// Deal Link — Investment Memorandum (IM) module 2: buyer SMS gate.
+// Buyer auth is COMPLETELY separate from wholesaler Supabase auth (PDF §8).
+// MUST be mounted BEFORE the generic /api/auth router so /api/auth/buyer/*
+// isn't shadowed by routes/auth.js.
+app.use('/api/auth/buyer', require('./routes/auth-buyer'))
+app.use('/api/im',         require('./routes/im'))
+app.use('/api/buyer',      require('./routes/buyer'))
+
 app.use('/api/auth', require('./routes/auth'))
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Gold Bridge API is running', version: '2.0.0', timestamp: new Date().toISOString() })
 })
