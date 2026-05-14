@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 import {
   Calculator, Home, Wrench, Banknote, TrendingUp, DollarSign,
   Percent, Building2, Save, Share2, ChevronRight, AlertTriangle,
-  CheckCircle2, FileText, Layers,
+  CheckCircle2, FileText, Layers, LayoutDashboard, Kanban, Globe,
+  Upload, Users, ListChecks, Handshake, UserCheck, Zap, Eye,
+  BarChart3, Settings, ExternalLink, Bell, LogOut, Menu, Grid3x3,
 } from "lucide-react";
 
 const fmt = (n: number) =>
@@ -100,9 +102,11 @@ export function DealAnalyzer() {
   }, [strategy, m]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Pipeline page chrome (so the Pipeline > Analyzer placement is obvious) */}
-      <PipelineChrome />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex">
+      <DealLinkSidebar />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <DealLinkTopbar />
+        <PipelineChrome />
 
       <div className="px-8 pb-12">
         {/* Page header */}
@@ -262,7 +266,105 @@ export function DealAnalyzer() {
           </div>
         </div>
       </div>
+      </div>
     </div>
+  );
+}
+
+/* ---------- DealLink sidebar ---------- */
+const NAV_GROUPS: { label: string | null; items: { label: string; icon: any; active?: boolean; enterprise?: boolean }[] }[] = [
+  { label: null, items: [{ label: "Dashboard", icon: LayoutDashboard }] },
+  { label: "Deals", items: [
+    { label: "Properties", icon: Building2 },
+    { label: "Pipeline", icon: Kanban, active: true },
+    { label: "Offers", icon: FileText },
+    { label: "Marketplace", icon: Globe },
+    { label: "Import CSV", icon: Upload },
+  ]},
+  { label: "Buyers", items: [
+    { label: "Buyers List", icon: Users },
+    { label: "Leads", icon: ListChecks },
+    { label: "JV Deals", icon: Handshake, enterprise: true },
+    { label: "Buyer Rental", icon: UserCheck, enterprise: true },
+  ]},
+  { label: "Enterprise", items: [
+    { label: "AI Deal Blast", icon: Zap, enterprise: true },
+    { label: "God Mode", icon: Eye, enterprise: true },
+    { label: "Artemis Mode", icon: Eye, enterprise: true },
+    { label: "Handoff", icon: Handshake, enterprise: true },
+  ]},
+  { label: "Reports", items: [{ label: "Analytics", icon: BarChart3 }] },
+];
+
+function DealLinkSidebar() {
+  return (
+    <aside className="w-56 bg-slate-900 border-r border-slate-700 flex flex-col flex-shrink-0">
+      <div className="px-5 py-4 border-b border-slate-700">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-slate-900" />
+          </div>
+          <span className="text-white font-bold text-lg tracking-tight">
+            Deal<span className="text-amber-400">Link</span>
+          </span>
+        </div>
+      </div>
+      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map(({ label, icon: Icon, active, enterprise }) => (
+                <div key={label}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    active ? "bg-amber-400 text-slate-900" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}>
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate">{label}</span>
+                  {enterprise && !active && (
+                    <span className="text-[10px] bg-amber-400/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">E</span>
+                  )}
+                  {active && <ChevronRight className="w-3 h-3 ml-auto" />}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <div className="px-3 py-3 border-t border-slate-700 space-y-1">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400">
+          <Settings className="w-4 h-4" /> Profile
+        </div>
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400">
+          <ExternalLink className="w-4 h-4" /> Public profile
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function DealLinkTopbar() {
+  return (
+    <header className="h-14 bg-slate-900 border-b border-slate-700 flex items-center px-4 gap-4 flex-shrink-0">
+      <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 font-mono">
+        deallink.io/chgroup <ExternalLink className="w-3 h-3" />
+      </span>
+      <div className="flex-1" />
+      <Grid3x3 className="w-5 h-5 text-slate-400" />
+      <button className="relative text-slate-400">
+        <Bell className="w-5 h-5" />
+        <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full" />
+      </button>
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-slate-900 font-bold text-sm">CH</div>
+        <span className="text-white text-sm font-medium hidden sm:block">Cleveland Holding</span>
+      </div>
+      <div className="text-slate-400 text-xs flex items-center gap-1.5">
+        <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sign out</span>
+      </div>
+    </header>
   );
 }
 

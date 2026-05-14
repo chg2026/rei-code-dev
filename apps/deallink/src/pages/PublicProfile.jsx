@@ -1,7 +1,40 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Twitter, Linkedin, Instagram, Globe } from 'lucide-react';
 import { PublicAPI } from '../lib/deallink-api.js';
 import { Avatar, Kicker, Stripe, Hairline, Tag, Modal, Field } from '../components/LegacyPublicUI.jsx';
+
+const SOCIAL_ICONS = {
+  twitter: Twitter,
+  linkedin: Linkedin,
+  instagram: Instagram,
+  website: Globe,
+};
+
+function backgroundStyleFor(profile) {
+  const t = profile?.backgroundType || 'solid';
+  const v = profile?.backgroundValue || '';
+  if (!v) return {};
+  if (t === 'gradient') return { background: v };
+  if (t === 'image') return { background: `center/cover no-repeat url(${v})` };
+  return { background: v };
+}
+
+function isDarkBackground(profile) {
+  if (!profile) return false;
+  const t = profile.backgroundType || 'solid';
+  if (t !== 'solid') return true;
+  const v = (profile.backgroundValue || '').trim();
+  if (!v.startsWith('#') || (v.length !== 4 && v.length !== 7)) return false;
+  const hex = v.length === 4
+    ? v.slice(1).split('').map((c) => c + c).join('')
+    : v.slice(1);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
 
 // Public, unauthenticated wholesaler profile page. Fetches from
 // /api/deallink/public/:handle so RLS + the server's hide_street masking
