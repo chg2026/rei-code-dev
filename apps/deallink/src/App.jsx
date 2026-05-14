@@ -50,9 +50,7 @@ export default function App() {
         <Route path="/onboarding" element={<Admin><Onboarding /></Admin>} />
 
         <Route path="/dashboard" element={<Admin><Dashboard /></Admin>} />
-        <Route path="/admin" element={<Admin><ProGate pageTitle="Properties" pageSubtitle="Manage all your deal inventory" title="Inventory dashboard is a paid feature" body="The Free plan includes deal posting via the public profile editor. Upgrade to Personal or Team to manage your full inventory dashboard.">
-          <AdminDashboard />
-        </ProGate></Admin>} />
+        <Route path="/admin" element={<Admin><AdminDashboard /></Admin>} />
         <Route path="/admin/leads" element={<Admin><ProGate pageTitle="Leads" pageSubtitle="Buyers who clicked Get details" title="Lead inbox is a paid feature" body="On the Free plan you'll still receive an email each time someone requests a deal. Upgrade to see, filter, and manage the full lead list here.">
           <AdminLeads />
         </ProGate></Admin>} />
