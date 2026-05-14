@@ -28,26 +28,12 @@ const SOCIALS = [
 ];
 
 function readTheme(profile) {
-  // Canonical fields (tone, accentColor, radius, gradientEnabled) win;
-  // fall back to the legacy storage (backgroundType, backgroundValue,
-  // onboarding.theme) so older saved profiles still hydrate the form.
-  const bag = (profile?.onboarding && profile.onboarding.theme) || {};
-
-  const toneCandidate = profile?.tone || profile?.backgroundType;
-  const tone = TONES[toneCandidate] ? toneCandidate : DEFAULT_THEME.tone;
-
-  const accentCandidate = profile?.accentColor || profile?.backgroundValue;
-  const accent = (accentCandidate && /^#[0-9a-f]{3,8}$/i.test(accentCandidate))
-    ? accentCandidate
+  const tone = TONES[profile?.tone] ? profile.tone : DEFAULT_THEME.tone;
+  const accent = (profile?.accentColor && /^#[0-9a-f]{3,8}$/i.test(profile.accentColor))
+    ? profile.accentColor
     : DEFAULT_THEME.accent;
-
-  const radiusCandidate = Number.isFinite(profile?.radius) ? profile.radius : bag.radius;
-  const radius = Number.isFinite(radiusCandidate) ? radiusCandidate : DEFAULT_THEME.radius;
-
-  const gradient = (profile && 'gradientEnabled' in profile)
-    ? !!profile.gradientEnabled
-    : !!bag.gradient;
-
+  const radius = Number.isFinite(profile?.radius) ? profile.radius : DEFAULT_THEME.radius;
+  const gradient = !!profile?.gradientEnabled;
   return { tone, accent, radius, gradient };
 }
 
