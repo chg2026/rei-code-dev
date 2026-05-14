@@ -5,6 +5,11 @@ import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge } from '../components/ui.jsx';
 import { DEAL_STATUSES } from '../lib/deallink-api.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { UpgradeBanner } from '../components/UpgradePrompt.jsx';
+
+const FREE_DEAL_LIMIT = 10;
+const FREE_HIDE_STREET_LIMIT = 1;
 
 const EMPTY = {
   addr: '', city: '', state: '', zip: '', type: 'SFR', units: 1, beds: 3, baths: 2, sqft: 1200,
@@ -18,9 +23,15 @@ export default function DealEditor({ mode }) {
   const nav = useNavigate();
   const { show, node } = useToast();
 
+  const { isFreePlan } = useAuth();
   const existing = mode === 'edit' ? state.deals.find((d) => d.id === id) : null;
   const [form, setForm] = React.useState(existing || EMPTY);
   const [error, setError] = React.useState(null);
+
+  const dealCount = state.deals.length;
+  const otherHiddenCount = state.deals.filter((d) => d.hideStreet && (!existing || d.id !== existing.id)).length;
+  const atDealCap = isFreePlan && mode === 'new' && dealCount >= FREE_DEAL_LIMIT;
+  const hideStreetLocked = isFreePlan && otherHiddenCount >= FREE_HIDE_STREET_LIMIT && !form.hideStreet;
 
   React.useEffect(() => { if (mode === 'edit' && existing) setForm(existing); }, [mode, existing]);
 
@@ -39,11 +50,17 @@ export default function DealEditor({ mode }) {
   function patch(p) { setForm((f) => ({ ...f, ...p })); setError(null); }
 
   function save() {
+    if (atDealCap) {
+      setError(`Free plan is limited to ${FREE_DEAL_LIMIT} deals. Upgrade to Personal or Team to add more.`);
+      return;
+    }
     if (!form.addr.trim()) { setError('Address is required'); return; }
     if (!form.zip.trim()) { setError('ZIP is required'); return; }
     if (!form.ask) { setError('Asking price is required'); return; }
+    const safeHide = isFreePlan && form.hideStreet && otherHiddenCount >= FREE_HIDE_STREET_LIMIT ? false : !!form.hideStreet;
     const data = {
       ...form,
+      hideStreet: safeHide,
       ask: Number(form.ask) || 0,
       arv: Number(form.arv) || 0,
       beds: Number(form.beds) || 0,
@@ -78,9 +95,13 @@ export default function DealEditor({ mode }) {
               <Trash2 className="w-4 h-4" /> Delete
             </Button>
           )}
-          <Button onClick={save}>{mode === 'new' ? 'Add deal' : 'Save changes'}</Button>
+          <Button onClick={save} disabled={atDealCap}>{mode === 'new' ? 'Add deal' : 'Save changes'}</Button>
         </div>
       </div>
+
+      {atDealCap && (
+        <UpgradeBanner message={`You've hit the Free plan's ${FREE_DEAL_LIMIT}-deal limit. Upgrade to Personal or Team to add more.`} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
         <Card>
@@ -95,9 +116,16 @@ export default function DealEditor({ mode }) {
                 <Field label="State"><Input value={form.state} onChange={(e) => patch({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="TX" /></Field>
                 <Field label="ZIP"><Input value={form.zip} onChange={(e) => patch({ zip: e.target.value })} placeholder="75215" /></Field>
               </div>
-              <label className="flex items-center gap-2 mt-3 text-xs text-slate-400">
-                <input type="checkbox" checked={!!form.hideStreet} onChange={(e) => patch({ hideStreet: e.target.checked })} className="w-4 h-4 accent-amber-400" />
+              <label className={`flex items-center gap-2 mt-3 text-xs ${hideStreetLocked ? 'text-slate-600 cursor-not-allowed' : 'text-slate-400'}`}>
+                <input
+                  type="checkbox"
+                  checked={!!form.hideStreet}
+                  disabled={hideStreetLocked}
+                  onChange={(e) => patch({ hideStreet: e.target.checked })}
+                  className="w-4 h-4 accent-amber-400 disabled:opacity-40"
+                />
                 Hide street number on public profile
+                {hideStreetLocked && <span className="text-amber-400 ml-1">(Free plan: 1 hidden deal max — upgrade for unlimited)</span>}
               </label>
             </section>
 

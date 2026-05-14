@@ -1,11 +1,13 @@
 import React from 'react';
-import { Building2, Users, FileText, DollarSign } from 'lucide-react';
+import { Building2, Users, FileText, DollarSign, Eye, MousePointerClick } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
 import Layout from '../components/Layout.jsx';
 import { useStore } from '../store.jsx';
 import { Card, CardHeader, CardTitle, PageHeader } from '../components/ui.jsx';
 import { formatCurrency } from '../lib/utils.js';
 import { DEAL_STATUSES } from '../lib/deallink-api.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { UpgradeBanner } from '../components/UpgradePrompt.jsx';
 
 const STATUS_COLORS = { 'New': '#94a3b8', 'Marketed': '#60a5fa', 'Under Contract': '#fbbf24', 'Closed': '#34d399', 'Dead': '#f87171' };
 
@@ -26,7 +28,11 @@ function StatCard({ label, value, sub, icon: Icon }) {
 
 export default function Analytics() {
   const { state } = useStore();
-  const { deals, leads, buyers, offers } = state;
+  const { isFreePlan } = useAuth();
+  const { deals, leads, buyers, offers, profile } = state;
+
+  const profileVisits = Number(profile?.viewCount ?? profile?.visits ?? 0);
+  const totalDealClicks = deals.reduce((s, d) => s + (Number(d.clickCount) || 0), 0);
 
   const byStatus = DEAL_STATUSES.map((s) => ({ status: s, count: deals.filter((d) => d.status === s).length }));
   const byType = Object.entries(deals.reduce((a, d) => { a[d.type || 'Other'] = (a[d.type || 'Other'] || 0) + 1; return a; }, {})).map(([type, count]) => ({ type, count }));
@@ -48,6 +54,19 @@ export default function Analytics() {
   const trend = Object.values(byMonth).slice(-6);
 
   const tooltipStyle = { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#fff', fontSize: 12 };
+
+  if (isFreePlan) {
+    return (
+      <Layout>
+        <PageHeader title="Analytics" subtitle="Top-line traffic for your public profile." />
+        <UpgradeBanner message="Free plan shows basic traffic. Upgrade to Personal or Team for pipeline charts, deal-status breakdowns, and 6-month trends." />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+          <StatCard label="Profile visits" value={profileVisits.toLocaleString()} sub="Lifetime views of your public page" icon={Eye} />
+          <StatCard label="Deal clicks" value={totalDealClicks.toLocaleString()} sub="Total clicks across all deals" icon={MousePointerClick} />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

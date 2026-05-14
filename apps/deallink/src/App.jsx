@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { StoreProvider } from './store.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ProGate from './components/ProGate.jsx';
 
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
@@ -49,25 +50,33 @@ export default function App() {
         <Route path="/onboarding" element={<Admin><Onboarding /></Admin>} />
 
         <Route path="/dashboard" element={<Admin><Dashboard /></Admin>} />
-        <Route path="/admin" element={<Admin><AdminDashboard /></Admin>} />
-        <Route path="/admin/leads" element={<Admin><AdminLeads /></Admin>} />
+        <Route path="/admin" element={<Admin><ProGate pageTitle="Properties" pageSubtitle="Manage all your deal inventory" title="Inventory dashboard is a paid feature" body="The Free plan includes deal posting via the public profile editor. Upgrade to Personal or Team to manage your full inventory dashboard.">
+          <AdminDashboard />
+        </ProGate></Admin>} />
+        <Route path="/admin/leads" element={<Admin><ProGate pageTitle="Leads" pageSubtitle="Buyers who clicked Get details" title="Lead inbox is a paid feature" body="On the Free plan you'll still receive an email each time someone requests a deal. Upgrade to see, filter, and manage the full lead list here.">
+          <AdminLeads />
+        </ProGate></Admin>} />
         <Route path="/admin/profile" element={<Admin><AdminProfile /></Admin>} />
         <Route path="/admin/deal/new" element={<Admin><DealEditor mode="new" /></Admin>} />
         <Route path="/admin/deal/:id" element={<Admin><DealEditor mode="edit" /></Admin>} />
         <Route path="/admin/import" element={<Admin><CsvImport /></Admin>} />
 
         <Route path="/pipeline" element={<Admin><Pipeline /></Admin>} />
-        <Route path="/buyers" element={<Admin><Buyers /></Admin>} />
+        <Route path="/buyers" element={<Admin><ProGate pageTitle="Buyers" pageSubtitle="Your buyer network" title="Buyer CRM is a paid feature" body="Upgrade to Personal or Team to build a deduped buyer list, import from leads, and match buyers to deals.">
+          <Buyers />
+        </ProGate></Admin>} />
         <Route path="/offers" element={<Admin><Offers /></Admin>} />
         <Route path="/analytics" element={<Admin><Analytics /></Admin>} />
-        <Route path="/marketplace" element={<Admin><Marketplace /></Admin>} />
+        <Route path="/marketplace" element={<Admin><ProGate pageTitle="Marketplace" pageSubtitle="Cross-wholesaler deal flow" title="Marketplace is a paid feature" body="Upgrade to Personal or Team to opt into the cross-wholesaler marketplace and browse deals from other DealLink members.">
+          <Marketplace />
+        </ProGate></Admin>} />
 
-        <Route path="/deal-blast" element={<Admin><DealBlast /></Admin>} />
-        <Route path="/god-mode" element={<Admin><GodMode /></Admin>} />
-        <Route path="/artemis-mode" element={<Admin><ArtemisMode /></Admin>} />
-        <Route path="/jv-deals" element={<Admin><JVDeals /></Admin>} />
-        <Route path="/buyer-rental" element={<Admin><BuyerRental /></Admin>} />
-        <Route path="/handoff" element={<Admin><Handoff /></Admin>} />
+        <Route path="/deal-blast" element={<Admin><ProGate pageTitle="AI Deal Blast"><DealBlast /></ProGate></Admin>} />
+        <Route path="/god-mode" element={<Admin><ProGate pageTitle="God Mode"><GodMode /></ProGate></Admin>} />
+        <Route path="/artemis-mode" element={<Admin><ProGate pageTitle="Artemis Mode"><ArtemisMode /></ProGate></Admin>} />
+        <Route path="/jv-deals" element={<Admin><ProGate pageTitle="JV Deals"><JVDeals /></ProGate></Admin>} />
+        <Route path="/buyer-rental" element={<Admin><ProGate pageTitle="Buyer Rental"><BuyerRental /></ProGate></Admin>} />
+        <Route path="/handoff" element={<Admin><ProGate pageTitle="Handoff"><Handoff /></ProGate></Admin>} />
 
         <Route path="/p/:handle" element={<PublicProfile />} />
         <Route path="/p/:handle/:dealId" element={<DealDetail />} />

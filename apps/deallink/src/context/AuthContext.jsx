@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [entitlements, setEntitlements] = useState([]);
+  const [billing, setBilling] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Captured synchronously during the render phase — BEFORE any child effects
@@ -40,10 +41,12 @@ export function AuthProvider({ children }) {
       const { data } = await api.get('/auth/me');
       setProfile(data.profile || null);
       setEntitlements(data.entitlements || []);
+      setBilling(data.billing || null);
       return data;
     } catch {
       setProfile(null);
       setEntitlements([]);
+      setBilling(null);
       return null;
     }
   }, []);
@@ -63,6 +66,7 @@ export function AuthProvider({ children }) {
         resolvedUserIdRef.current = null;
         setProfile(null);
         setEntitlements([]);
+        setBilling(null);
         setLoading(false);
       }
     }
@@ -108,6 +112,7 @@ export function AuthProvider({ children }) {
       } else {
         setProfile(null);
         setEntitlements([]);
+        setBilling(null);
         setLoading(false);
       }
     });
@@ -127,6 +132,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setEntitlements([]);
+    setBilling(null);
   };
 
   const isSuperAdmin = profile?.is_super_admin === true;
@@ -140,12 +146,30 @@ export function AuthProvider({ children }) {
     .filter((e) => e && e.status === 'active' && e.code)
     .map((e) => e.code);
 
+  const deallinkEnt = (entitlements || []).find((e) => e?.code === 'deallink' && e?.status === 'active') || null;
+  const planFromEnt = deallinkEnt?.plan || deallinkEnt?.tier || deallinkEnt?.plan_code || null;
+  const plan = billing?.plan || planFromEnt || 'free';
+  const seatLimit = typeof billing?.seat_limit === 'number' ? billing.seat_limit : null;
+  const guestLimit = typeof billing?.guest_limit === 'number' ? billing.guest_limit : null;
+  const seatsUsed = typeof billing?.seats_used === 'number' ? billing.seats_used : null;
+  const guestsUsed = typeof billing?.guests_used === 'number' ? billing.guests_used : null;
+  const isFreePlan = plan === 'free';
+  const isPaidPlan = plan === 'personal' || plan === 'team';
+
   const value = {
     session,
     user,
     profile,
     entitlements,
     enabledProducts,
+    billing,
+    plan,
+    seatLimit,
+    guestLimit,
+    seatsUsed,
+    guestsUsed,
+    isFreePlan,
+    isPaidPlan,
     loading,
     isSuperAdmin,
     hasProductAccess,
