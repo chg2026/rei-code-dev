@@ -2,17 +2,34 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Building2, ArrowRight, Upload, Plus, Copy, Check } from 'lucide-react';
 import { useStore, useToast } from '../store.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { Card, Button, Input, Field, Modal } from '../components/ui.jsx';
 
 export default function Onboarding() {
   const { state, dispatch } = useStore();
+  const { profile: authProfile, user: authUser } = useAuth();
   const nav = useNavigate();
   const { show, node } = useToast();
   const [choiceOpen, setChoiceOpen] = React.useState(false);
   const [step, setStep] = React.useState(state.profile?.handle ? 'checklist' : 'claim');
   const [handle, setHandle] = React.useState((state.profile?.handle || '').replace(/\.deals$/, ''));
-  const [email, setEmail] = React.useState(state.profile?.email || '');
-  const [name, setName] = React.useState(state.profile?.name || '');
+
+  const authEmail = (authProfile?.email || authUser?.email || '').trim();
+  const authFullName = (authProfile?.full_name || authProfile?.fullName || '').trim();
+  const initialEmail = state.profile?.email || authEmail || '';
+  const initialName = state.profile?.name || authFullName || '';
+
+  const [email, setEmail] = React.useState(initialEmail);
+  const [name, setName] = React.useState(initialName);
+
+  React.useEffect(() => {
+    if (!email && authEmail) setEmail(authEmail);
+    if (!name && authFullName) setName(authFullName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authEmail, authFullName]);
+
+  const emailLocked = !!authEmail;
+  const nameLocked = !!authFullName;
 
   React.useEffect(() => { if (state.profile?.handle && step === 'claim') setStep('checklist'); }, [state.profile?.handle, step]);
 
@@ -48,8 +65,18 @@ export default function Onboarding() {
                 <input value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))} placeholder="yourname" className="flex-1 bg-transparent text-white text-sm px-3 outline-none" autoFocus />
               </div>
             </Field>
-            <Field label="Your name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="J Rodriguez" /></Field>
-            <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" required /></Field>
+            {!nameLocked && (
+              <Field label="Your name"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="J Rodriguez" /></Field>
+            )}
+            {!emailLocked && (
+              <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" required /></Field>
+            )}
+            {(nameLocked || emailLocked) && (
+              <div className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-xs text-slate-400">
+                Signed in as <span className="text-white font-medium">{authFullName || authEmail}</span>
+                {authFullName && authEmail ? <span className="text-slate-500"> · {authEmail}</span> : null}
+              </div>
+            )}
             <Button type="submit" className="w-full">Create profile <ArrowRight className="w-4 h-4" /></Button>
             <p className="text-xs text-slate-400 text-center">Already have one? <Link to="/login" className="text-amber-400 hover:underline">Sign in</Link></p>
           </form>
