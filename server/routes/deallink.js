@@ -151,6 +151,18 @@ router.delete('/deals/:id', async (req, res) => {
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
 
+  // Null any offers' deal_id first — the composite FK
+  // (deal_id, account_id) → deallink_deals is ON DELETE NO ACTION to
+  // preserve cross-tenant integrity (see 20260514000000 migration), so
+  // we must clear the ref ourselves. Offers carry denormalized
+  // buyer_name and survive parent removal by design.
+  const { error: nErr } = await db
+    .from('deallink_offers')
+    .update({ deal_id: null })
+    .eq('deal_id', req.params.id)
+    .eq('account_id', accountId)
+  if (nErr) return res.status(500).json({ error: nErr.message })
+
   const { error } = await db
     .from('deallink_deals')
     .delete()
@@ -225,6 +237,16 @@ router.delete('/buyers/:id', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  // Null any offers' buyer_id first — see /deals/:id DELETE for rationale
+  // (composite FK is NO ACTION; offers preserve buyer_name denormalized).
+  const { error: nErr } = await db
+    .from('deallink_offers')
+    .update({ buyer_id: null })
+    .eq('buyer_id', req.params.id)
+    .eq('account_id', accountId)
+  if (nErr) return res.status(500).json({ error: nErr.message })
+
   const { error } = await db.from('deallink_buyers').delete()
     .eq('id', req.params.id).eq('account_id', accountId)
   if (error) return res.status(500).json({ error: error.message })
