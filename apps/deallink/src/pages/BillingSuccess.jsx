@@ -22,7 +22,7 @@ export default function BillingSuccess() {
             Thanks for upgrading. All Personal features are now unlocked on your account.
           </p>
           <Link
-            to="/admin/dashboard"
+            to="/admin"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-400 text-slate-900 font-semibold text-sm hover:bg-amber-300 transition-colors"
           >
             Go to dashboard <ArrowRight className="w-4 h-4" />
