@@ -49,8 +49,6 @@ export function dealFromApi(d) {
     imShowMao:          d.im_show_mao          == null ? false : !!d.im_show_mao,
     imShowContact:      d.im_show_contact      == null ? true  : !!d.im_show_contact,
     imShowStreetNumber: d.im_show_street_number == null ? true : !!d.im_show_street_number,
-    // ─── Deal Analyzer state (Task #4) — opaque blob; null until saved ──
-    analyzerState: d.analyzer_state || null,
   };
 }
 
@@ -62,7 +60,7 @@ export function dealToApi(d) {
     beds: 'beds', baths: 'baths', sqft: 'sqft', ask: 'ask', arv: 'arv',
     occ: 'occ', access: 'access', status: 'status', notes: 'notes',
     description: 'description', photoUrl: 'photo_url', tags: 'tags',
-    hideStreet: 'hide_street', new: 'is_new', analyzerState: 'analyzer_state',
+    hideStreet: 'hide_street', new: 'is_new',
   };
   for (const [from, to] of Object.entries(map)) {
     if (from in d) out[to] = d[from];

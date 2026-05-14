@@ -1,13 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Home, Wrench, ArrowLeft, Plus, Trash2, AlertCircle,
-  CheckCircle2, Save, Repeat, Layers, Briefcase, Calculator,
-  Building2,
+  CheckCircle2, Save, Repeat, Layers, Briefcase,
 } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
-import { useStore, useToast } from '../store.jsx';
-import { Card, Button, EmptyState, PageHeader, StatusBadge } from '../components/ui.jsx';
 
 const fmt = (n) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -29,171 +25,35 @@ const SUBTABS = [
   { k: 'rehab', label: 'Rehab' },
 ];
 
-// Default analyzer state used when a deal has never been analyzed before.
-// Purchase price + ARV are seeded from the deal record itself; everything
-// else here is just a sensible starting point the user can edit.
-function buildInitialState(deal) {
-  const ask = Number(deal?.ask) || 0;
-  const arv = Number(deal?.arv) || 0;
-  return {
-    strategy: 'brrrr',
-    subtab: 'rehab',
-    purchasePrice: ask,
-    arv,
-    downPct: 20,
-    rate: 8.25,
-    term: 30,
-    closingPct: 2.5,
-    monthlyRent: 0,
-    vacancyPct: 8,
-    taxesYr: 0,
-    insYr: 0,
-    mgmtPct: 12,
-    maintPct: 10,
-    capexPct: 10,
-    holdingMo: 6,
-    rehabOverride: 0,
-    items: [],
-    refiArv: arv,
-    refiLTV: 75,
-    refiRate: 7.5,
-  };
-}
-
 export default function DealAnalyzer() {
-  const { dealId } = useParams();
-  const { state } = useStore();
+  const [strategy, setStrategy] = useState('brrrr');
+  const [subtab, setSubtab] = useState('rehab');
 
-  // No dealId in URL → render the picker (list of saved Properties).
-  if (!dealId) {
-    return <AnalyzerPicker deals={state.deals} loaded={state.loaded} />;
-  }
+  const [purchasePrice, setPurchasePrice] = useState(295000);
+  const [arv, setArv] = useState(0);
+  const [downPct, setDownPct] = useState(20);
+  const [rate, setRate] = useState(8.25);
+  const [term, setTerm] = useState(30);
+  const [closingPct, setClosingPct] = useState(2.5);
 
-  // Wait for store hydration before deciding the deal is missing.
-  if (!state.loaded) {
-    return <Layout><div className="py-32 text-center text-slate-400 text-xs font-mono">Loading deal…</div></Layout>;
-  }
+  const [monthlyRent, setMonthlyRent] = useState(1900);
+  const [vacancyPct, setVacancyPct] = useState(8);
+  const [taxesYr, setTaxesYr] = useState(4200);
+  const [insYr, setInsYr] = useState(1400);
+  const [mgmtPct, setMgmtPct] = useState(12);
+  const [maintPct, setMaintPct] = useState(10);
+  const [capexPct, setCapexPct] = useState(10);
+  const [holdingMo, setHoldingMo] = useState(6);
 
-  const deal = state.deals.find((d) => d.id === dealId);
-  if (!deal) {
-    return (
-      <Layout>
-        <PageHeader title="Deal not found" subtitle="That deal isn't in your Properties." />
-        <EmptyState
-          title="No matching property"
-          body="Pick a deal from your Properties list to analyze it."
-          action={<Link to="/admin"><Button>Go to Properties</Button></Link>}
-        />
-      </Layout>
-    );
-  }
+  const [rehabOverride, setRehabOverride] = useState(8000);
+  const [items, setItems] = useState([
+    { id: 'r1', category: 'Flooring', description: 'LVP throughout', cost: 4500 },
+    { id: 'r2', category: 'Interior Paint', description: 'Interior paint', cost: 3500 },
+  ]);
 
-  return <AnalyzerForDeal key={deal.id} deal={deal} />;
-}
-
-// ─── Picker ──────────────────────────────────────────────────────────────
-function AnalyzerPicker({ deals, loaded }) {
-  if (!loaded) {
-    return <Layout><div className="py-32 text-center text-slate-400 text-xs font-mono">Loading properties…</div></Layout>;
-  }
-  return (
-    <Layout>
-      <PageHeader
-        title="Deal Analyzer"
-        subtitle="Pick a property to analyze. The analyzer pulls purchase price and ARV straight from the deal."
-        actions={<Link to="/admin/deal/new"><Button><Plus className="w-4 h-4" /> Add property</Button></Link>}
-      />
-
-      {deals.length === 0 ? (
-        <EmptyState
-          title="No properties yet"
-          body="The Deal Analyzer only runs on deals saved in your Properties. Add a property first, then come back."
-          action={<Link to="/admin/deal/new"><Button>Add property</Button></Link>}
-        />
-      ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Property</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Asking</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">ARV</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-5 py-3 w-32"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700">
-                {deals.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Building2 className="w-4 h-4 text-slate-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-white text-sm font-medium truncate">{d.addr || '—'}</p>
-                          <p className="text-slate-400 text-xs truncate">{[d.city, d.state || d.zip].filter(Boolean).join(', ')} · {d.type}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 hidden sm:table-cell"><p className="text-white text-sm font-semibold">${Number(d.ask || 0).toLocaleString()}</p></td>
-                    <td className="px-5 py-4 hidden md:table-cell"><p className="text-green-400 text-sm font-semibold">${Number(d.arv || 0).toLocaleString()}</p></td>
-                    <td className="px-5 py-4"><StatusBadge status={d.status} /></td>
-                    <td className="px-5 py-4 text-right">
-                      <Link to={`/deal-analyzer/${d.id}`}>
-                        <Button variant="secondary"><Calculator className="w-4 h-4" /> Analyze {d.analyzerState ? '↻' : ''}</Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </Layout>
-  );
-}
-
-// ─── Analyzer (deal-bound) ───────────────────────────────────────────────
-function AnalyzerForDeal({ deal }) {
-  const { dispatch } = useStore();
-  const { show, node } = useToast();
-  const nav = useNavigate();
-
-  const seed = useMemo(() => ({
-    ...buildInitialState(deal),
-    ...(deal.analyzerState || {}),
-  }), [deal.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [strategy, setStrategy] = useState(seed.strategy);
-  const [subtab, setSubtab] = useState(seed.subtab);
-
-  const [purchasePrice, setPurchasePrice] = useState(seed.purchasePrice);
-  const [arv, setArv] = useState(seed.arv);
-  const [downPct, setDownPct] = useState(seed.downPct);
-  const [rate, setRate] = useState(seed.rate);
-  const [term, setTerm] = useState(seed.term);
-  const [closingPct, setClosingPct] = useState(seed.closingPct);
-
-  const [monthlyRent, setMonthlyRent] = useState(seed.monthlyRent);
-  const [vacancyPct, setVacancyPct] = useState(seed.vacancyPct);
-  const [taxesYr, setTaxesYr] = useState(seed.taxesYr);
-  const [insYr, setInsYr] = useState(seed.insYr);
-  const [mgmtPct, setMgmtPct] = useState(seed.mgmtPct);
-  const [maintPct, setMaintPct] = useState(seed.maintPct);
-  const [capexPct, setCapexPct] = useState(seed.capexPct);
-  const [holdingMo, setHoldingMo] = useState(seed.holdingMo);
-
-  const [rehabOverride, setRehabOverride] = useState(seed.rehabOverride);
-  const [items, setItems] = useState(Array.isArray(seed.items) ? seed.items : []);
-
-  const [refiArv, setRefiArv] = useState(seed.refiArv);
-  const [refiLTV, setRefiLTV] = useState(seed.refiLTV);
-  const [refiRate, setRefiRate] = useState(seed.refiRate);
-
-  const [saving, setSaving] = useState(false);
+  const [refiArv, setRefiArv] = useState(0);
+  const [refiLTV, setRefiLTV] = useState(75);
+  const [refiRate, setRefiRate] = useState(7.5);
 
   const m = useMemo(() => {
     const rehab = rehabOverride || items.reduce((s, i) => s + (i.cost || 0), 0);
@@ -263,76 +123,19 @@ function AnalyzerForDeal({ deal }) {
 
   const isHold = strategy === 'rental' || strategy === 'multi' || strategy === 'commercial' || strategy === 'brrrr';
 
-  async function handleSave() {
-    setSaving(true);
-    const snapshot = {
-      mao: Math.round(m.mao),
-      monthlyCashFlow: Math.round(m.cashFlowYr / 12),
-      annualCashFlow: Math.round(m.cashFlowYr),
-      coc: Number(m.coc.toFixed(2)),
-      cap: Number(m.cap.toFixed(2)),
-      noi: Math.round(m.noi),
-      totalCash: Math.round(m.totalCash),
-      flipNetProfit: Math.round(m.flipNetProfit),
-      flipROI: Number(m.flipROI.toFixed(2)),
-    };
-    const analyzerState = {
-      strategy, subtab,
-      purchasePrice, arv,
-      downPct, rate, term, closingPct,
-      monthlyRent, vacancyPct, taxesYr, insYr, mgmtPct, maintPct, capexPct, holdingMo,
-      rehabOverride, items,
-      refiArv, refiLTV, refiRate,
-      snapshot,
-      savedAt: new Date().toISOString(),
-    };
-    try {
-      const res = await dispatch({ type: 'update_deal', id: deal.id, patch: { analyzerState } });
-      if (res && res.ok === false) {
-        show(res.error || 'Failed to save analyzer');
-      } else {
-        show('Analyzer saved to deal');
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <Layout>
       <div className="-m-4 md:-m-6 p-4 md:p-6">
-        <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={() => nav(`/admin/deal/${deal.id}`)}
-              className="text-slate-500 hover:text-slate-200"
-              title="Back to deal"
-            >
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <button className="text-slate-500 hover:text-slate-200">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            {deal.photoUrl ? (
-              <img
-                src={deal.photoUrl}
-                alt=""
-                className="w-14 h-14 rounded-lg object-cover border border-slate-800 flex-shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-lg bg-slate-800 border border-slate-800 flex items-center justify-center flex-shrink-0">
-                <Building2 className="w-5 h-5 text-slate-500" />
-              </div>
-            )}
-            <div className="min-w-0">
-              <Link to="/deal-analyzer" className="text-slate-400 text-xs hover:text-amber-400">Deal Analyzer</Link>
-              <h1 className="text-2xl font-semibold text-white truncate">{deal.addr || 'Untitled deal'}</h1>
-              <p className="text-xs text-slate-500 truncate">{[deal.city, deal.state || deal.zip].filter(Boolean).join(', ')}</p>
-            </div>
+            <h1 className="text-2xl font-semibold text-white">123 Maple Street</h1>
+            <AlertCircle className="w-4 h-4 text-rose-400" />
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 text-sm rounded-md bg-amber-500 text-slate-950 font-medium hover:bg-amber-400 disabled:opacity-60 flex items-center gap-2 shadow-sm"
-          >
-            <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Deal'}
+          <button className="px-4 py-2 text-sm rounded-md bg-amber-500 text-slate-950 font-medium hover:bg-amber-400 flex items-center gap-2 shadow-sm">
+            <Save className="w-4 h-4" /> Save Deal
           </button>
         </div>
 
@@ -379,13 +182,13 @@ function AnalyzerForDeal({ deal }) {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-5 space-y-5">
             {subtab === 'property' && (
-              <InputCard title="Property">
+              <Card title="Property">
                 <Field label="Purchase price" prefix="$" value={purchasePrice} onChange={setPurchasePrice} />
                 <Field label="ARV (after-repair value)" prefix="$" value={arv} onChange={setArv} />
-              </InputCard>
+              </Card>
             )}
             {subtab === 'financing' && (
-              <InputCard title="Financing">
+              <Card title="Financing">
                 <Field label="Down payment" suffix="%" value={downPct} onChange={setDownPct} />
                 <Field label="Interest rate" suffix="%" value={rate} onChange={setRate} step={0.125} />
                 <Field label="Term" suffix="yrs" value={term} onChange={setTerm} />
@@ -398,10 +201,10 @@ function AnalyzerForDeal({ deal }) {
                     <Field label="Refi rate" suffix="%" value={refiRate} onChange={setRefiRate} step={0.125} />
                   </>
                 )}
-              </InputCard>
+              </Card>
             )}
             {subtab === 'income' && (
-              <InputCard title="Income & Operations">
+              <Card title="Income & Operations">
                 <Field label="Monthly rent" prefix="$" value={monthlyRent} onChange={setMonthlyRent} />
                 <Field label="Vacancy" suffix="%" value={vacancyPct} onChange={setVacancyPct} />
                 <Field label="Taxes (yr)" prefix="$" value={taxesYr} onChange={setTaxesYr} />
@@ -410,7 +213,7 @@ function AnalyzerForDeal({ deal }) {
                 <Field label="Maintenance" suffix="%" value={maintPct} onChange={setMaintPct} />
                 <Field label="CapEx reserve" suffix="%" value={capexPct} onChange={setCapexPct} />
                 <Field label="Holding months" value={holdingMo} onChange={setHoldingMo} />
-              </InputCard>
+              </Card>
             )}
             {subtab === 'rehab' && (
               <RehabEstimator
@@ -440,7 +243,6 @@ function AnalyzerForDeal({ deal }) {
           </div>
         </div>
       </div>
-      {node}
     </Layout>
   );
 }
@@ -469,14 +271,12 @@ function RehabEstimator({ override, setOverride, items, setItems }) {
           </div>
           <p className="text-[11px] text-slate-500 mt-1">Or use line items below for detailed estimate</p>
         </div>
-        {items.length > 0 && (
-          <div className="grid grid-cols-12 gap-2 text-[11px] text-slate-500 uppercase tracking-wider px-1">
-            <div className="col-span-4">Category</div>
-            <div className="col-span-5">Description</div>
-            <div className="col-span-2">Cost</div>
-            <div className="col-span-1" />
-          </div>
-        )}
+        <div className="grid grid-cols-12 gap-2 text-[11px] text-slate-500 uppercase tracking-wider px-1">
+          <div className="col-span-4">Category</div>
+          <div className="col-span-5">Description</div>
+          <div className="col-span-2">Cost</div>
+          <div className="col-span-1" />
+        </div>
         {items.map((it) => (
           <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
             <select value={it.category}
@@ -686,9 +486,6 @@ function FlipResults({ m, arv, purchasePrice }) {
 }
 
 function Comps() {
-  // Placeholder static comps — kept from the original analyzer layout so
-  // the right-rail still has a Comps section. Real comp data will plug
-  // into this UI in a follow-up; the shape is intentionally inert here.
   const comps = [
     { addr: '110 Oak Ave', beds: '3bd/2ba', sqft: '1,640 sqft', ppsf: '$190/sqft', date: '2024-11-01', price: 295000 },
     { addr: '201 Elm Dr', beds: '3bd/2ba', sqft: '1,800 sqft', ppsf: '$155/sqft', date: '2024-10-15', price: 280000 },
@@ -722,7 +519,7 @@ function Comps() {
   );
 }
 
-function InputCard({ title, children }) {
+function Card({ title, children }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/40">
       <div className="px-5 py-3 border-b border-slate-800">
