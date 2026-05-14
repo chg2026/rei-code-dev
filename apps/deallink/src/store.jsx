@@ -181,7 +181,15 @@ export function StoreProvider({ children }) {
         try {
           const updated = await DealLinkAPI.updateDeal(action.id, action.patch);
           rawDispatch({ type: '_replace_deal', tempId: action.id, deal: updated });
-        } catch (e) { handleError(e, 'Failed to save deal'); await refetchDeals(); }
+        } catch (e) {
+          // Roll back optimistic state by refetching the canonical row.
+          await refetchDeals();
+          // Callers that need to react to failure (e.g. show their own error
+          // toast) can opt in via { throwOnError: true } — otherwise we
+          // continue to surface the global error toast as before.
+          if (action.throwOnError) throw e;
+          handleError(e, 'Failed to save deal');
+        }
         return;
       }
       case 'remove_deal': {

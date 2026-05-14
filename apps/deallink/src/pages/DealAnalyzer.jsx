@@ -192,10 +192,10 @@ function Analyzer({ deal }) {
       },
     };
     try {
-      await dispatch({ type: 'update_deal', id: deal.id, patch: { analyzerState } });
+      await dispatch({ type: 'update_deal', id: deal.id, patch: { analyzerState }, throwOnError: true });
       show('Analysis saved');
     } catch (e) {
-      show('Could not save analysis');
+      show(e?.response?.data?.error || e?.message || 'Could not save analysis');
     } finally {
       setSaving(false);
     }

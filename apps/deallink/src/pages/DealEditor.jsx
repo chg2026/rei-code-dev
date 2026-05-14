@@ -195,10 +195,19 @@ export default function DealEditor({ mode }) {
             {mode === 'edit' && existing && (
               <DealAnalysisSection
                 deal={existing}
-                onClear={() => {
+                onClear={async () => {
                   if (!confirm('Clear the saved analysis for this property?')) return;
-                  dispatch({ type: 'update_deal', id: existing.id, patch: { analyzerState: null } });
-                  show('Analysis cleared');
+                  try {
+                    await dispatch({
+                      type: 'update_deal',
+                      id: existing.id,
+                      patch: { analyzerState: null },
+                      throwOnError: true,
+                    });
+                    show('Analysis cleared');
+                  } catch (e) {
+                    show(e?.response?.data?.error || e?.message || 'Could not clear analysis');
+                  }
                 }}
               />
             )}
