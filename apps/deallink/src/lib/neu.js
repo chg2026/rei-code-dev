@@ -49,7 +49,7 @@ export const DEFAULT_THEME = { tone: 'Mist', accent: '#6C5DD3', radius: 20, grad
 export function resolveTheme(profile) {
   const toneName = TONES[profile?.tone] ? profile.tone : DEFAULT_THEME.tone;
   const tone = TONES[toneName];
-  const accent = (profile?.accentColor && /^#[0-9a-f]{3,8}$/i.test(profile.accentColor))
+  const accent = ((profile?.accentColor || profile?.accent_color) && /^#[0-9a-f]{3,8}$/i.test(profile.accentColor || profile.accent_color))
     ? profile.accentColor
     : DEFAULT_THEME.accent;
   const radius = Number.isFinite(profile?.radius)
