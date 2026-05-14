@@ -49,6 +49,9 @@ export function dealFromApi(d) {
     imShowMao:          d.im_show_mao          == null ? false : !!d.im_show_mao,
     imShowContact:      d.im_show_contact      == null ? true  : !!d.im_show_contact,
     imShowStreetNumber: d.im_show_street_number == null ? true : !!d.im_show_street_number,
+    // ─── Analyzer state ────────────────────────────────────────────────
+    analyzerState: d.analyzer_state || null,
+    analyzerStateUpdatedAt: d.analyzer_state_updated_at || null,
   };
 }
 
@@ -61,6 +64,7 @@ export function dealToApi(d) {
     occ: 'occ', access: 'access', status: 'status', notes: 'notes',
     description: 'description', photoUrl: 'photo_url', tags: 'tags',
     hideStreet: 'hide_street', new: 'is_new',
+    analyzerState: 'analyzer_state',
   };
   for (const [from, to] of Object.entries(map)) {
     if (from in d) out[to] = d[from];

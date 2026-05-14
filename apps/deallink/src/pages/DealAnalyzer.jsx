@@ -5,7 +5,7 @@ import {
   CheckCircle2, Save, Repeat, Layers, Briefcase, Building2, Search, Repeat2,
 } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
-import { useStore } from '../store.jsx';
+import { useStore, useToast } from '../store.jsx';
 import { DEAL_STATUSES } from '../lib/deallink-api.js';
 
 const fmt = (n) =>
@@ -57,34 +57,47 @@ export default function DealAnalyzer() {
 }
 
 function Analyzer({ deal }) {
-  const [strategy, setStrategy] = useState('brrrr');
+  const { dispatch } = useStore();
+  const { show, node: toastNode } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  // Saved analysis (if any) wins over the raw deal fields. Falls back to
+  // sane defaults whenever a key is missing from saved state.
+  const s = deal.analyzerState || {};
+  const seed = (key, fallback) => (s[key] !== undefined && s[key] !== null ? s[key] : fallback);
+
+  const [strategy, setStrategy] = useState(seed('strategy', 'brrrr'));
   const [subtab, setSubtab] = useState('rehab');
 
-  const [purchasePrice, setPurchasePrice] = useState(Number(deal.ask) || 0);
-  const [arv, setArv] = useState(Number(deal.arv) || 0);
-  const [downPct, setDownPct] = useState(20);
-  const [rate, setRate] = useState(8.25);
-  const [term, setTerm] = useState(30);
-  const [closingPct, setClosingPct] = useState(2.5);
+  const [purchasePrice, setPurchasePrice] = useState(seed('purchasePrice', Number(deal.ask) || 0));
+  const [arv, setArv] = useState(seed('arv', Number(deal.arv) || 0));
+  const [downPct, setDownPct] = useState(seed('downPct', 20));
+  const [rate, setRate] = useState(seed('rate', 8.25));
+  const [term, setTerm] = useState(seed('term', 30));
+  const [closingPct, setClosingPct] = useState(seed('closingPct', 2.5));
 
-  const [monthlyRent, setMonthlyRent] = useState(1900);
-  const [vacancyPct, setVacancyPct] = useState(8);
-  const [taxesYr, setTaxesYr] = useState(4200);
-  const [insYr, setInsYr] = useState(1400);
-  const [mgmtPct, setMgmtPct] = useState(12);
-  const [maintPct, setMaintPct] = useState(10);
-  const [capexPct, setCapexPct] = useState(10);
-  const [holdingMo, setHoldingMo] = useState(6);
+  const [monthlyRent, setMonthlyRent] = useState(seed('monthlyRent', 1900));
+  const [vacancyPct, setVacancyPct] = useState(seed('vacancyPct', 8));
+  const [taxesYr, setTaxesYr] = useState(seed('taxesYr', 4200));
+  const [insYr, setInsYr] = useState(seed('insYr', 1400));
+  const [mgmtPct, setMgmtPct] = useState(seed('mgmtPct', 12));
+  const [maintPct, setMaintPct] = useState(seed('maintPct', 10));
+  const [capexPct, setCapexPct] = useState(seed('capexPct', 10));
+  const [holdingMo, setHoldingMo] = useState(seed('holdingMo', 6));
 
-  const [rehabOverride, setRehabOverride] = useState(8000);
-  const [items, setItems] = useState([
-    { id: 'r1', category: 'Flooring', description: 'LVP throughout', cost: 4500 },
-    { id: 'r2', category: 'Interior Paint', description: 'Interior paint', cost: 3500 },
-  ]);
+  const [rehabOverride, setRehabOverride] = useState(seed('rehabOverride', 8000));
+  const [items, setItems] = useState(
+    Array.isArray(s.items) && s.items.length > 0
+      ? s.items
+      : [
+          { id: 'r1', category: 'Flooring', description: 'LVP throughout', cost: 4500 },
+          { id: 'r2', category: 'Interior Paint', description: 'Interior paint', cost: 3500 },
+        ]
+  );
 
-  const [refiArv, setRefiArv] = useState(Number(deal.arv) || 0);
-  const [refiLTV, setRefiLTV] = useState(75);
-  const [refiRate, setRefiRate] = useState(7.5);
+  const [refiArv, setRefiArv] = useState(seed('refiArv', Number(deal.arv) || 0));
+  const [refiLTV, setRefiLTV] = useState(seed('refiLTV', 75));
+  const [refiRate, setRefiRate] = useState(seed('refiRate', 7.5));
 
   const m = useMemo(() => {
     const rehab = rehabOverride || items.reduce((s, i) => s + (i.cost || 0), 0);
@@ -154,6 +167,40 @@ function Analyzer({ deal }) {
 
   const isHold = strategy === 'rental' || strategy === 'multi' || strategy === 'commercial' || strategy === 'brrrr';
 
+  async function saveAnalysis() {
+    if (saving) return;
+    setSaving(true);
+    const stratLabel = (STRATS.find((x) => x.k === strategy) || {}).label || strategy;
+    const monthlyCashFlow = strategy === 'flip' ? 0 : m.cashFlowYr / 12;
+    const roi = strategy === 'flip' ? m.flipROI : m.coc;
+    const analyzerState = {
+      v: 1,
+      strategy,
+      purchasePrice, arv, downPct, rate, term, closingPct,
+      monthlyRent, vacancyPct, taxesYr, insYr, mgmtPct, maintPct, capexPct, holdingMo,
+      rehabOverride, items,
+      refiArv, refiLTV, refiRate,
+      summary: {
+        strategy,
+        strategyLabel: stratLabel,
+        purchasePrice,
+        arv,
+        rehab: m.rehab,
+        mao: m.mao,
+        monthlyCashFlow,
+        roi,
+      },
+    };
+    try {
+      await dispatch({ type: 'update_deal', id: deal.id, patch: { analyzerState } });
+      show('Analysis saved');
+    } catch (e) {
+      show('Could not save analysis');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <Layout>
       <div className="-m-4 md:-m-6 p-4 md:p-6">
@@ -183,11 +230,16 @@ function Analyzer({ deal }) {
             <Link to="/deal-analyzer" className="px-3 py-2 text-xs rounded-md border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 flex items-center gap-1.5">
               <Repeat2 className="w-3.5 h-3.5" /> Switch property
             </Link>
-            <button className="px-4 py-2 text-sm rounded-md bg-amber-500 text-slate-950 font-medium hover:bg-amber-400 flex items-center gap-2 shadow-sm">
-              <Save className="w-4 h-4" /> Save Deal
+            <button
+              onClick={saveAnalysis}
+              disabled={saving}
+              className="px-4 py-2 text-sm rounded-md bg-amber-500 text-slate-950 font-medium hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+            >
+              <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Deal'}
             </button>
           </div>
         </div>
+        {toastNode}
 
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {STRATS.map(({ k, label, icon: Icon }) => {

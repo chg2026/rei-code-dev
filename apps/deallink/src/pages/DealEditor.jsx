@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check } from 'lucide-react';
+import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge } from '../components/ui.jsx';
@@ -193,18 +193,14 @@ export default function DealEditor({ mode }) {
             </section>
 
             {mode === 'edit' && existing && (
-              <section>
-                <h3 className="text-white font-semibold text-sm mb-3">Deal analysis</h3>
-                <Link
-                  to={`/deal-analyzer/${existing.id}`}
-                  className="inline-flex items-center px-3 py-2 rounded-md border border-amber-400/60 bg-slate-900 text-amber-300 text-sm hover:border-amber-400 hover:text-amber-200"
-                >
-                  deal analysis
-                </Link>
-                <p className="text-xs text-slate-500 mt-2">
-                  Opens the analyzer prefilled with this property's address, ask, and ARV.
-                </p>
-              </section>
+              <DealAnalysisSection
+                deal={existing}
+                onClear={() => {
+                  if (!confirm('Clear the saved analysis for this property?')) return;
+                  dispatch({ type: 'update_deal', id: existing.id, patch: { analyzerState: null } });
+                  show('Analysis cleared');
+                }}
+              />
             )}
 
             {mode === 'edit' && existing && (
@@ -232,6 +228,113 @@ export default function DealEditor({ mode }) {
       </div>
       {node}
     </Layout>
+  );
+}
+
+// ─── Deal Analysis section ───────────────────────────────────────────────
+// Shown inside the property editor. When the analyzer has been saved for
+// this deal, renders a summary card with the headline numbers; otherwise
+// falls back to the original "open analyzer" button.
+
+const fmtUsd = (n) =>
+  Number.isFinite(n)
+    ? Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    : '$0';
+const fmtSignedUsd = (n) => (n < 0 ? `-${fmtUsd(Math.abs(n))}` : fmtUsd(n));
+const fmtPct = (n) => (Number.isFinite(n) ? `${Number(n).toFixed(1)}%` : '0.0%');
+
+function relTime(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const s = Math.floor(ms / 1000);
+  if (s < 60)         return 'just now';
+  const min = Math.floor(s / 60);
+  if (min < 60)       return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24)         return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30)         return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function DealAnalysisSection({ deal, onClear }) {
+  const summary = deal.analyzerState && deal.analyzerState.summary;
+
+  if (!summary) {
+    return (
+      <section>
+        <h3 className="text-white font-semibold text-sm mb-3">Deal analysis</h3>
+        <Link
+          to={`/deal-analyzer/${deal.id}`}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-amber-400/60 bg-slate-900 text-amber-300 text-sm hover:border-amber-400 hover:text-amber-200"
+        >
+          <Calculator className="w-3.5 h-3.5" /> deal analysis
+        </Link>
+        <p className="text-xs text-slate-500 mt-2">
+          Opens the analyzer prefilled with this property's address, ask, and ARV.
+        </p>
+      </section>
+    );
+  }
+
+  const cfTone = summary.monthlyCashFlow >= 0 ? 'text-emerald-300' : 'text-rose-300';
+  const roiTone = summary.roi >= 0 ? 'text-emerald-300' : 'text-rose-300';
+  const maoTone = summary.mao >= 0 ? 'text-emerald-300' : 'text-rose-300';
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <Calculator className="w-4 h-4 text-amber-400" /> Deal analysis
+        </h3>
+        <span className="text-[11px] text-slate-500">
+          {summary.strategyLabel || summary.strategy}
+          {deal.analyzerStateUpdatedAt ? ` · saved ${relTime(deal.analyzerStateUpdatedAt)}` : ''}
+        </span>
+      </div>
+      <div className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <SummaryStat label="Purchase" value={fmtUsd(summary.purchasePrice)} />
+          <SummaryStat label="ARV"      value={fmtUsd(summary.arv)} />
+          <SummaryStat label="MAO (70%)" value={fmtSignedUsd(summary.mao)} tone={maoTone} />
+          <SummaryStat
+            label={summary.strategy === 'flip' ? 'Net profit / mo' : 'Monthly cash flow'}
+            value={summary.strategy === 'flip' ? '—' : fmtSignedUsd(summary.monthlyCashFlow)}
+            tone={summary.strategy === 'flip' ? 'text-slate-300' : cfTone}
+          />
+          <SummaryStat
+            label={summary.strategy === 'flip' ? 'Flip ROI' : 'Cash-on-Cash'}
+            value={fmtPct(summary.roi)}
+            tone={roiTone}
+          />
+          <SummaryStat label="Rehab" value={fmtUsd(summary.rehab || 0)} />
+        </div>
+        <div className="flex items-center gap-3 pt-3 border-t border-amber-400/15">
+          <Link
+            to={`/deal-analyzer/${deal.id}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-400/60 bg-slate-900 text-amber-300 text-xs hover:border-amber-400 hover:text-amber-200"
+          >
+            <Calculator className="w-3.5 h-3.5" /> Open analysis
+          </Link>
+          <button
+            onClick={onClear}
+            className="text-[11px] text-slate-500 hover:text-rose-300"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryStat({ label, value, tone }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
+      <p className={`text-sm font-semibold mt-0.5 ${tone || 'text-white'}`}>{value}</p>
+    </div>
   );
 }
 
