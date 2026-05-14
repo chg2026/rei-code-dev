@@ -90,6 +90,22 @@ export default function DealEditor({ mode }) {
           <h1 className="text-2xl font-bold text-white mt-2">{mode === 'new' ? 'New deal' : (form.addr || 'Edit deal')}</h1>
         </div>
         <div className="flex gap-2">
+          {mode === 'edit' && existing && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const el = document.getElementById('im-share-panel');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  el.classList.add('ring-2', 'ring-amber-400/60');
+                  setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400/60'), 1600);
+                }
+              }}
+              title={existing.imSlug ? 'Manage shareable IM link' : 'Generate a shareable IM link'}
+            >
+              <Share2 className="w-4 h-4" /> {existing.imSlug ? 'Manage IM' : 'Share IM'}
+            </Button>
+          )}
           {mode === 'edit' && (
             <Button variant="danger" onClick={() => { if (confirm('Delete this deal?')) { dispatch({ type: 'remove_deal', id: existing.id }); show('Deleted'); nav('/admin'); } }}>
               <Trash2 className="w-4 h-4" /> Delete
@@ -270,7 +286,7 @@ function IMSharePanel({ deal, onChange, show }) {
   }
 
   return (
-    <section>
+    <section id="im-share-panel" className="rounded-lg p-3 -m-3 transition-shadow scroll-mt-6">
       <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
         <Share2 className="w-4 h-4 text-amber-400" /> Investment Memorandum
       </h3>
