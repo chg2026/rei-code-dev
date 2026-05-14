@@ -1,5 +1,5 @@
 import React from 'react';
-import { Twitter, Linkedin, Instagram, Globe, Upload, Link2, Camera } from 'lucide-react';
+import { Twitter, Linkedin, Instagram, Globe } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { DealLinkAPI } from '../lib/deallink-api.js';
@@ -208,7 +208,6 @@ export default function AdminProfile() {
   const [form, setForm] = React.useState(state.profile);
   const [bgTab, setBgTab] = React.useState(() => state.profile.backgroundType || 'solid');
   const [saving, setSaving] = React.useState(false);
-  const fileInputRef = React.useRef(null);
 
   React.useEffect(() => {
     if (state.loaded) {
@@ -238,30 +237,9 @@ export default function AdminProfile() {
   }
 
   function pickSwatch(val) {
-    setForm((f) => ({ ...f, backgroundValue: val }));
-  }
-
-  function onUploadClick() { fileInputRef.current?.click(); }
-
-  function onFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setField('avatarUrl', ev.target?.result || '');
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  }
-
-  function onUseUrl() {
-    const url = window.prompt('Image URL', form.avatarUrl || '');
-    if (url == null) return;
-    setField('avatarUrl', url.trim());
-  }
-
-  function onBgImageUrl() {
-    const url = window.prompt('Background image URL', form.backgroundType === 'image' ? (form.backgroundValue || '') : '');
-    if (url == null) return;
-    setForm((f) => ({ ...f, backgroundType: 'image', backgroundValue: url.trim() }));
+    // Always sync the background TYPE with the currently visible tab so
+    // a gradient swatch saves with type=gradient (and not type=solid).
+    setForm((f) => ({ ...f, backgroundType: bgTab, backgroundValue: val }));
   }
 
   async function save(e) {
@@ -330,9 +308,12 @@ export default function AdminProfile() {
                   {!form.avatarUrl && (form.initials || initialsOf(form.name || form.handle))}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                  <NeuButton onClick={onUploadClick}><Upload size={14} /> Upload photo</NeuButton>
-                  <NeuButton onClick={onUseUrl}><Link2 size={14} /> Use URL</NeuButton>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+                  <Label>Image URL</Label>
+                  <NeuInput
+                    value={form.avatarUrl}
+                    onChange={(e) => setField('avatarUrl', e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
+                  />
                 </div>
               </div>
             </NeuCard>
@@ -393,9 +374,16 @@ export default function AdminProfile() {
                     height: 80,
                     borderRadius: 12,
                     boxShadow: INSET_SHADOW,
-                    background: form.backgroundValue ? `center/cover no-repeat url(${form.backgroundValue})` : 'transparent',
+                    background: form.backgroundType === 'image' && form.backgroundValue
+                      ? `center/cover no-repeat url(${form.backgroundValue})`
+                      : 'transparent',
                   }} />
-                  <NeuButton onClick={onBgImageUrl}><Camera size={14} /> Set image URL</NeuButton>
+                  <Label>Background image URL</Label>
+                  <NeuInput
+                    value={form.backgroundType === 'image' ? (form.backgroundValue || '') : ''}
+                    onChange={(e) => setForm((f) => ({ ...f, backgroundType: 'image', backgroundValue: e.target.value }))}
+                    placeholder="https://example.com/background.jpg"
+                  />
                 </div>
               )}
             </NeuCard>
