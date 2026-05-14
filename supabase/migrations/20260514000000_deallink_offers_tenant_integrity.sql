@@ -51,12 +51,19 @@ ALTER TABLE public.deallink_offers
   DROP CONSTRAINT IF EXISTS deallink_offers_buyer_id_fkey;
 
 -- ─── 3. Add composite FKs that pin (deal/buyer, account) together ────────
--- Use ON DELETE SET NULL to match prior behaviour. NOTE: a composite FK
--- with SET NULL would null BOTH columns — but account_id is NOT NULL on
--- offers, so we cannot use SET NULL on the composite. Use NO ACTION and
--- rely on the existing ON DELETE CASCADE from offers.account_id →
--- accounts.id (when an account is deleted the offer rows go with it),
--- and on app-level cleanup for individual deal/buyer deletes.
+-- The original v2 single-column FKs used ON DELETE SET NULL so that offers
+-- survive the deletion of their parent deal/buyer (offers carry a
+-- denormalized `buyer_name` precisely for that reason — see the column
+-- comment in the v2 migration).
+--
+-- A composite FK with SET NULL would null BOTH columns, but `account_id`
+-- is NOT NULL on offers — so we cannot use SET NULL here. We use
+-- NO ACTION (the default) which preserves offer history: the app layer
+-- already nulls `deal_id`/`buyer_id` before deleting the parent, and a
+-- direct DELETE that left dangling refs would simply fail (correct
+-- behaviour). When an entire account is deleted, the existing
+-- account_id → accounts.id ON DELETE CASCADE on the offers table itself
+-- removes the offers, so the no-action composite FK never blocks that.
 
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -68,7 +75,7 @@ DO $$ BEGIN
       ADD CONSTRAINT deallink_offers_deal_account_fkey
       FOREIGN KEY (deal_id, account_id)
       REFERENCES public.deallink_deals (id, account_id)
-      ON DELETE CASCADE
+      ON DELETE NO ACTION
       DEFERRABLE INITIALLY IMMEDIATE;
   END IF;
 END $$;
@@ -83,7 +90,7 @@ DO $$ BEGIN
       ADD CONSTRAINT deallink_offers_buyer_account_fkey
       FOREIGN KEY (buyer_id, account_id)
       REFERENCES public.deallink_buyers (id, account_id)
-      ON DELETE CASCADE
+      ON DELETE NO ACTION
       DEFERRABLE INITIALLY IMMEDIATE;
   END IF;
 END $$;
