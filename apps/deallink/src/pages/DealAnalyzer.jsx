@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Home, Wrench, ArrowLeft, Plus, Trash2, AlertCircle,
@@ -195,12 +195,6 @@ function AnalyzerForDeal({ deal }) {
 
   const [saving, setSaving] = useState(false);
 
-  // If the user navigates from one deal's analyzer to another via the
-  // sidebar, useState above won't re-init — but the `key` prop on
-  // <AnalyzerForDeal> in the parent means React unmounts/remounts on
-  // dealId change, so the seed memo always reflects the new deal.
-  useEffect(() => {}, [deal.id]);
-
   const m = useMemo(() => {
     const rehab = rehabOverride || items.reduce((s, i) => s + (i.cost || 0), 0);
     const closingBuy = purchasePrice * (closingPct / 100);
@@ -316,6 +310,17 @@ function AnalyzerForDeal({ deal }) {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
+            {deal.photoUrl ? (
+              <img
+                src={deal.photoUrl}
+                alt=""
+                className="w-14 h-14 rounded-lg object-cover border border-slate-800 flex-shrink-0"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-slate-800 border border-slate-800 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 text-slate-500" />
+              </div>
+            )}
             <div className="min-w-0">
               <Link to="/deal-analyzer" className="text-slate-400 text-xs hover:text-amber-400">Deal Analyzer</Link>
               <h1 className="text-2xl font-semibold text-white truncate">{deal.addr || 'Untitled deal'}</h1>
@@ -431,6 +436,7 @@ function AnalyzerForDeal({ deal }) {
               </>
             )}
             {strategy === 'brrrr' && <BrrrAnalysis m={m} />}
+            <Comps />
           </div>
         </div>
       </div>
@@ -676,6 +682,43 @@ function FlipResults({ m, arv, purchasePrice }) {
         </div>
       </div>
     </>
+  );
+}
+
+function Comps() {
+  // Placeholder static comps — kept from the original analyzer layout so
+  // the right-rail still has a Comps section. Real comp data will plug
+  // into this UI in a follow-up; the shape is intentionally inert here.
+  const comps = [
+    { addr: '110 Oak Ave', beds: '3bd/2ba', sqft: '1,640 sqft', ppsf: '$190/sqft', date: '2024-11-01', price: 295000 },
+    { addr: '201 Elm Dr', beds: '3bd/2ba', sqft: '1,800 sqft', ppsf: '$155/sqft', date: '2024-10-15', price: 280000 },
+  ];
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-medium text-slate-100">Comparable Sales (Comps)</h3>
+          <p className="text-[11px] text-slate-500">Avg: $288K · $172/sqft</p>
+        </div>
+        <button className="px-3 py-1.5 text-xs rounded-md border border-slate-700 hover:border-slate-600 text-slate-200 flex items-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> Add Comp
+        </button>
+      </div>
+      <div className="space-y-2">
+        {comps.map((c) => (
+          <div key={c.addr} className="flex items-center justify-between border-t border-slate-800 pt-2 text-sm">
+            <div>
+              <p className="text-slate-200 flex items-center gap-2"><Home className="w-3.5 h-3.5 text-amber-400" /> {c.addr}</p>
+              <p className="text-[11px] text-slate-500 ml-5">{c.beds} · {c.sqft} · {c.ppsf} · {c.date}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-slate-100 font-medium">{fmt(c.price)}</span>
+              <button className="text-slate-500 hover:text-rose-400"><Trash2 className="w-4 h-4" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
