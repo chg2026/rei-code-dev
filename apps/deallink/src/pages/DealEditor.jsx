@@ -92,15 +92,6 @@ export default function DealEditor({ mode }) {
           <h1 className="text-2xl font-bold text-white mt-2">{mode === 'new' ? 'New deal' : (form.addr || 'Edit deal')}</h1>
         </div>
         <div className="flex gap-2">
-          {mode === 'edit' && existing && (
-            <Button
-              variant="secondary"
-              onClick={() => setTab('im')}
-              title="Open Investment Memorandum builder"
-            >
-              <Share2 className="w-4 h-4" /> Share IM
-            </Button>
-          )}
           {mode === 'edit' && (
             <Button variant="danger" onClick={() => { if (confirm('Delete this deal?')) { dispatch({ type: 'remove_deal', id: existing.id }); show('Deleted'); nav('/admin'); } }}>
               <Trash2 className="w-4 h-4" /> Delete
@@ -1250,36 +1241,102 @@ function DealIMSection({ deal, onSave, show }) {
 
   return (
     <section className="space-y-5">
-      <div className="flex items-center gap-6 border-b border-slate-800 pb-2">
-        {[
-          { k: 'builder', label: 'Memo builder', Icon: FileSignature },
-          { k: 'preview', label: 'Live preview', Icon: Eye },
-        ].map((s) => {
-          const active = sub === s.k;
-          const Icon = s.Icon;
-          return (
-            <button
-              key={s.k}
-              onClick={() => setSub(s.k)}
-              className={`relative pb-2 flex items-center gap-2 text-sm font-medium transition-colors ${
-                active ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {s.label}
-              <span
-                className={`absolute left-0 right-0 -bottom-px h-0.5 rounded-full ${
-                  active ? 'bg-amber-400' : 'bg-transparent'
+      <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-6">
+          {[
+            { k: 'builder', label: 'Memo builder', Icon: FileSignature },
+            { k: 'preview', label: 'Live preview', Icon: Eye },
+          ].map((s) => {
+            const active = sub === s.k;
+            const Icon = s.Icon;
+            return (
+              <button
+                key={s.k}
+                onClick={() => setSub(s.k)}
+                className={`relative pb-2 flex items-center gap-2 text-sm font-medium transition-colors ${
+                  active ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'
                 }`}
-              />
-            </button>
-          );
-        })}
+              >
+                <Icon className="w-4 h-4" />
+                {s.label}
+                <span
+                  className={`absolute left-0 right-0 -bottom-px h-0.5 rounded-full ${
+                    active ? 'bg-amber-400' : 'bg-transparent'
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+        {/* Share IM lives in Live preview only — wholesalers must see what
+            buyers see before they can share. */}
+        {sub === 'preview' && (
+          <ShareIMButton deal={deal} onSave={onSave} show={show} />
+        )}
       </div>
 
       {sub === 'builder' && <IMMemoBuilder deal={deal} onSave={onSave} show={show} />}
       {sub === 'preview' && <IMLivePreview deal={deal} />}
     </section>
+  );
+}
+
+// Share button rendered next to the Live preview sub-tab. Generates the
+// public buyer link (slug) on first click via DealLinkAPI.shareIM, then
+// switches to a copy affordance with the resolved URL.
+function ShareIMButton({ deal, onSave, show }) {
+  const [busy, setBusy]   = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const slug = deal.imSlug || null;
+  const shareUrl = slug && typeof window !== 'undefined'
+    ? `${window.location.origin}/deal/${slug}`
+    : '';
+
+  async function handleClick() {
+    setError(null);
+    if (!slug) {
+      setBusy(true);
+      try {
+        const s = await DealLinkAPI.shareIM(deal.id);
+        await onSave({ imSlug: s });
+        show && show('Share link ready — click again to copy');
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to generate share link');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      show && show('Link copied');
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError('Could not copy — select and copy manually.');
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={busy}
+        className="inline-flex items-center gap-2 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 text-sm font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        title={slug ? shareUrl : 'Generate a public buyer link for this IM'}
+      >
+        <Share2 className="w-4 h-4" />
+        {busy ? 'Generating…' : copied ? 'Copied!' : 'Share IM'}
+      </button>
+      {error && <span className="text-[11px] text-red-400">{error}</span>}
+      {slug && !error && (
+        <span className="text-[11px] text-slate-500 max-w-[280px] truncate" title={shareUrl}>
+          {shareUrl}
+        </span>
+      )}
+    </div>
   );
 }
 
