@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, Info } from 'lucide-react';
+import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, Info, ChevronRight } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge } from '../components/ui.jsx';
@@ -231,18 +231,22 @@ export default function DealEditor({ mode }) {
             {mode === 'edit' && existing && tab === 'analysis' && (
               <DealAnalysisSection
                 deal={existing}
-                onClear={async () => {
-                  if (!confirm('Clear the saved analysis for this property?')) return;
+                onDelete={async (analysisId) => {
+                  if (!confirm('Delete this saved analysis?')) return;
+                  const current = Array.isArray(existing.analyzerState)
+                    ? existing.analyzerState
+                    : (existing.analyzerState ? [existing.analyzerState] : []);
+                  const next = current.filter((a) => a && a.id !== analysisId);
                   try {
                     await dispatch({
                       type: 'update_deal',
                       id: existing.id,
-                      patch: { analyzerState: null },
+                      patch: { analyzerState: next.length ? next : null },
                       throwOnError: true,
                     });
-                    show('Analysis cleared');
+                    show('Analysis deleted');
                   } catch (e) {
-                    show(e?.response?.data?.error || e?.message || 'Could not clear analysis');
+                    show(e?.response?.data?.error || e?.message || 'Could not delete analysis');
                   }
                 }}
               />
@@ -367,10 +371,42 @@ function deriveMetrics(s) {
   };
 }
 
-function DealAnalysisSection({ deal, onClear }) {
-  const state = deal.analyzerState;
+const STRATEGY_BADGE = {
+  rental:     { label: 'Rental',      cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  brrrr:      { label: 'BRRRR',       cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+  flip:       { label: 'Fix & Flip',  cls: 'bg-amber-400/20 text-amber-300 border-amber-400/40' },
+  multi:      { label: 'Multifamily', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  commercial: { label: 'Commercial',  cls: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
+};
 
-  if (!state) {
+function fmtSavedAt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const datePart = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${datePart} · ${timePart}`;
+}
+
+function DealAnalysisSection({ deal, onDelete }) {
+  const raw = deal.analyzerState;
+  const analyses = React.useMemo(() => {
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (raw && typeof raw === 'object') return [raw]; // legacy single object
+    return [];
+  }, [raw]);
+
+  const sorted = React.useMemo(() => {
+    return [...analyses].sort((a, b) => {
+      const ta = new Date(a?.savedAt || 0).getTime();
+      const tb = new Date(b?.savedAt || 0).getTime();
+      return tb - ta;
+    });
+  }, [analyses]);
+
+  const [expandedId, setExpandedId] = React.useState(null);
+
+  if (analyses.length === 0) {
     return (
       <section>
         <h3 className="text-white font-semibold text-sm mb-3">Deal analysis</h3>
@@ -392,6 +428,92 @@ function DealAnalysisSection({ deal, onClear }) {
     );
   }
 
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <Calculator className="w-4 h-4 text-amber-400" /> Saved analyses
+          <span className="text-[11px] text-slate-500 font-normal">({analyses.length})</span>
+        </h3>
+        <Link
+          to={`/deal-analyzer/${deal.id}`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-400 text-slate-900 text-xs font-semibold hover:bg-amber-300"
+        >
+          <Calculator className="w-3.5 h-3.5" /> New analysis
+        </Link>
+      </div>
+
+      <div className="space-y-2">
+        {sorted.map((a) => {
+          const expanded = expandedId === a.id;
+          return (
+            <SavedAnalysisRow
+              key={a.id || a.savedAt}
+              analysis={a}
+              deal={deal}
+              expanded={expanded}
+              onToggle={() => setExpandedId(expanded ? null : a.id)}
+              onDelete={() => onDelete && onDelete(a.id)}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SavedAnalysisRow({ analysis, deal, expanded, onToggle, onDelete }) {
+  const a = analysis;
+  const strategy = a.strategy || (a.summary && a.summary.strategy) || 'rental';
+  const badge = STRATEGY_BADGE[strategy] || { label: strategy, cls: 'bg-slate-500/20 text-slate-300 border-slate-500/40' };
+  const isFlip = strategy === 'flip';
+
+  const m = deriveMetrics(a);
+  const previewLabel = isFlip ? 'Net Profit' : 'Monthly Cash Flow';
+  const previewValue = isFlip ? m.flipNetProfit : m.monthlyCashFlow;
+  const previewTone = previewValue >= 0 ? 'text-emerald-300' : 'text-rose-300';
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900/40 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center gap-3 min-w-0 text-left hover:opacity-90 transition-opacity"
+        >
+          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded border ${badge.cls} flex-shrink-0`}>
+            {badge.label}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 truncate">{fmtSavedAt(a.savedAt)}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              <span className="text-slate-400">{previewLabel}:</span>{' '}
+              <span className={`font-mono font-semibold ${previewTone}`}>{fmtSignedUsd(previewValue)}</span>
+            </p>
+          </div>
+          <ChevronRight
+            className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          />
+        </button>
+        <button
+          onClick={onDelete}
+          className="text-slate-500 hover:text-rose-300 p-1.5 rounded hover:bg-slate-800 flex-shrink-0"
+          title="Delete this analysis"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800">
+          <SavedAnalysisReport analysis={a} deal={deal} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SavedAnalysisReport({ analysis, deal }) {
+  const state = analysis;
   const strategy = state.strategy || (state.summary && state.summary.strategy) || 'rental';
   const strategyLabel = STRATEGY_LABELS[strategy] || (state.summary && state.summary.strategyLabel) || strategy;
   const isFlip = strategy === 'flip';
@@ -534,12 +656,6 @@ function DealAnalysisSection({ deal, onClear }) {
         >
           <Calculator className="w-3.5 h-3.5" /> Re-run analysis
         </Link>
-        <button
-          onClick={onClear}
-          className="text-[11px] text-slate-500 hover:text-rose-300"
-        >
-          Clear saved analysis
-        </button>
       </div>
     </section>
   );

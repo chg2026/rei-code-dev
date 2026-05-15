@@ -61,9 +61,26 @@ function Analyzer({ deal }) {
   const { show, node: toastNode } = useToast();
   const [saving, setSaving] = useState(false);
 
-  // Saved analysis (if any) wins over the raw deal fields. Falls back to
-  // sane defaults whenever a key is missing from saved state.
-  const s = deal.analyzerState || {};
+  // analyzerState is now an array of saved analyses. Legacy single-object
+  // saves are coerced into a 1-item array. The most-recent saved analysis
+  // (by savedAt) seeds the form; missing fields fall back to sensible
+  // defaults.
+  const savedAnalyses = React.useMemo(() => {
+    const raw = deal.analyzerState;
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return [raw]; // legacy single object
+    return [];
+  }, [deal.analyzerState]);
+
+  const s = React.useMemo(() => {
+    if (savedAnalyses.length === 0) return {};
+    const sorted = [...savedAnalyses].sort((a, b) => {
+      const ta = new Date(a?.savedAt || 0).getTime();
+      const tb = new Date(b?.savedAt || 0).getTime();
+      return tb - ta;
+    });
+    return sorted[0] || {};
+  }, [savedAnalyses]);
   const seed = (key, fallback) => (s[key] !== undefined && s[key] !== null ? s[key] : fallback);
 
   const [strategy, setStrategy] = useState(seed('strategy', 'brrrr'));
@@ -175,9 +192,15 @@ function Analyzer({ deal }) {
     const stratLabel = (STRATS.find((x) => x.k === strategy) || {}).label || strategy;
     const monthlyCashFlow = strategy === 'flip' ? 0 : m.cashFlowYr / 12;
     const roi = strategy === 'flip' ? m.flipROI : m.coc;
-    const analyzerState = {
+    const newAnalysis = {
+      id:
+        (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `an_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       v: 1,
       strategy,
+      label: `${stratLabel} Analysis`,
+      savedAt: new Date().toISOString(),
       purchasePrice, arv, downPct, rate, term, closingPct,
       monthlyRent, vacancyPct, taxesYr, insYr, mgmtPct, maintPct, capexPct, holdingMo,
       rehabOverride, items,
@@ -193,8 +216,14 @@ function Analyzer({ deal }) {
         roi,
       },
     };
+    const nextAnalyses = [...savedAnalyses, newAnalysis];
     try {
-      await dispatch({ type: 'update_deal', id: deal.id, patch: { analyzerState }, throwOnError: true });
+      await dispatch({
+        type: 'update_deal',
+        id: deal.id,
+        patch: { analyzerState: nextAnalyses },
+        throwOnError: true,
+      });
       show('Analysis saved');
     } catch (e) {
       show(e?.response?.data?.error || e?.message || 'Could not save analysis');
