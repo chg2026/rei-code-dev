@@ -473,6 +473,47 @@ function DealDetailModal({ deal, theme, onClose, onInterested }) {
           </div>
         )}
 
+        {/* Photos — up to 3 thumbnails, +N overlay on the third when more exist */}
+        {Array.isArray(deal.photos) && deal.photos.length > 0 && (() => {
+          const visible = deal.photos.slice(0, 3);
+          const overflow = deal.photos.length - visible.length;
+          return (
+            <div style={{
+              marginTop: 16, display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+            }}>
+              {visible.map((url, i) => {
+                const isOverflow = i === 2 && overflow > 0;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '1 / 1',
+                      borderRadius: radius,
+                      overflow: 'hidden',
+                      background: `center/cover no-repeat url(${url}), ${tone.dark}`,
+                      boxShadow: neuOut(tone.base, tone.dark, 0.7, 8),
+                    }}
+                  >
+                    {isOverflow && (
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        background: 'rgba(0,0,0,0.55)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: 700, fontSize: 14,
+                        fontFamily: 'JetBrains Mono, monospace',
+                      }}>
+                        +{overflow + 1} more
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         {/* Price tile */}
         <div style={{
           marginTop: 16, padding: '14px 16px',
