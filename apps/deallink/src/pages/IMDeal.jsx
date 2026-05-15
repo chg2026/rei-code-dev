@@ -169,10 +169,15 @@ export default function IMDeal() {
   async function sendOtp() {
     setSubmitting(true);
     try {
+      // The user types 10 digits; the API expects E.164 (+1XXXXXXXXXX).
+      // Normalize once here and persist back to state so verifyOtp sends
+      // the same phone the server already keyed the code under.
+      const formattedPhone = phone.startsWith('+1') ? phone : '+1' + phone.replace(/\D/g, '');
+      setPhone(formattedPhone);
       const res = await fetch(`${IM_API_BASE}/${encodeURIComponent(dealId)}/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone }),
+        body: JSON.stringify({ name, phone: formattedPhone }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
