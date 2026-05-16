@@ -41,40 +41,10 @@
 
 const express = require('express')
 const router  = express.Router()
-const { supabaseAdmin } = require('../middleware/auth')
+const { supabaseAdmin, supabaseAnon } = require('../middleware/auth')
 
 const PHONE_RE = /^\+1[2-9]\d{9}$/
-const OTP_TTL_MS = 10 * 60 * 1000   // 10 minutes
 const FREE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
-
-// ─── Twilio ───────────────────────────────────────────────────────────────────
-// Lazy-init so the server still boots when TWILIO_* vars are absent.
-
-let twilioClient = null
-function getTwilio() {
-  if (twilioClient) return twilioClient
-  const sid   = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (sid && token) {
-    twilioClient = require('twilio')(sid, token)
-  }
-  return twilioClient
-}
-
-async function sendOtpSms(phone, code) {
-  const client = getTwilio()
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID
-  if (client && messagingServiceSid) {
-    await client.messages.create({
-      body:              `Your DealLink verification code is: ${code}`,
-      messagingServiceSid,
-      to:                phone,
-    })
-  } else {
-    // Fallback for dev/unconfigured environments — log instead of send.
-    console.log(`[deallink-im/otp] SMS not sent (Twilio unconfigured). Code for ${phone}: ${code}`)
-  }
-}
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,10 +54,6 @@ function dbOrFail(res) {
     return null
   }
   return supabaseAdmin
-}
-
-function randomOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000))
 }
 
 // Fetch the account_products plan for a given account_id.
@@ -149,6 +115,7 @@ router.get('/:dealId', async (req, res) => {
 
 router.post('/:dealId/send-otp', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
+  if (!supabaseAnon) return res.status(503).json({ error: 'Supabase anon client not configured.' })
   const { dealId } = req.params
   const { name, phone: rawPhone } = req.body
   const digits = (rawPhone || '').replace(/\D/g, '')
@@ -172,13 +139,11 @@ router.post('/:dealId/send-otp', async (req, res) => {
     if (dealErr) return res.status(500).json({ error: dealErr.message })
     if (!deal)   return res.status(404).json({ error: 'Deal not found.' })
 
-    const code = randomOtp()
-    const now  = new Date().toISOString()
-
+    // Store name + phone so verify-otp can use it for buyer creation.
     const { error: upsertErr } = await db
       .from('deallink_im_sessions')
       .upsert(
-        { deal_id: dealId, phone, name: String(name).trim(), otp_code: code, otp_sent_at: now },
+        { deal_id: dealId, phone, name: String(name).trim() },
         { onConflict: 'deal_id,phone' }
       )
     if (upsertErr) {
@@ -186,7 +151,9 @@ router.post('/:dealId/send-otp', async (req, res) => {
       return res.status(500).json({ error: 'Failed to create session.' })
     }
 
-    await sendOtpSms(phone, code)
+    // Delegate OTP delivery to Supabase phone auth.
+    const { error } = await supabaseAnon.auth.signInWithOtp({ phone })
+    if (error) return res.status(400).json({ error: error.message })
 
     res.json({ ok: true })
   } catch (e) {
@@ -199,6 +166,7 @@ router.post('/:dealId/send-otp', async (req, res) => {
 
 router.post('/:dealId/verify-otp', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
+  if (!supabaseAnon) return res.status(503).json({ error: 'Supabase anon client not configured.' })
   const { dealId } = req.params
   const { phone, code } = req.body
 
@@ -207,24 +175,20 @@ router.post('/:dealId/verify-otp', async (req, res) => {
   }
 
   try {
-    // Validate session.
-    const { data: session, error: sessErr } = await db
+    // Verify OTP via Supabase phone auth — returns a real session on success.
+    const { data, error: otpErr } = await supabaseAnon.auth.verifyOtp({ phone, token: code, type: 'sms' })
+    if (otpErr) return res.status(401).json({ error: 'Invalid or expired code.' })
+    const supabaseSession = data.session
+
+    // Retrieve stored name from the im_sessions record created at send-otp.
+    const { data: imSession, error: sessErr } = await db
       .from('deallink_im_sessions')
-      .select('name, otp_code, otp_sent_at')
+      .select('name')
       .eq('deal_id', dealId)
       .eq('phone', phone)
       .maybeSingle()
-
     if (sessErr) return res.status(500).json({ error: sessErr.message })
-    if (!session) return res.status(404).json({ error: 'Session not found. Please request a new code.' })
-
-    if (session.otp_code !== String(code).trim()) {
-      return res.status(401).json({ error: 'Incorrect verification code.' })
-    }
-    const age = Date.now() - new Date(session.otp_sent_at).getTime()
-    if (age > OTP_TTL_MS) {
-      return res.status(410).json({ error: 'Verification code has expired. Please request a new one.' })
-    }
+    const buyerName = imSession?.name || null
 
     // Fetch full deal including im_config.
     const { data: deal, error: dealErr } = await db
@@ -255,7 +219,7 @@ router.post('/:dealId/verify-otp', async (req, res) => {
         {
           account_id:       deal.account_id,
           phone,
-          name:             session.name,
+          name:             buyerName,
           source_deal_id:   dealId,
           source:           'im-link',
           im_registered_at: now,
@@ -298,6 +262,9 @@ router.post('/:dealId/verify-otp', async (req, res) => {
     if (imConfig.show_rehab)    dealOut.rehabItems    = deal.rehab_items    || []
 
     res.json({
+      session: supabaseSession
+        ? { access_token: supabaseSession.access_token, refresh_token: supabaseSession.refresh_token }
+        : null,
       buyer_id:   buyer?.id || null,
       deal:       dealOut,
       wholesaler: {
