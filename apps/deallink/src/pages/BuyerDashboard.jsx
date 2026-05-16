@@ -1,13 +1,11 @@
 // Public route /buyer/dashboard — simplified dashboard for verified IM
-// buyers. Pulls baseline data from localStorage (the same store that
-// IMDeal.jsx writes to) so the page works even if the backend dashboard
-// endpoint isn't reachable. If GET /api/deallink/buyer/:id/dashboard
-// resolves, its fields take precedence.
+// buyers. Reads entirely from localStorage (the same store that
+// IMDeal.jsx writes to). No authenticated API calls — this page must
+// never redirect to /login.
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Calculator, Send, ShieldCheck, Building2, ArrowRight, ListChecks } from 'lucide-react';
+import { Send, ShieldCheck, Building2, ArrowRight, ListChecks } from 'lucide-react';
 
-const IM_API_BASE = 'https://rei-code-dev.replit.app/api/deallink';
 const BUYER_STORAGE_KEY = 'dl.im.buyer';
 
 function loadJson(key, fallback) {
@@ -39,36 +37,8 @@ export default function BuyerDashboard() {
   const navigate = useNavigate();
   const buyer = loadJson(BUYER_STORAGE_KEY, null);
 
-  const [profile, setProfile] = React.useState(buyer);
-  const [sharedDeals, setSharedDeals] = React.useState(() => loadJson('dl.im.viewed', []));
-  const [offers, setOffers] = React.useState(() => loadJson('dl.im.offers', []));
-  const [loading, setLoading] = React.useState(!!buyer?.id);
-
-  // Optimistically try to enrich from the server. If anything fails we
-  // silently keep the localStorage view — the buyer can still see their
-  // recent activity.
-  React.useEffect(() => {
-    if (!buyer?.id) { setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${IM_API_BASE}/buyer/${encodeURIComponent(buyer.id)}/dashboard`, {
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (!res.ok) throw new Error(`${res.status}`);
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.buyer)        setProfile({ ...buyer, ...data.buyer });
-        if (Array.isArray(data.shared_deals)) setSharedDeals(data.shared_deals);
-        if (Array.isArray(data.offers))       setOffers(data.offers);
-      } catch {
-        // Use localStorage fallback only.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [buyer?.id]);
+  const sharedDeals = loadJson('dl.im.viewed', []);
+  const offers = loadJson('dl.im.offers', []);
 
   if (!buyer?.id) {
     return (
@@ -79,7 +49,7 @@ export default function BuyerDashboard() {
           </div>
           <h1 className="text-xl font-semibold text-white mb-2">Buyer dashboard</h1>
           <p className="text-sm text-slate-400 mb-6">
-            You'll see your shared deals and offers here once a wholesaler shares an Investment Memorandum with you.
+            Start by clicking a DealLink from a wholesaler.
           </p>
           <button
             type="button"
@@ -93,7 +63,7 @@ export default function BuyerDashboard() {
     );
   }
 
-  const displayName = profile?.name || buyer.name || 'there';
+  const displayName = buyer.name || 'there';
 
   const bestSpread = sharedDeals.reduce((max, d) => {
     const ask = Number(d.ask ?? d.asking ?? 0);
@@ -122,9 +92,7 @@ export default function BuyerDashboard() {
         <h2 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
           <Building2 className="w-4 h-4 text-amber-400" /> Deals shared with me
         </h2>
-        {loading ? (
-          <div className="text-xs text-slate-500 py-6 text-center">Loading deals…</div>
-        ) : sharedDeals.length === 0 ? (
+        {sharedDeals.length === 0 ? (
           <Empty body="No deals shared with you yet. Ask a wholesaler for their DealLink." />
         ) : (
           <div className="space-y-2">
@@ -184,25 +152,6 @@ export default function BuyerDashboard() {
         )}
       </section>
 
-      {/* Analyzer card */}
-      <section className="mb-6">
-        <Link
-          to="/deal-analyzer"
-          className="block rounded-xl border border-slate-800 bg-gradient-to-br from-amber-400/[0.08] to-slate-900/40 p-5 hover:border-amber-400/40"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-amber-400/20 text-amber-300 inline-flex items-center justify-center border border-amber-400/30">
-              <Calculator className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-semibold">Analyze any deal</p>
-              <p className="text-xs text-slate-400 mt-0.5">Run the free calculator on any property — no signup required.</p>
-            </div>
-            <ArrowRight className="w-4 h-4 text-amber-300" />
-          </div>
-        </Link>
-      </section>
-
       {/* Wholesaler unlock */}
       <section className="rounded-xl border border-amber-400/30 bg-amber-400/[0.06] p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
         <div className="flex items-start gap-3">
@@ -231,9 +180,8 @@ export default function BuyerDashboard() {
 function Shell({ children }) {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-between">
+      <header className="px-4 py-3 border-b border-slate-800/60 flex items-center justify-center">
         <div className="text-amber-400 font-bold tracking-wide text-sm">DealLink</div>
-        <Link to="/deal-analyzer" className="text-xs text-slate-400 hover:text-amber-400">Deal Analyzer</Link>
       </header>
       <main className="max-w-3xl mx-auto px-4 py-6">{children}</main>
     </div>
