@@ -753,14 +753,26 @@ function PropertySelector({ deals, loaded }) {
 
       {!loaded ? (
         <div className="py-24 text-center text-xs text-slate-500 font-mono">Loading properties…</div>
+      ) : deals.length === 0 ? (
+        <div className="py-20 text-center max-w-md mx-auto">
+          <div className="inline-flex w-12 h-12 rounded-full bg-slate-800 items-center justify-center mb-4">
+            <Search className="w-5 h-5 text-slate-500" />
+          </div>
+          <p className="text-slate-200 font-medium mb-1">No properties yet</p>
+          <p className="text-sm text-slate-400 mb-6">
+            Add your first deal in Properties to start analyzing deals.
+          </p>
+          <Link
+            to="/admin/deal/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-400 text-slate-900 font-semibold hover:bg-amber-300"
+          >
+            Add your first property
+          </Link>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-slate-300 mb-2">{deals.length === 0 ? 'No properties yet.' : 'No matches.'}</p>
-          <p className="text-xs text-slate-500">
-            {deals.length === 0
-              ? <>Add a deal in <Link to="/admin" className="text-amber-400 hover:underline">Properties</Link> to get started.</>
-              : 'Try a different filter or search.'}
-          </p>
+          <p className="text-slate-300 mb-2">No matches.</p>
+          <p className="text-xs text-slate-500">Try a different filter or search.</p>
         </div>
       ) : (
         <div className="space-y-3">

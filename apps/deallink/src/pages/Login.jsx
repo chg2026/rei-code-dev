@@ -1,16 +1,31 @@
 import React from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
-import { Building2, ArrowRight } from 'lucide-react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Building2, ArrowRight, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Button, Input, Field } from '../components/ui.jsx';
+import { supabase } from '../lib/supabase.js';
+
+const PHONE_API_BASE = 'https://rei-code-dev.replit.app/api/auth/phone';
 
 export default function Login() {
   const auth = useAuth();
   const loc = useLocation();
+  const navigate = useNavigate();
+  const [tab, setTab] = React.useState('email'); // 'email' | 'phone'
+
+  // Email tab state
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState(null);
+
+  // Phone tab state
+  const [phone, setPhone] = React.useState('');
+  const [code, setCode] = React.useState('');
+  const [phoneStep, setPhoneStep] = React.useState('phone'); // 'phone' | 'code'
+  const [phoneSubmitting, setPhoneSubmitting] = React.useState(false);
+  const [phoneError, setPhoneError] = React.useState(null);
+  const [sentPhone, setSentPhone] = React.useState(''); // E.164 phone we sent the code to
 
   React.useEffect(() => {
     if (window.location.hash.includes('access_token=')) {
@@ -31,6 +46,73 @@ export default function Login() {
     try { await auth.signIn(email.trim(), password); }
     catch (err) { setError(err?.message || 'Sign-in failed.'); }
     finally { setSubmitting(false); }
+  }
+
+  function normalizePhone(raw) {
+    const trimmed = (raw || '').trim();
+    if (trimmed.startsWith('+1')) return trimmed.replace(/[^\d+]/g, '');
+    return '+1' + trimmed.replace(/\D/g, '');
+  }
+
+  async function sendPhoneCode(e) {
+    if (e) e.preventDefault();
+    setPhoneError(null);
+    const formatted = normalizePhone(phone);
+    if (formatted.replace(/\D/g, '').length < 11) {
+      setPhoneError('Enter a valid 10-digit phone number.');
+      return;
+    }
+    setPhoneSubmitting(true);
+    try {
+      const res = await fetch(`${PHONE_API_BASE}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formatted }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Failed to send code (${res.status})`);
+      }
+      setSentPhone(formatted);
+      setPhone(formatted);
+      setPhoneStep('code');
+    } catch (err) {
+      setPhoneError(err?.message || 'Could not send code.');
+    } finally {
+      setPhoneSubmitting(false);
+    }
+  }
+
+  async function verifyPhoneCode(e) {
+    if (e) e.preventDefault();
+    setPhoneError(null);
+    const clean = (code || '').replace(/\D/g, '').slice(0, 6);
+    if (clean.length !== 6) { setPhoneError('Enter the 6-digit code.'); return; }
+    setPhoneSubmitting(true);
+    try {
+      const res = await fetch(`${PHONE_API_BASE}/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: sentPhone || normalizePhone(phone), code: clean }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Invalid code (${res.status})`);
+      }
+      const data = await res.json();
+      if (data?.session?.access_token) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
+      const dest = (loc.state && loc.state.from) || '/dashboard';
+      navigate(dest, { replace: true });
+    } catch (err) {
+      setPhoneError(err?.message || 'Code did not verify.');
+    } finally {
+      setPhoneSubmitting(false);
+    }
   }
 
   return (
@@ -55,13 +137,86 @@ export default function Login() {
           </div>
           <p className="text-amber-400 text-xs uppercase tracking-widest font-mono">Sign in</p>
           <h1 className="text-2xl text-white font-bold mt-2">Welcome back.</h1>
-          <form onSubmit={submit} className="mt-8 space-y-4">
-            <Field label="Email"><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="you@email.com" autoFocus disabled={submitting} /></Field>
-            <Field label="Password"><Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} placeholder="••••••••" disabled={submitting} /></Field>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button type="submit" className="w-full" disabled={submitting}>{submitting ? 'Signing in…' : <>Sign in <ArrowRight className="w-4 h-4" /></>}</Button>
-            <p className="text-xs text-slate-400 text-center">Need an account? <Link to="/signup" className="text-amber-400 hover:underline">Sign up</Link></p>
-          </form>
+
+          {/* Tabs */}
+          <div className="mt-6 grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-900 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => { setTab('email'); setError(null); }}
+              className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === 'email' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Mail className="w-4 h-4" /> Email
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab('phone'); setPhoneError(null); }}
+              className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === 'phone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Phone className="w-4 h-4" /> Phone
+            </button>
+          </div>
+
+          {tab === 'email' ? (
+            <form onSubmit={submit} className="mt-6 space-y-4">
+              <Field label="Email"><Input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} placeholder="you@email.com" autoFocus disabled={submitting} /></Field>
+              <Field label="Password"><Input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} placeholder="••••••••" disabled={submitting} /></Field>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              <Button type="submit" className="w-full" disabled={submitting}>{submitting ? 'Signing in…' : <>Sign in <ArrowRight className="w-4 h-4" /></>}</Button>
+              <p className="text-xs text-slate-400 text-center">Need an account? <Link to="/signup" className="text-amber-400 hover:underline">Sign up</Link></p>
+            </form>
+          ) : phoneStep === 'phone' ? (
+            <form onSubmit={sendPhoneCode} className="mt-6 space-y-4">
+              <Field label="Phone number">
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); setPhoneError(null); }}
+                  placeholder="(555) 123-4567"
+                  autoFocus
+                  disabled={phoneSubmitting}
+                />
+              </Field>
+              <p className="text-xs text-slate-500">We'll text you a 6-digit code. US numbers only.</p>
+              {phoneError && <p className="text-sm text-red-400">{phoneError}</p>}
+              <Button type="submit" className="w-full" disabled={phoneSubmitting}>
+                {phoneSubmitting ? 'Sending…' : <>Send code <ArrowRight className="w-4 h-4" /></>}
+              </Button>
+              <p className="text-xs text-slate-400 text-center">Need an account? <Link to="/signup" className="text-amber-400 hover:underline">Sign up</Link></p>
+            </form>
+          ) : (
+            <form onSubmit={verifyPhoneCode} className="mt-6 space-y-4">
+              <Field label="6-digit code">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={code}
+                  onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPhoneError(null); }}
+                  placeholder="000000"
+                  autoFocus
+                  disabled={phoneSubmitting}
+                  maxLength={6}
+                />
+              </Field>
+              <p className="text-xs text-slate-500">Sent to {sentPhone || phone}. <button type="button" onClick={() => { setPhoneStep('phone'); setCode(''); setPhoneError(null); }} className="text-amber-400 hover:underline">Change number</button></p>
+              {phoneError && <p className="text-sm text-red-400">{phoneError}</p>}
+              <Button type="submit" className="w-full" disabled={phoneSubmitting}>
+                {phoneSubmitting ? 'Verifying…' : <>Verify <ArrowRight className="w-4 h-4" /></>}
+              </Button>
+              <button
+                type="button"
+                onClick={() => sendPhoneCode()}
+                disabled={phoneSubmitting}
+                className="block w-full text-xs text-slate-400 text-center hover:text-amber-400 disabled:opacity-50"
+              >
+                Resend code
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

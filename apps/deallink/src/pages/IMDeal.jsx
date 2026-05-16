@@ -8,6 +8,7 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Lock, ArrowLeft, ArrowRight, Building2, MapPin, Bed, Bath, Ruler, KeyRound, ShieldCheck, Hammer, BarChart3, Send } from 'lucide-react';
+import { supabase } from '../lib/supabase.js';
 
 const IM_API_BASE = 'https://rei-code-dev.replit.app/api/deallink/im';
 const BUYER_STORAGE_KEY = 'dl.im.buyer';
@@ -204,6 +205,19 @@ export default function IMDeal() {
         throw new Error(data?.error || `Invalid code (${res.status})`);
       }
       const data = await res.json();
+      // Establish a real Supabase session so the buyer can navigate the app
+      // (e.g. /buyer/dashboard) without being kicked back to /login.
+      if (data?.session?.access_token) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        } catch (sessionErr) {
+          // eslint-disable-next-line no-console
+          console.warn('[deallink] Failed to set Supabase session after OTP verify:', sessionErr);
+        }
+      }
       const buyerId = data.buyer_id || data.buyerId || data.id || `buyer-${Date.now()}`;
       const buyer = { id: buyerId, name, phone, verifiedAt: Date.now() };
       saveBuyer(buyer);
