@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PublicAPI } from '../lib/deallink-api.js';
-import { Kicker, Hairline, Stripe, Status, Modal, Field } from '../components/LegacyPublicUI.jsx';
+import { Kicker, Hairline, Status, Modal, Field } from '../components/LegacyPublicUI.jsx';
 
 export default function DealDetail() {
   const { handle, dealId } = useParams();
@@ -68,11 +68,17 @@ export default function DealDetail() {
         <div className="serif" style={{ fontSize: 22, marginTop: 6, lineHeight: 1.2 }}>{d.addr}</div>
 
         <Hairline style={{ margin: '18px 0 0' }} />
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderTop: 'none' }}>
+        <div style={{
+          background: 'var(--card)', border: '1px solid var(--line)', borderTop: 'none',
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 16,
+        }}>
           {rows.map(([l, v]) => (
-            <div key={l} className="spec-row">
-              <span className="l">{l}</span>
-              <span className="v">{v}</span>
+            <div key={l} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{
+                fontSize: 9, textTransform: 'uppercase', letterSpacing: 1,
+                color: 'var(--mute)', fontFamily: 'var(--mono)',
+              }}>{l}</span>
+              <span style={{ fontSize: 13, color: 'var(--ink)' }}>{v}</span>
             </div>
           ))}
         </div>
@@ -84,12 +90,39 @@ export default function DealDetail() {
           </div>
         )}
 
-        <div style={{ marginTop: 18 }}>
-          <Kicker>Photos · placeholder</Kicker>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 8 }}>
-            {[0, 1, 2, 3].map((i) => <Stripe key={i} height={70} />)}
+        {Array.isArray(d.photos) && d.photos.length > 0 ? (
+          <div style={{ marginTop: 18 }}>
+            <Kicker>Photos</Kicker>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 8 }}>
+              {d.photos.slice(0, 8).map((url, i) => (
+                <div key={i} style={{
+                  aspectRatio: '1 / 1', borderRadius: 8, overflow: 'hidden',
+                  background: 'var(--card)', border: '1px solid var(--line)',
+                }}>
+                  <img
+                    src={url}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 4 }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (d.photoUrl ? (
+          <div style={{ marginTop: 18 }}>
+            <Kicker>Photo</Kicker>
+            <div style={{
+              marginTop: 8, borderRadius: 8, overflow: 'hidden',
+              background: 'var(--card)', border: '1px solid var(--line)',
+            }}>
+              <img
+                src={d.photoUrl}
+                alt=""
+                style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block', borderRadius: 4 }}
+              />
+            </div>
+          </div>
+        ) : null)}
       </div>
 
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '14px 20px 18px', borderTop: '1px solid var(--line)', background: 'var(--bg)', display: 'flex', justifyContent: 'center' }}>
