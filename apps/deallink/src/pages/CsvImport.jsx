@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, CheckCircle2, AlertCircle, XCircle, Copy } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle2, AlertCircle, XCircle, Copy, Download } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardBody, Button, Select } from '../components/ui.jsx';
@@ -19,6 +19,7 @@ const FIELDS = [
   { key: 'arv', label: 'ARV', match: ['arv', 'after repair', 'value'] },
   { key: 'occ', label: 'Occupancy', match: ['occ', 'occupancy', 'occupied'] },
   { key: 'access', label: 'Access type', match: ['access'] },
+  { key: 'status', label: 'Status', match: ['status'] },
   { key: 'description', label: 'Description', match: ['description', 'desc'] },
   { key: 'notes', label: 'Notes', match: ['notes', 'comments', 'remarks'] },
   { key: '__ignore', label: '— Ignore —', match: [] },
@@ -64,6 +65,20 @@ export default function CsvImport() {
     const rows = parseCsv(SAMPLE_CSV);
     setFilename('properties_sample.csv'); setRawRows(rows); setMapping(autoMap(rows[0])); setStep(2);
   }
+  function downloadTemplate() {
+    const csv =
+      'addr,city,state,zip,type,units,beds,baths,sqft,ask,arv,occ,access,status,notes\n' +
+      '123 Main St,Cleveland,OH,44101,SFR,1,3,2,1200,85000,150000,Vacant,Lockbox,New,Great deal';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'deallink-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
   function buildPreview() {
     if (rawRows.length < 2) return [];
     const headers = rawRows[0];
@@ -86,7 +101,19 @@ export default function CsvImport() {
     return (
       <Layout>
         <Header step={1} />
-        <div className="flex items-center justify-center py-8">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4 max-w-2xl mx-auto">
+          <p className="text-sm text-slate-400">
+            New to bulk import? Download a starter CSV with the exact column headers we expect.
+          </p>
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-400 text-slate-900 text-sm font-semibold hover:bg-amber-300"
+          >
+            <Download className="w-4 h-4" /> Download CSV template
+          </button>
+        </div>
+        <div className="flex items-center justify-center py-4">
           <label
             className={`relative cursor-pointer w-full max-w-2xl border-2 border-dashed rounded-2xl p-12 text-center transition-colors ${over ? 'border-amber-400 bg-amber-400/5' : 'border-slate-700 hover:border-slate-500'}`}
             onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -96,9 +123,10 @@ export default function CsvImport() {
             <Upload className="w-10 h-10 mx-auto text-slate-500 mb-3" />
             <p className="text-white font-semibold">Drop CSV here or click to browse</p>
             <p className="text-slate-400 text-xs mt-1">Up to 500 rows · max 10 MB</p>
-            <div className="flex gap-2 justify-center mt-4">
+            <div className="flex gap-2 justify-center mt-4 flex-wrap">
               <Button variant="secondary" type="button">Browse files</Button>
               <Button variant="secondary" type="button" onClick={(e) => { e.preventDefault(); useSample(); }}><Copy className="w-3 h-3" /> Use sample</Button>
+              <Button variant="secondary" type="button" onClick={(e) => { e.preventDefault(); downloadTemplate(); }}><Download className="w-3 h-3" /> Template</Button>
             </div>
             <input type="file" accept=".csv,text/csv" onChange={(e) => handleFile(e.target.files[0])} className="hidden" />
           </label>
