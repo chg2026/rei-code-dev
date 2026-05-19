@@ -82,8 +82,12 @@ const HTML = `<!DOCTYPE html>
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 app.get('/r/:handle', (req, res) => {
-  res.redirect(301, `https://reiflywheel.doorine.com/p/${req.params.handle}`)
+  const { handle } = req.params
+  const prefix = UUID_RE.test(handle) ? 'im' : 'p'
+  res.redirect(301, `https://reiflywheel.doorine.com/${prefix}/${handle}`)
 })
 
 app.get('/im/:dealId', (req, res) => {
