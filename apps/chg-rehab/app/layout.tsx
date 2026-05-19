@@ -7,7 +7,7 @@ import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "CHG Rehab",
+  title: "REI Flywheel",
   description: "Property rehab operations platform",
 };
 
