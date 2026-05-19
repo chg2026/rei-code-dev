@@ -86,6 +86,10 @@ app.get('/r/:handle', (req, res) => {
   res.redirect(301, `https://reiflywheel.doorine.com/p/${req.params.handle}`)
 })
 
+app.get('/im/:dealId', (req, res) => {
+  res.redirect(301, `https://reiflywheel.doorine.com/im/${req.params.dealId}`)
+})
+
 app.get('/', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.send(HTML)
