@@ -137,7 +137,7 @@ export default function Onboarding() {
     <div style={pageStyle}>
       <div style={{ width: '100%', maxWidth: 480, marginBottom: 20 }}>
         <Link to="/" style={{ color: SHELL.mute, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', textDecoration: 'none' }}>
-          ← DealLink
+          ← REI Flywheel
         </Link>
         <ProgressBar step={step} />
         <p style={{ fontSize: 11, color: SHELL.dim, marginTop: 8, fontFamily: 'JetBrains Mono, monospace' }}>
@@ -309,11 +309,11 @@ function Step1({ handle, setHandle, name, setName, email, setEmail, emailLocked,
   return (
     <form onSubmit={onContinue}>
       <Kicker>Claim your handle</Kicker>
-      <Title>Pick your DealLink address</Title>
+      <Title>Pick your REI Flywheel address</Title>
       <Sub>This is the public URL buyers will see.</Sub>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: 4, borderRadius: 14, boxShadow: neuIn(SHELL.base, true, 1, 10), marginBottom: 16 }}>
-        <span style={{ padding: '8px 12px', color: SHELL.dim, fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>deallink.io/</span>
+        <span style={{ padding: '8px 12px', color: SHELL.dim, fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>doorine.com/r/</span>
         <input
           value={handle}
           onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))}

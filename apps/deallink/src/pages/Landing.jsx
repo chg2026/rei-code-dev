@@ -12,7 +12,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center"><Building2 className="w-5 h-5 text-slate-900" /></div>
-            <span className="text-white font-bold text-lg">Deal<span className="text-amber-400">Link</span></span>
+            <span className="text-white font-bold text-lg">REI <span className="text-amber-400">Flywheel</span></span>
           </Link>
           <div className="flex items-center gap-3">
             <Link to="/login"><Button variant="ghost">Sign in</Button></Link>
@@ -29,7 +29,7 @@ export default function Landing() {
           <Link to="/signup"><Button size="lg">Claim your handle <ArrowRight className="w-4 h-4" /></Button></Link>
           <Link to={`/p/${EXAMPLE_HANDLE}`}><Button size="lg" variant="secondary">View example profile</Button></Link>
         </div>
-        <p className="text-slate-500 text-xs font-mono mt-6">deallink.io/<u>yourname</u></p>
+        <p className="text-slate-500 text-xs font-mono mt-6">doorine.com/r/<u>yourname</u></p>
       </section>
 
       <section className="border-t border-slate-800 py-16">
