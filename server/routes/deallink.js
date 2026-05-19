@@ -163,6 +163,174 @@ router.delete('/deals/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+// ─── DEAL DOCUMENTS ───────────────────────────────────────────────────────
+// Metadata stored in deallink_documents; files in Supabase Storage bucket
+// 'deal-photos' under deals/{dealId}/docs/.
+//
+// Required table (apply via Supabase SQL editor):
+//
+//   CREATE TABLE IF NOT EXISTS public.deallink_documents (
+//     id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+//     deal_id    UUID        NOT NULL,
+//     account_id UUID        NOT NULL,
+//     filename   TEXT        NOT NULL,
+//     path       TEXT        NOT NULL,
+//     size       BIGINT,
+//     mime_type  TEXT,
+//     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+//   );
+
+const DOC_BUCKET = 'deal-photos'
+
+// Verify the deal belongs to the caller's account.
+async function assertDealOwner(db, dealId, accountId) {
+  const { data, error } = await db
+    .from('deallink_deals')
+    .select('id')
+    .eq('id', dealId)
+    .eq('account_id', accountId)
+    .maybeSingle()
+  if (error) throw error
+  return !!data
+}
+
+// GET /api/deallink/deals/:dealId/documents
+router.get('/deals/:dealId/documents', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data, error } = await db
+      .from('deallink_documents')
+      .select('*')
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false })
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ documents: data || [] })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/deallink/deals/:dealId/documents/signed-upload
+router.post('/deals/:dealId/documents/signed-upload', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  const { filename } = req.body
+  if (!filename) return res.status(400).json({ error: 'filename is required.' })
+
+  try {
+    const owned = await assertDealOwner(db, req.params.dealId, accountId)
+    if (!owned) return res.status(404).json({ error: 'Deal not found.' })
+
+    const storagePath = `deals/${req.params.dealId}/docs/${Date.now()}-${filename}`
+    const { data, error } = await db.storage
+      .from(DOC_BUCKET)
+      .createSignedUploadUrl(storagePath)
+    if (error) return res.status(500).json({ error: error.message })
+
+    res.json({ signedUrl: data.signedUrl, path: storagePath, token: data.token })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/deallink/deals/:dealId/documents
+router.post('/deals/:dealId/documents', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  const { filename, path, size, mime_type } = req.body
+  if (!filename || !path) return res.status(400).json({ error: 'filename and path are required.' })
+
+  try {
+    const owned = await assertDealOwner(db, req.params.dealId, accountId)
+    if (!owned) return res.status(404).json({ error: 'Deal not found.' })
+
+    const { data, error } = await db
+      .from('deallink_documents')
+      .insert({
+        deal_id:   req.params.dealId,
+        account_id: accountId,
+        filename,
+        path,
+        size:      size      || null,
+        mime_type: mime_type || null,
+      })
+      .select()
+      .single()
+    if (error) return res.status(500).json({ error: error.message })
+    res.status(201).json({ document: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/deallink/deals/:dealId/documents/:docId/download
+router.get('/deals/:dealId/documents/:docId/download', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data: doc, error: docErr } = await db
+      .from('deallink_documents')
+      .select('path')
+      .eq('id', req.params.docId)
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (docErr) return res.status(500).json({ error: docErr.message })
+    if (!doc)   return res.status(404).json({ error: 'Document not found.' })
+
+    const { data, error } = await db.storage
+      .from(DOC_BUCKET)
+      .createSignedUrl(doc.path, 300)   // 5-minute signed URL
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ url: data.signedUrl })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// DELETE /api/deallink/deals/:dealId/documents/:docId
+router.delete('/deals/:dealId/documents/:docId', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data: doc, error: docErr } = await db
+      .from('deallink_documents')
+      .select('path')
+      .eq('id', req.params.docId)
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (docErr) return res.status(500).json({ error: docErr.message })
+    if (!doc)   return res.status(404).json({ error: 'Document not found.' })
+
+    // Remove storage object first (non-fatal if missing).
+    await db.storage.from(DOC_BUCKET).remove([doc.path])
+
+    const { error: delErr } = await db
+      .from('deallink_documents')
+      .delete()
+      .eq('id', req.params.docId)
+      .eq('account_id', accountId)
+    if (delErr) return res.status(500).json({ error: delErr.message })
+
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ─── LEADS ────────────────────────────────────────────────────────────────
 
 router.get('/leads', async (req, res) => {
