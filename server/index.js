@@ -11,6 +11,11 @@ const ALLOWED_ORIGINS = [
   'https://deallink.neuroaios.ai',
   'https://investorportal.neuroaios.ai',
   'https://contractorportal.neuroaios.ai',
+  'https://reiflywheel.doorine.com',
+  'https://chg.doorine.com',
+  'https://investor.doorine.com',
+  'https://contractor.doorine.com',
+  'https://doorine.com',
 ]
 const DEV_ORIGIN_RE = /^https:\/\/[a-zA-Z0-9-]+\.(replit\.dev|replit\.app)$/
 
