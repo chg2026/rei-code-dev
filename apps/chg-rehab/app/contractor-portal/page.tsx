@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import OperatorLensClient from "./Client";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Contractor Portal · CHG Rehab" };
+export const metadata = { title: "Contractor Portal · CHG Platform" };
 
 /**
  * The "Operator Lens" inside chg-rehab. This is the L1 view — what the CHG
