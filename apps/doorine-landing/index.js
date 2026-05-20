@@ -83,11 +83,166 @@ const HTML = `<!DOCTYPE html>
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const API_BASE = 'https://rei-code-dev.replit.app'
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return ''
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeJs(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/</g, '\\u003c')
+}
+
+function ogHtml({ title, description, image, url, redirectUrl }) {
+  const safeTitle = escapeHtml(title)
+  const safeDescription = escapeHtml(description)
+  const safeImage = image ? escapeHtml(image) : ''
+  const safeUrl = escapeHtml(url)
+  const safeRedirect = escapeHtml(redirectUrl)
+  const jsRedirect = escapeJs(redirectUrl)
+  const imageTags = safeImage
+    ? `  <meta property="og:image" content="${safeImage}" />\n  <meta name="twitter:image" content="${safeImage}" />\n`
+    : ''
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeTitle}</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${safeTitle}" />
+  <meta property="og:description" content="${safeDescription}" />
+${imageTags}  <meta property="og:url" content="${safeUrl}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${safeTitle}" />
+  <meta name="twitter:description" content="${safeDescription}" />
+  <meta http-equiv="refresh" content="0;url=${safeRedirect}" />
+  <link rel="canonical" href="${safeRedirect}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${safeRedirect}">${safeRedirect}</a>…</p>
+  <script>window.location.href = '${jsRedirect}';</script>
+</body>
+</html>`
+}
+
+async function fetchJson(url) {
+  try {
+    const r = await fetch(url, { headers: { accept: 'application/json' } })
+    if (!r.ok) return null
+    return await r.json()
+  } catch {
+    return null
+  }
+}
+
+function formatMoney(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return ''
+  return '$' + Math.round(num).toLocaleString('en-US')
+}
+
+app.get('/og/p/:handle', async (req, res) => {
+  const { handle } = req.params
+  const redirectUrl = `https://reiflywheel.doorine.com/p/${handle}`
+  const data = await fetchJson(`${API_BASE}/api/deallink/public/${encodeURIComponent(handle)}`)
+
+  const profile = data?.profile ?? data ?? {}
+  const deals = Array.isArray(data?.deals) ? data.deals : Array.isArray(profile?.deals) ? profile.deals : []
+  const activeDeals = deals.filter((d) => {
+    const s = String(d?.status ?? '').toLowerCase()
+    return !s || s === 'active' || s === 'live' || s === 'open'
+  }).length || deals.length
+
+  const bio = profile.bio || profile.tagline || profile.description || 'Real estate investor on REI Flywheel'
+  const avatar = profile.avatar_url || profile.avatarUrl || profile.photo_url || profile.photoUrl
+  const firstDealPhoto = deals
+    .map((d) => {
+      const photos = d?.photos || d?.images || []
+      if (Array.isArray(photos) && photos.length) {
+        const p = photos[0]
+        return typeof p === 'string' ? p : p?.url || p?.src
+      }
+      return d?.cover_photo || d?.coverPhoto || d?.photo_url || d?.image_url
+    })
+    .find(Boolean)
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.send(
+    ogHtml({
+      title: `@${handle} — REI Flywheel`,
+      description: `${bio} · ${activeDeals} active deals`,
+      image: avatar || firstDealPhoto || '',
+      url: `https://doorine.com/r/${handle}`,
+      redirectUrl,
+    }),
+  )
+})
+
+app.get('/og/im/:dealId', async (req, res) => {
+  const { dealId } = req.params
+  const redirectUrl = `https://reiflywheel.doorine.com/im/${dealId}`
+  const data = await fetchJson(`${API_BASE}/api/deallink/im/${encodeURIComponent(dealId)}`)
+
+  const deal = data?.deal ?? data ?? {}
+  const addr = deal.address || deal.addr || deal.street || ''
+  const city = deal.city || ''
+  const ask = deal.ask || deal.asking || deal.asking_price || deal.askPrice || deal.price
+  const arv = deal.arv || deal.ARV || deal.after_repair_value
+  const type = deal.type || deal.property_type || deal.propertyType || 'Property'
+  const beds = deal.beds ?? deal.bedrooms ?? '?'
+  const baths = deal.baths ?? deal.bathrooms ?? '?'
+  const sqft = deal.sqft ?? deal.square_feet ?? deal.squareFeet ?? '?'
+  const spread = Number(arv) - Number(ask)
+
+  const photos = deal.photos || deal.images || []
+  let firstPhoto = ''
+  if (Array.isArray(photos) && photos.length) {
+    const p = photos[0]
+    firstPhoto = typeof p === 'string' ? p : p?.url || p?.src || ''
+  }
+  if (!firstPhoto) firstPhoto = deal.cover_photo || deal.coverPhoto || deal.photo_url || deal.image_url || ''
+
+  const title = [
+    [addr, city].filter(Boolean).join(', '),
+    [ask && `${formatMoney(ask)} asking`, arv && `${formatMoney(arv)} ARV`].filter(Boolean).join(' / '),
+  ]
+    .filter(Boolean)
+    .join(' — ') || 'Deal — REI Flywheel'
+
+  const spreadStr = Number.isFinite(spread) ? `${formatMoney(spread)} spread` : ''
+  const description = [
+    type,
+    `${beds}bd/${baths}ba`,
+    `${sqft}sqft`,
+    spreadStr,
+    'View full deal analysis.',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.send(
+    ogHtml({
+      title,
+      description,
+      image: firstPhoto,
+      url: `https://doorine.com/r/${dealId}`,
+      redirectUrl,
+    }),
+  )
+})
 
 app.get('/r/:handle', (req, res) => {
   const { handle } = req.params
-  const prefix = UUID_RE.test(handle) ? 'im' : 'p'
-  res.redirect(301, `https://reiflywheel.doorine.com/${prefix}/${handle}`)
+  const prefix = UUID_RE.test(handle) ? 'og/im' : 'og/p'
+  res.redirect(302, `/${prefix}/${handle}`)
 })
 
 app.get('/im/:dealId', (req, res) => {
