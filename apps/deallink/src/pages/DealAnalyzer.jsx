@@ -240,6 +240,14 @@ function Analyzer({ deal }) {
             <Link to="/deal-analyzer" className="text-[#86868b] hover:text-[#3a3a3c]" title="Pick a different property">
               <ArrowLeft className="w-5 h-5" />
             </Link>
+            {dealId && (
+              <Link
+                to={`/admin/deal/${dealId}`}
+                className="text-[#6e6e73] hover:text-[#1d1d1f] text-sm flex items-center gap-1"
+              >
+                ← Back to property
+              </Link>
+            )}
             {deal.photoUrl ? (
               <img src={deal.photoUrl} alt="" className="w-12 h-12 rounded-lg object-cover border border-[rgba(0,0,0,0.08)] flex-shrink-0" />
             ) : (

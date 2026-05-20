@@ -111,7 +111,7 @@ export default function DealEditor({ mode }) {
         <div className="border-b border-[rgba(0,0,0,0.08)] mb-5 flex items-center gap-6">
           {[
             { k: 'overview', label: 'Overview' },
-            { k: 'analysis', label: 'Deal analysis' },
+            { k: 'analysis', label: 'Deal Analysis' },
             { k: 'documents', label: 'Documents' },
             { k: 'im',       label: 'Investment memo (IM)' },
           ].map((t) => {
@@ -541,7 +541,7 @@ function DealAnalysisSection({ deal, onDelete }) {
   if (analyses.length === 0) {
     return (
       <section>
-        <h3 className="text-[#1d1d1f] font-semibold text-sm mb-3">Deal analysis</h3>
+        <h3 className="text-[#1d1d1f] font-semibold text-sm mb-3">Deal Analysis</h3>
         <div className="rounded-lg border border-[rgba(0,0,0,0.08)] bg-white/40 p-4">
           <p className="text-sm text-[#6e6e73] mb-3">
             No analysis saved yet.
