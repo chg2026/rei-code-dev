@@ -79,7 +79,7 @@ router.get('/:dealId', async (req, res) => {
   try {
     const { data: deal, error: dealErr } = await db
       .from('deallink_deals')
-      .select('id, account_id, addr, city, zip, type, ask, arv, beds, baths, sqft, status, hide_street')
+      .select('id, account_id, addr, city, zip, type, ask, arv, beds, baths, sqft, status, hide_street, photos')
       .eq('id', dealId)
       .maybeSingle()
 
@@ -103,6 +103,7 @@ router.get('/:dealId', async (req, res) => {
         baths:  deal.baths,
         sqft:   deal.sqft,
         status: deal.status,
+        photos: deal.photos?.[0] ? [deal.photos[0]] : [],
       },
     })
   } catch (e) {
