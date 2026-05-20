@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ProGate from './components/ProGate.jsx';
 
 import Landing from './pages/Landing.jsx';
+import Demo from './pages/Demo.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import Onboarding from './pages/Onboarding.jsx';
@@ -51,6 +52,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/demo" element={<Demo />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/onboarding" element={<Admin><Onboarding /></Admin>} />

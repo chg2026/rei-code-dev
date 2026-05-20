@@ -27,7 +27,7 @@ export default function Landing() {
         <p className="text-slate-400 text-base mt-6 max-w-xl mx-auto">Share a public profile. Post inventory once. Capture buyers — without the spreadsheet shuffle.</p>
         <div className="flex justify-center gap-3 mt-8">
           <Link to="/signup"><Button size="lg">Claim your handle <ArrowRight className="w-4 h-4" /></Button></Link>
-          <Link to={`/p/${EXAMPLE_HANDLE}`}><Button size="lg" variant="secondary">View example profile</Button></Link>
+          <Link to="/demo"><Button size="lg" variant="secondary">View example profile</Button></Link>
         </div>
         <p className="text-slate-500 text-xs font-mono mt-6">doorine.com/r/<u>yourname</u></p>
       </section>
