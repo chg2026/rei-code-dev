@@ -160,7 +160,7 @@ export default function Onboarding() {
             lastName={lastName} setLastName={setLastName}
             email={email} setEmail={setEmail}
             emailLocked={emailLocked}
-            authFullName={authFullName} authEmail={authEmail}
+            authFullName={[authFirstName, authLastName].filter(Boolean).join(' ')} authEmail={authEmail}
             onContinue={saveStep1} busy={busy}
           />
         )}
