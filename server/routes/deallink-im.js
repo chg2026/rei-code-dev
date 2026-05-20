@@ -118,7 +118,7 @@ router.post('/:dealId/send-otp', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   if (!supabaseAnon) return res.status(503).json({ error: 'Supabase anon client not configured.' })
   const { dealId } = req.params
-  const { name, phone: rawPhone } = req.body
+  const { first_name, last_name, phone: rawPhone } = req.body
   const digits = (rawPhone || '').replace(/\D/g, '')
   const phone = digits.length === 10 ? '+1' + digits
     : digits.length === 11 && digits.startsWith('1') ? '+' + digits
@@ -126,8 +126,8 @@ router.post('/:dealId/send-otp', async (req, res) => {
   if (!PHONE_RE.test(phone)) {
     return res.status(400).json({ error: 'Valid US phone number required (+1XXXXXXXXXX).' })
   }
-  if (!name || !String(name).trim()) {
-    return res.status(400).json({ error: 'name is required.' })
+  if (!first_name || !String(first_name).trim()) {
+    return res.status(400).json({ error: 'first_name is required.' })
   }
 
   try {
@@ -140,11 +140,13 @@ router.post('/:dealId/send-otp', async (req, res) => {
     if (dealErr) return res.status(500).json({ error: dealErr.message })
     if (!deal)   return res.status(404).json({ error: 'Deal not found.' })
 
+    const fullName = [(first_name || '').trim(), (last_name || '').trim()].filter(Boolean).join(' ')
+
     // Store name + phone so verify-otp can use it for buyer creation.
     const { error: upsertErr } = await db
       .from('deallink_im_sessions')
       .upsert(
-        { deal_id: dealId, phone, name: String(name).trim() },
+        { deal_id: dealId, phone, name: fullName, first_name: (first_name || '').trim(), last_name: (last_name || '').trim() },
         { onConflict: 'deal_id,phone' }
       )
     if (upsertErr) {
@@ -185,12 +187,14 @@ router.post('/:dealId/verify-otp', async (req, res) => {
     // Retrieve stored name from the im_sessions record created at send-otp.
     const { data: imSession, error: sessErr } = await db
       .from('deallink_im_sessions')
-      .select('name')
+      .select('name, first_name, last_name')
       .eq('deal_id', dealId)
       .eq('phone', phone)
       .maybeSingle()
     if (sessErr) return res.status(500).json({ error: sessErr.message })
-    const buyerName = imSession?.name || null
+    const buyerFirstName = (imSession?.first_name || '').trim()
+    const buyerLastName  = (imSession?.last_name  || '').trim()
+    const buyerName      = [buyerFirstName, buyerLastName].filter(Boolean).join(' ').trim() || imSession?.name || null
 
     // Fetch full deal including im_config.
     const { data: deal, error: dealErr } = await db
@@ -221,6 +225,8 @@ router.post('/:dealId/verify-otp', async (req, res) => {
         {
           account_id:       deal.account_id,
           phone,
+          first_name:       buyerFirstName,
+          last_name:        buyerLastName,
           name:             buyerName,
           source_deal_id:   dealId,
           source:           'im-link',
@@ -271,7 +277,7 @@ router.post('/:dealId/verify-otp', async (req, res) => {
         // 4. User profile row.
         const { error: profileErr } = await db
           .from('user_profiles')
-          .insert({ id: supabaseUser.id, phone, full_name: buyerName, account_id: newAccountId, status: 'active', is_account_admin: true })
+          .insert({ id: supabaseUser.id, phone, full_name: buyerName, first_name: buyerFirstName, last_name: buyerLastName, account_id: newAccountId, status: 'active', is_account_admin: true })
         if (profileErr) throw profileErr
 
         // 5. Update the buyer's account_id to their own new account.
