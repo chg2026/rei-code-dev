@@ -15,7 +15,12 @@ const TONE_CHOICES = [
 const RADIUS_CHOICES = [12, 18, 24, 32];
 
 // Onboarding always renders against the Ink tone — the brand "studio" shell.
-const SHELL = TONES.Ink;
+const SHELL = {
+  base:  '#f5f5f7',
+  ink:   '#1d1d1f',
+  mute:  '#6e6e73',
+  dim:   '#86868b',
+};
 
 export default function Onboarding() {
   const { state, dispatch } = useStore();
@@ -123,7 +128,7 @@ export default function Onboarding() {
   // ─── shell ──────────────────────────────────────────────────────────────
   const pageStyle = {
     minHeight: '100vh',
-    background: neuBg(SHELL.base, true, true),
+    background: '#f5f5f7',
     color: SHELL.ink,
     fontFamily: NEU_FONT,
     padding: '32px 16px 64px',
@@ -134,10 +139,10 @@ export default function Onboarding() {
   const cardStyle = {
     width: '100%',
     maxWidth: 480,
-    background: SHELL.base,
+    background: '#ffffff',
     borderRadius: 24,
     padding: 24,
-    boxShadow: neuOut(SHELL.base, true, 1, 22),
+    boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.08)',
   };
 
   return (
@@ -214,8 +219,8 @@ function ProgressBar({ step }) {
               flex: 1,
               height: 6,
               borderRadius: 999,
-              background: active ? '#F59E0B' : 'rgba(255,255,255,0.08)',
-              boxShadow: active ? '0 0 12px rgba(245,158,11,0.45)' : neuIn(SHELL.base, true, 0.6, 6),
+              background: active ? '#b8860b' : 'rgba(0,0,0,0.08)',
+              boxShadow: active ? '0 0 12px rgba(184,134,11,0.45)' : 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)',
               transition: 'background 0.25s ease',
             }}
           />
@@ -229,7 +234,7 @@ function ProgressBar({ step }) {
 function Kicker({ children }) {
   return (
     <p style={{
-      color: '#F59E0B', fontSize: 10, fontWeight: 700, letterSpacing: 2,
+      color: '#b8860b', fontSize: 10, fontWeight: 700, letterSpacing: 2,
       textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace', margin: 0,
     }}>{children}</p>
   );
@@ -261,7 +266,7 @@ function NeuInput(props) {
         width: '100%', boxSizing: 'border-box', padding: '10px 14px',
         borderRadius: 12, border: 'none', outline: 'none',
         background: SHELL.base, color: SHELL.ink, fontSize: 14,
-        boxShadow: neuIn(SHELL.base, true, 1, 10),
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)',
         ...(props.style || {}),
       }}
     />
@@ -275,7 +280,7 @@ function NeuTextarea(props) {
         width: '100%', boxSizing: 'border-box', padding: '10px 14px',
         borderRadius: 12, border: 'none', outline: 'none', resize: 'none',
         background: SHELL.base, color: SHELL.ink, fontSize: 14,
-        boxShadow: neuIn(SHELL.base, true, 1, 10),
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)',
         fontFamily: NEU_FONT,
         ...(props.style || {}),
       }}
@@ -288,9 +293,9 @@ function PrimaryButton({ children, onClick, disabled, type = 'button' }) {
       type={type} onClick={onClick} disabled={disabled}
       style={{
         width: '100%', padding: '12px 16px', borderRadius: 14, border: 'none',
-        background: '#F59E0B', color: '#1F2230', fontWeight: 700, fontSize: 14,
+        background: '#b8860b', color: '#1F2230', fontWeight: 700, fontSize: 14,
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
-        boxShadow: neuOut(SHELL.base, true, 1, 14),
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       }}
     >{children}</button>
@@ -303,7 +308,7 @@ function GhostButton({ children, onClick, type = 'button' }) {
       style={{
         padding: '10px 14px', borderRadius: 12, border: 'none',
         background: SHELL.base, color: SHELL.mute, fontSize: 13, cursor: 'pointer',
-        boxShadow: neuOut(SHELL.base, true, 0.7, 10),
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
         display: 'inline-flex', alignItems: 'center', gap: 6,
       }}
     >{children}</button>
@@ -320,7 +325,7 @@ function Step1({ handle, setHandle, firstName, setFirstName, lastName, setLastNa
       <Title>Pick your REI Flywheel address</Title>
       <Sub>This is the public URL buyers will see.</Sub>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: 4, borderRadius: 14, boxShadow: neuIn(SHELL.base, true, 1, 10), marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: 4, borderRadius: 14, boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)', marginBottom: 16 }}>
         <span style={{ padding: '8px 12px', color: SHELL.dim, fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>doorine.com/r/</span>
         <input
           value={handle}
@@ -355,7 +360,7 @@ function Step1({ handle, setHandle, firstName, setFirstName, lastName, setLastNa
           </NeuField>
         )}
         {emailLocked && (
-          <div style={{ padding: '10px 12px', borderRadius: 12, boxShadow: neuIn(SHELL.base, true, 0.7, 8), color: SHELL.dim, fontSize: 12 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 12, boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)', color: SHELL.dim, fontSize: 12 }}>
             Signed in as <span style={{ color: SHELL.ink, fontWeight: 600 }}>{authFullName || authEmail}</span>
           </div>
         )}
@@ -389,8 +394,8 @@ function Step2({ tone, setTone, onBack, onContinue, busy }) {
               style={{
                 padding: 14, borderRadius: 16, border: 'none', cursor: 'pointer',
                 background: SHELL.base, textAlign: 'left',
-                boxShadow: selected ? neuIn(SHELL.base, true, 1, 12) : neuOut(SHELL.base, true, 1, 14),
-                outline: selected ? `2px solid #F59E0B` : '2px solid transparent',
+                boxShadow: selected ? 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
+                outline: selected ? `2px solid #b8860b` : '2px solid transparent',
                 transition: 'outline-color 0.15s ease',
               }}
             >
@@ -432,7 +437,7 @@ function Step3({ avatarUrl, setAvatarUrl, displayName, setDisplayName, bio, setB
           <div style={{
             width: 72, height: 72, borderRadius: '50%',
             background: SHELL.base,
-            boxShadow: neuOut(SHELL.base, true, 1, 14),
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
             backgroundImage: avatarUrl ? `url(${avatarUrl})` : 'none',
             backgroundSize: 'cover', backgroundPosition: 'center',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -516,15 +521,15 @@ function OptionCard({ icon, title, desc, onClick }) {
         display: 'flex', alignItems: 'center', gap: 14,
         padding: 16, borderRadius: 16, border: 'none', cursor: 'pointer',
         background: SHELL.base, textAlign: 'left',
-        boxShadow: neuOut(SHELL.base, true, 1, 14),
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
         color: SHELL.ink,
       }}
     >
       <div style={{
         width: 40, height: 40, borderRadius: 12,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: SHELL.base, color: '#F59E0B',
-        boxShadow: neuIn(SHELL.base, true, 0.8, 8),
+        background: SHELL.base, color: '#b8860b',
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)',
       }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
@@ -557,7 +562,7 @@ function Step5({ radius, setRadius, accentColor, setAccentColor, gradientEnabled
                     padding: '14px 0', border: 'none', cursor: 'pointer',
                     background: SHELL.base, color: SHELL.ink, fontWeight: 700, fontSize: 13,
                     borderRadius: r,
-                    boxShadow: selected ? neuIn(SHELL.base, true, 1, 10) : neuOut(SHELL.base, true, 1, 12),
+                    boxShadow: selected ? 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
                     outline: selected ? `2px solid ${accentColor}` : '2px solid transparent',
                   }}
                 >{r}</button>
@@ -579,8 +584,8 @@ function Step5({ radius, setRadius, accentColor, setAccentColor, gradientEnabled
                   style={{
                     width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer',
                     background: c,
-                    boxShadow: neuOut(SHELL.base, true, 1, 12),
-                    outline: selected ? '3px solid #F59E0B' : '3px solid transparent',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
+                    outline: selected ? '3px solid #b8860b' : '3px solid transparent',
                     outlineOffset: 2,
                   }}
                 />
@@ -597,17 +602,17 @@ function Step5({ radius, setRadius, accentColor, setAccentColor, gradientEnabled
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               width: '100%', padding: '12px 16px', border: 'none', cursor: 'pointer',
               background: SHELL.base, color: SHELL.ink, borderRadius: 14,
-              boxShadow: neuOut(SHELL.base, true, 1, 12),
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)',
             }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
-              <Sparkles size={14} color="#F59E0B" />
+              <Sparkles size={14} color="#b8860b" />
               {gradientEnabled ? 'On' : 'Off'}
             </span>
             <span style={{
               width: 44, height: 24, borderRadius: 999, position: 'relative',
-              background: gradientEnabled ? '#F59E0B' : 'rgba(255,255,255,0.08)',
-              boxShadow: neuIn(SHELL.base, true, 0.7, 8),
+              background: gradientEnabled ? '#b8860b' : 'rgba(0,0,0,0.08)',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08)',
               transition: 'background 0.2s ease',
             }}>
               <span style={{
