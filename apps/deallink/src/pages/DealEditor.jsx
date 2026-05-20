@@ -1213,12 +1213,12 @@ const IM_SECTIONS = [
   { key: 'description',       title: 'Description',        desc: 'Short pitch shown at top of the memo',            defaultOn: true  },
   { key: 'photos',            title: 'Photos',             desc: 'Gallery from the property record',                defaultOn: true  },
   { key: 'dealNumbers',       title: 'Deal numbers',       desc: 'ARV, asking, repair, MAO',                        defaultOn: true  },
-  { key: 'dealAnalysis',      title: 'Deal analysis',      desc: 'Cash flow, cap rate, ROI from the chosen scenario', defaultOn: true  },
   { key: 'dealChecks',        title: 'Deal checks',        desc: '1% rule, ARV spread, etc.',                       defaultOn: true  },
   { key: 'rehabBreakdown',    title: 'Rehab breakdown',    desc: 'Line-item scope & cost',                          defaultOn: true  },
   { key: 'notes',             title: 'Notes',              desc: 'Public notes you write here',                     defaultOn: false },
   { key: 'documents',         title: 'Documents',          desc: 'Files attached to this deal (per-doc toggles next)', defaultOn: false },
   { key: 'wholesalerContact', title: 'Wholesaler contact', desc: 'Your name, phone, email',                         defaultOn: true  },
+  { key: 'dealAnalysis',      title: 'Deal analysis',      desc: 'Cash flow, cap rate, ROI from the chosen scenario', defaultOn: true  },
 ];
 
 const IM_NUMBER_FIELDS = [
@@ -1787,6 +1787,58 @@ function IMMemoBuilder({ deal, onSave, show }) {
         )}
       </div>
 
+      {/* ─── Sections to include ───────────────────────────────────────── */}
+      <div>
+        <p className="text-xs uppercase tracking-wider text-[#86868b] mb-2">Sections to include</p>
+        <div className="space-y-2">
+          {IM_SECTIONS.map((s) => {
+            const value = !!cfg.sections[s.key];
+            const isSaving = saving === `sections.${s.key}`;
+            return (
+              <SectionToggleRow
+                key={s.key}
+                title={s.title}
+                desc={s.desc}
+                value={value}
+                disabled={isSaving}
+                onToggle={() => patchCfg(`sections.${s.key}`, !value)}
+              >
+                {/* Inline sub-toggles for "Deal numbers" — fine-grained
+                    control over which dollar amounts appear on the IM. */}
+                {s.key === 'dealNumbers' && value && (
+                  <div className="mt-3 pl-3 border-l-2 border-[#b8860b]/30 space-y-1.5">
+                    {IM_NUMBER_FIELDS.map((f) => {
+                      const fv = !!cfg.fields[f.key];
+                      const fSaving = saving === `fields.${f.key}`;
+                      return (
+                        <label
+                          key={f.key}
+                          className={`flex items-center justify-between gap-3 py-1 ${fSaving ? 'opacity-60' : ''}`}
+                        >
+                          <span className="text-xs text-[#3a3a3c]">
+                            {f.label}
+                            {f.sensitive && (
+                              <span className="ml-2 text-[9px] uppercase tracking-wider text-[#b8860b]">sensitive</span>
+                            )}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={fv}
+                            disabled={fSaving}
+                            onChange={(e) => patchCfg(`fields.${f.key}`, e.target.checked)}
+                            className="w-4 h-4 accent-[#b8860b]"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </SectionToggleRow>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ─── Choose analysis ───────────────────────────────────────────── */}
       <div>
         <p className="text-xs uppercase tracking-wider text-[#86868b] mb-2">Choose analysis</p>
@@ -1847,58 +1899,6 @@ function IMMemoBuilder({ deal, onSave, show }) {
             </p>
           </div>
         )}
-      </div>
-
-      {/* ─── Sections to include ───────────────────────────────────────── */}
-      <div>
-        <p className="text-xs uppercase tracking-wider text-[#86868b] mb-2">Sections to include</p>
-        <div className="space-y-2">
-          {IM_SECTIONS.map((s) => {
-            const value = !!cfg.sections[s.key];
-            const isSaving = saving === `sections.${s.key}`;
-            return (
-              <SectionToggleRow
-                key={s.key}
-                title={s.title}
-                desc={s.desc}
-                value={value}
-                disabled={isSaving}
-                onToggle={() => patchCfg(`sections.${s.key}`, !value)}
-              >
-                {/* Inline sub-toggles for "Deal numbers" — fine-grained
-                    control over which dollar amounts appear on the IM. */}
-                {s.key === 'dealNumbers' && value && (
-                  <div className="mt-3 pl-3 border-l-2 border-[#b8860b]/30 space-y-1.5">
-                    {IM_NUMBER_FIELDS.map((f) => {
-                      const fv = !!cfg.fields[f.key];
-                      const fSaving = saving === `fields.${f.key}`;
-                      return (
-                        <label
-                          key={f.key}
-                          className={`flex items-center justify-between gap-3 py-1 ${fSaving ? 'opacity-60' : ''}`}
-                        >
-                          <span className="text-xs text-[#3a3a3c]">
-                            {f.label}
-                            {f.sensitive && (
-                              <span className="ml-2 text-[9px] uppercase tracking-wider text-[#b8860b]">sensitive</span>
-                            )}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={fv}
-                            disabled={fSaving}
-                            onChange={(e) => patchCfg(`fields.${f.key}`, e.target.checked)}
-                            className="w-4 h-4 accent-[#b8860b]"
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </SectionToggleRow>
-            );
-          })}
-        </div>
       </div>
 
       {/* ─── Privacy ───────────────────────────────────────────────────── */}
