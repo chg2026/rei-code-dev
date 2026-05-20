@@ -18,7 +18,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
     const t = getBuyerToken()
     if (t) headers.Authorization = `Bearer ${t}`
   }
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://rei-code-dev.replit.app'}/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
