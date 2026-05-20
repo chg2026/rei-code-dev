@@ -1041,8 +1041,8 @@ function DealDocumentsSection({ deal, show }) {
     try {
       const signed = await DealLinkAPI.createSignedUpload(deal.id, file.name);
       const { error: upErr } = await supabase.storage
-        .from(signed.bucket)
-        .uploadToSignedUrl(signed.storagePath, signed.token, file, {
+        .from(signed.bucket || 'deal-photos')
+        .uploadToSignedUrl(signed.path || signed.storagePath, signed.token, file, {
           contentType: file.type || 'application/octet-stream',
           upsert: false,
         });
@@ -1050,7 +1050,7 @@ function DealDocumentsSection({ deal, show }) {
       const created = await DealLinkAPI.commitDocument(deal.id, {
         name: finalName,
         category,
-        storagePath: signed.storagePath,
+        storagePath: signed.path || signed.storagePath,
         fileSizeBytes: file.size,
         mimeType: file.type || '',
       });
