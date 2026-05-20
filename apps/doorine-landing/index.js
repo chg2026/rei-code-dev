@@ -107,7 +107,7 @@ function ogHtml({ title, description, image, url, redirectUrl }) {
   const safeRedirect = escapeHtml(redirectUrl)
   const jsRedirect = escapeJs(redirectUrl)
   const imageTags = safeImage
-    ? `  <meta property="og:image" content="${safeImage}" />\n  <meta name="twitter:image" content="${safeImage}" />\n`
+    ? `  <meta property="og:image" content="${safeImage}" />\n  <meta property="og:image:width" content="1200" />\n  <meta property="og:image:height" content="630" />\n  <meta name="twitter:image" content="${safeImage}" />\n`
     : ''
   return `<!DOCTYPE html>
 <html lang="en">
@@ -116,6 +116,7 @@ function ogHtml({ title, description, image, url, redirectUrl }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${safeTitle}</title>
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="REI Flywheel" />
   <meta property="og:title" content="${safeTitle}" />
   <meta property="og:description" content="${safeDescription}" />
 ${imageTags}  <meta property="og:url" content="${safeUrl}" />
@@ -191,23 +192,9 @@ app.get('/og/im/:dealId', async (req, res) => {
   const data = await fetchJson(`${API_BASE}/api/deallink/im/${encodeURIComponent(dealId)}`)
 
   const preview = data?.preview ?? {}
-  const { addr = '', city = '', ask, arv, type = 'Property', beds = '?', baths = '?', sqft = '?' } = preview
-
-  const askStr = Number.isFinite(Number(ask)) ? `$${Number(ask).toLocaleString('en-US')}` : ''
-  const arvStr = Number.isFinite(Number(arv)) ? `$${Number(arv).toLocaleString('en-US')}` : ''
-
-  const location = [addr, city].filter(Boolean).join(', ')
-  const priceLine = [askStr && `${askStr} asking`, arvStr && `${arvStr} ARV`].filter(Boolean).join(' / ')
-  const title = [location, priceLine].filter(Boolean).join(' — ') || 'Deal — REI Flywheel'
-
-  const description = `${type} · ${beds}bd/${baths}ba · ${sqft}sqft · View full deal analysis on REI Flywheel`
-
-  const photos = preview.photos || data?.photos || []
-  let firstPhoto = ''
-  if (Array.isArray(photos) && photos.length) {
-    const p = photos[0]
-    firstPhoto = typeof p === 'string' ? p : p?.url || p?.src || ''
-  }
+  const title = `${preview.addr}, ${preview.city} — $${Number(preview.ask).toLocaleString()} asking`
+  const description = `${preview.type} · ${preview.beds}bd/${preview.baths}ba · View full deal analysis on REI Flywheel`
+  const firstPhoto = preview.photos?.[0] || ''
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.send(
