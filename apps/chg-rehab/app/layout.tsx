@@ -23,6 +23,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // Login screen owns the full viewport (no top bar).
     return (
       <html lang="en">
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+        </head>
         <body style={{ display: "block", overflow: "auto" }}>{children}</body>
       </html>
     );
@@ -43,6 +48,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+      </head>
       <body>
         <div className="app-shell">
           <TopNav user={user} />
