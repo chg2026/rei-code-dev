@@ -154,7 +154,7 @@ export function UnsubscribedTable({ rows }: { rows: UnsubscribedRow[] }) {
             </>
           )}
           {statusMsg && (
-            <span style={{ fontSize: 10, color: "#0C447C" }}>{statusMsg}</span>
+            <span style={{ fontSize: 10, color: "#143641" }}>{statusMsg}</span>
           )}
           {error && (
             <span style={{ fontSize: 10, color: "#791F1F" }}>{error}</span>

@@ -664,7 +664,7 @@ function UsersPanel({
             <span
               style={{
                 background: "#E6F1FB",
-                color: "#0C447C",
+                color: "#143641",
                 padding: "1px 6px",
                 borderRadius: 3,
                 fontWeight: 500,

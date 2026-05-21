@@ -113,7 +113,7 @@ export default function DealActions({
           <button
             type="button"
             className="btn-sm btn-primary"
-            style={{ background: "var(--navy)", color: "#fff", borderColor: "var(--navy)" }}
+            style={{ background: "var(--marine)", color: "#fff", borderColor: "var(--marine)" }}
             onClick={() => setAdvanceOpen(true)}
           >
             {ADVANCE_LABEL[deal.stage] || "Advance stage →"}

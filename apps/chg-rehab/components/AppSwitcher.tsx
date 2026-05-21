@@ -30,7 +30,7 @@ const PRODUCTS: Product[] = [
     code: "chg",
     name: "CHG Platform",
     tagline: "Operations platform",
-    color: "#0C447C",
+    color: "#143641",
     initial: "C",
     devBareHost: true,
     productionUrl: (process.env.NEXT_PUBLIC_CHG_URL || "").replace(/\/$/, "") || undefined,

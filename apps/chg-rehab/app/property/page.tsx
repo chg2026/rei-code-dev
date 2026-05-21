@@ -160,7 +160,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
             {visible.map((p) => {
               const active = p.id === selectedId;
               const isRehab = (p.status || "").toLowerCase().includes("rehab");
-              const bg = isRehab ? "background:#E6F1FB;color:#0C447C;" : "background:#EAF3DE;color:#27500A;";
+              const bg = isRehab ? "background:#E8EFF1;color:#143641;" : "background:#EAF3DE;color:#27500A;";
               return (
                 <Link
                   key={p.id}
@@ -266,7 +266,7 @@ function parseInlineStyle(s: string): Record<string, string> {
 
 function statusBadgeStyle(status: string): React.CSSProperties {
   const s = status.toLowerCase();
-  if (s.includes("rehab")) return { background: "#E6F1FB", color: "#0C447C" };
+  if (s.includes("rehab")) return { background: "#E8EFF1", color: "#143641" };
   if (s.includes("rental") || s.includes("tenanted")) return { background: "#EAF3DE", color: "#27500A" };
   if (s.includes("sold")) return { background: "#EEEDFE", color: "#3C3489" };
   return { background: "#FAEEDA", color: "#633806" };
@@ -322,7 +322,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Total invested</div>
-          <div className="kpi-val" style={{ color: "#185FA5" }}>{formatMoney(totalInvested || null)}</div>
+          <div className="kpi-val" style={{ color: "#1F4D5C" }}>{formatMoney(totalInvested || null)}</div>
           <div className="kpi-sub">Purchase + rehab to date</div>
         </div>
         {isRental ? (
@@ -385,7 +385,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                 Active project
                 <Link
                   href={`/rehab?project=${project.code}`}
-                  style={{ float: "right", fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: 10, color: "#185FA5", textDecoration: "none" }}
+                  style={{ float: "right", fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: 10, color: "#1F4D5C", textDecoration: "none" }}
                 >
                   Open in Rehab Manager →
                 </Link>
@@ -445,7 +445,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                 </span>
               </div>
               {openItems.map((it, i) => {
-                const sevColor = it.severity === "high" ? "#C2410C" : it.severity === "med" ? "#A16207" : "#185FA5";
+                const sevColor = it.severity === "high" ? "#C2410C" : it.severity === "med" ? "#A16207" : "#1F4D5C";
                 const sevBg    = it.severity === "high" ? "#FEF1E5" : it.severity === "med" ? "#FEF7E0" : "#E8F0FA";
                 return (
                   <div key={it.id} style={{
@@ -558,7 +558,7 @@ async function HistoryTab({ propertyId, companyId }: { propertyId: string; compa
               </span>
               <Link
                 href={`/rehab?project=${encodeURIComponent(p.code)}`}
-                style={{ fontSize: 10, color: "#185FA5", textDecoration: "none" }}
+                style={{ fontSize: 10, color: "#1F4D5C", textDecoration: "none" }}
               >
                 Open →
               </Link>
@@ -634,7 +634,7 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
 
         <div style={{ padding: "14px 16px", background: "var(--bg-secondary)", borderBottom: "0.5px solid var(--border-lo)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-            <Summary label="Total invested"          val={formatMoney(totalInvested)}    color="#185FA5" />
+            <Summary label="Total invested"          val={formatMoney(totalInvested)}    color="#1F4D5C" />
             <Summary label="Projected net profit"    val={formatMoney(projectedNet)}     color="#1D9E75" />
             <Summary label="Projected ROI"           val={`${projectedRoi}%`}             color="#1D9E75" sub="(sell scenario)" />
           </div>
@@ -817,9 +817,9 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
     return (
       <>
         <div style={{
-          padding: "8px 16px", background: "#E6F1FB",
+          padding: "8px 16px", background: "#E8EFF1",
           borderBottom: "0.5px solid rgba(24,95,165,0.2)",
-          fontSize: 10, color: "#0C447C",
+          fontSize: 10, color: "#143641",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <span>Tenant records are managed in the Contacts module</span>
@@ -861,7 +861,7 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: "50%",
-                  background: "#E6F1FB", color: "#0C447C",
+                  background: "#E8EFF1", color: "#143641",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 11, fontWeight: 700, flexShrink: 0,
                 }}>{initials}</div>

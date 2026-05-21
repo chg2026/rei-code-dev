@@ -344,8 +344,8 @@ body {
 /* ── BUTTONS ── */
 .btn{padding:6px 12px;font-size:11px;border:0.5px solid var(--border-mid);border-radius:5px;background:transparent;cursor:pointer;font-family:var(--font);color:var(--text-primary);}
 .btn:hover{background:var(--bg-secondary);}
-.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy);}
-.btn-primary:hover{background:#152d48;}
+.btn-primary{background:var(--marine);color:#fff;border-color:var(--marine);}
+.btn-primary:hover{background:var(--marine-ink);}
 .btn-green{background:var(--green);color:#fff;border-color:var(--green);}
 .btn-green:hover{background:#188c65;}
 .btn-sm{padding:4px 9px;font-size:10px;border:0.5px solid var(--border-mid);border-radius:4px;background:transparent;cursor:pointer;font-family:var(--font);}

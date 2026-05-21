@@ -132,7 +132,7 @@ function Avatar({ initials }: { initials: string }) {
   return (
     <div style={{
       width: 20, height: 20, borderRadius: "50%",
-      background: "linear-gradient(135deg,#7EB5E6,#4A90D9)",
+      background: "linear-gradient(135deg,#A8C4D0,#5B8FA8)",
       color: "#fff", fontSize: 8, fontWeight: 700,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0,

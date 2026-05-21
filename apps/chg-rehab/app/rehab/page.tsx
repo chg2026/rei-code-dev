@@ -12,7 +12,7 @@ const PAGE_SIZE = 60;
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   Planning:    { bg: "#F1F5F9", color: "#475569" },
-  Active:      { bg: "#E6F1FB", color: "#0C447C" },
+  Active:      { bg: "#E8EFF1", color: "#143641" },
   OnHold:      { bg: "#FEF9EC", color: "#92400E" },
   Complete:    { bg: "#EAF3DE", color: "#27500A" },
 };

@@ -558,9 +558,9 @@ function ModeRadio({
         color: disabled
           ? "var(--text-tertiary)"
           : active
-          ? "#0C447C"
+          ? "#143641"
           : "var(--text-secondary)",
-        border: `0.5px solid ${active ? "#0C447C" : "var(--border-lo)"}`,
+        border: `0.5px solid ${active ? "#143641" : "var(--border-lo)"}`,
         borderRadius: 5,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.55 : 1,
