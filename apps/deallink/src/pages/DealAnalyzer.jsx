@@ -19,8 +19,6 @@ const STRATS = [
   { k: 'flip', label: 'Fix & Flip', icon: Wrench },
   { k: 'multi', label: 'Multifamily', icon: Layers },
   { k: 'commercial', label: 'Commercial', icon: Briefcase },
-  { k: 'chg-flip',  label: 'Flip Pro',  icon: Briefcase },
-  { k: 'chg-brrrr', label: 'BRRRR Pro', icon: Repeat2   },
   { k: 'chg-flip-extra', label: 'FLIP EXTRA TEST', icon: Calculator },
 ];
 
@@ -321,16 +319,15 @@ function Analyzer({ deal }) {
           </div>
         </div>
 
-        {(strategy === 'chg-flip' || strategy === 'chg-brrrr' || strategy === 'chg-flip-extra') && (
+        {strategy === 'chg-flip-extra' && (
           <ChgCalculatorFrame
             deal={deal}
             strategy={strategy}
             onSave={(payload) => {
-              const label = strategy === 'chg-flip' ? 'Flip Pro' : strategy === 'chg-brrrr' ? 'BRRRR Pro' : 'Flip Extra';
               const newAnalysis = {
                 id: 'chg-' + Date.now(),
-                strategy: strategy === 'chg-brrrr' ? 'brrrr' : 'flip',
-                label,
+                strategy: 'flip',
+                label: 'Flip Extra',
                 savedAt: payload.savedAt,
                 chgInputs: payload.inputs,
                 monthlyRent: 0,
@@ -346,7 +343,7 @@ function Analyzer({ deal }) {
           />
         )}
 
-        {strategy !== 'chg-flip' && strategy !== 'chg-brrrr' && strategy !== 'chg-flip-extra' && (
+        {strategy !== 'chg-flip-extra' && (
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-5 space-y-5">
             {subtab === 'property' && (
