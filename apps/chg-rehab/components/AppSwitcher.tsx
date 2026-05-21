@@ -168,7 +168,7 @@ export default function AppSwitcher({
         style={{
           background: "transparent",
           border: "none",
-          color: "rgba(255,255,255,0.65)",
+          color: "#6B6862",
           cursor: "pointer",
           padding: 6,
           borderRadius: 6,
@@ -178,11 +178,11 @@ export default function AppSwitcher({
           transition: "all 0.15s",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#0A0A0A";
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.06)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.65)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#6B6862";
           (e.currentTarget as HTMLButtonElement).style.background = "transparent";
         }}
       >
@@ -278,8 +278,8 @@ export default function AppSwitcher({
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             fontWeight: 600,
-                            color: "#0C447C",
-                            background: "#E8F0FA",
+                            color: "#143641",
+                            background: "#E8EFF1",
                             padding: "2px 6px",
                             borderRadius: 4,
                           }}
@@ -343,7 +343,7 @@ export default function AppSwitcher({
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = "#f9fafb";
+                      (e.currentTarget as HTMLAnchorElement).style.background = "#F5F4F0";
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
