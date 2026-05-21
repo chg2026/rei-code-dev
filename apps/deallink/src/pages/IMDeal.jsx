@@ -557,16 +557,25 @@ function FullDealReport({ deal, dealId, buyer, onDashboard }) {
   // `cfg.fields.<key>`); the legacy renderer used flat `cfg.show_*` keys.
   // Support both so old and new memos both render correctly.
   const cfg = deal.im_config || deal.imConfig || {};
-  const sections = (cfg && typeof cfg.sections === 'object' && cfg.sections) || {};
+  const hasSections = cfg && typeof cfg.sections === 'object' && cfg.sections !== null;
+  const sections = hasSections ? cfg.sections : {};
   const showPhotos   = cfg.show_photos   !== false && sections.photos          !== false;
   const showAnalyzer = cfg.show_analyzer !== false && sections.dealAnalysis    !== false;
   const showRehab    = cfg.show_rehab    !== false && sections.rehabBreakdown  !== false;
-  // Fix & Flip+ advanced viz toggles default ON for deal structure and
-  // sensitivity, OFF for the doomsday stress test (matches the memo
-  // builder defaults in DealEditor.jsx IM_SECTIONS).
-  const showFlipExtraStructure   = sections.flipExtraDealStructure !== false;
-  const showFlipExtraSensitivity = sections.flipExtraSensitivity   !== false;
-  const showFlipExtraStress      = sections.flipExtraStressTest    === true;
+  // Fix & Flip+ advanced viz toggles. For NEW memos (cfg has `sections`)
+  // use per-section defaults from IM_SECTIONS. For LEGACY memos (flat
+  // `show_*` only, no `sections` object) inherit the master `showAnalyzer`
+  // gate so a wholesaler who explicitly set `show_analyzer:false` does
+  // not suddenly start exposing flip-extra blocks after this upgrade.
+  const showFlipExtraStructure   = hasSections
+    ? sections.flipExtraDealStructure !== false
+    : showAnalyzer;
+  const showFlipExtraSensitivity = hasSections
+    ? sections.flipExtraSensitivity   !== false
+    : showAnalyzer;
+  const showFlipExtraStress      = hasSections
+    ? sections.flipExtraStressTest    === true
+    : false;
 
   const wholesaler = deal.wholesaler || {};
   const spread = (deal.arv != null && deal.ask != null) ? Number(deal.arv) - Number(deal.ask) : null;
