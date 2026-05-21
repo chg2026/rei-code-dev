@@ -191,7 +191,7 @@ export default function PublicProfile() {
             Join buyer list
           </button>
           <a
-            href={`https://doorine.com/r/${profile.handle}`}
+            href="https://reiflywheel.doorine.com/signup"
             target="_blank"
             rel="noreferrer"
             style={{
