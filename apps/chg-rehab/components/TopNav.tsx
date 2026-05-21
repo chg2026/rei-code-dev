@@ -2,10 +2,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/session";
-import NotificationBell from "./NotificationBell";
-import BillingNavIndicator from "./BillingNavIndicator";
-import BillingNavBadge from "./BillingNavBadge";
-import AppSwitcher from "./AppSwitcher";
 
 type NavItem = { href: string; label: string };
 type NavSection = { label?: string; items: NavItem[] };
@@ -76,15 +72,6 @@ export default function TopNav({ user }: { user: SessionUser }) {
     { label: "Admin", items: adminItems },
   ];
 
-  const initials =
-    [(user.firstName || "")[0], (user.lastName || "")[0]]
-      .filter(Boolean)
-      .join("")
-      .toUpperCase() || (user.email || "U")[0].toUpperCase();
-
-  const fullName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
-
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
@@ -118,29 +105,6 @@ export default function TopNav({ user }: { user: SessionUser }) {
           </div>
         ))}
       </aside>
-
-      <div className="topbar">
-        <div className="spacer" />
-        {user.role === "Admin" ? <BillingNavIndicator /> : <BillingNavBadge />}
-        <NotificationBell />
-        <AppSwitcher
-          currentProduct="chg"
-          isInvestor={user.isInvestor ?? false}
-          isContractor={user.isContractor ?? false}
-          enabledProducts={user.accountProducts ?? []}
-        />
-        <Link
-          href="/account"
-          className="avatar-chip"
-          title={user.email ? `${user.email} — Account settings` : "Account settings"}
-        >
-          <div className="avatar">{initials}</div>
-          {fullName}
-        </Link>
-        <a href="/api/logout" className="sign-out-btn" title="Sign out">
-          Sign out
-        </a>
-      </div>
     </>
   );
 }

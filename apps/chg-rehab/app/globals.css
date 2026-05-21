@@ -65,6 +65,8 @@
   --red: var(--danger);
   --red-bg: var(--danger-soft);
   --red-txt: #7A1F1F;
+  --purple-bg: #EEEDFE;
+  --purple-txt: #3C3489;
   --navy: var(--marine);
   --r-md: var(--radius-sm);
   --r-lg: var(--radius-md);

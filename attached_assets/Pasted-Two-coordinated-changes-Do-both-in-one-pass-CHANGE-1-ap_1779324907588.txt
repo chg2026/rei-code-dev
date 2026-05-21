@@ -1,0 +1,56 @@
+Two coordinated changes. Do both in one pass.
+
+CHANGE 1 — apps/chg-rehab/components/TopNav.tsx
+Update the component to return ONLY the sidebar — remove the topbar div from its return entirely. The component should return just:
+  <aside className="sidebar">
+    ... (all the brand + nav sections as already built)
+  </aside>
+
+Remove the <div className="topbar"> block and everything inside it. The topbar is moving to layout.tsx.
+Keep all imports that are still needed for the sidebar. Remove imports only used by the topbar (BillingNavIndicator, BillingNavBadge, NotificationBell, AppSwitcher) ONLY if they are not used anywhere else in the file after this change.
+
+CHANGE 2 — apps/chg-rehab/app/layout.tsx
+Replace the existing authenticated user body structure with this new layout:
+
+  <body>
+    <div className="app-shell">
+      <TopNav user={user} />
+      <div className="main-col">
+        <div className="topbar">
+          <div className="spacer" />
+          {isAdmin ? <BillingNavIndicator /> : <BillingNoticeForTeammates />}
+          <NotificationBell />
+          <AppSwitcher
+            currentProduct="chg"
+            isInvestor={user.isInvestor ?? false}
+            isContractor={user.isContractor ?? false}
+            enabledProducts={user.accountProducts ?? []}
+          />
+          <Link
+            href="/account"
+            className="avatar-chip"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <div className="avatar">
+              {[(user.firstName || "")[0], (user.lastName || "")[0]].filter(Boolean).join("").toUpperCase() || (user.email || "U")[0].toUpperCase()}
+            </div>
+            {[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User"}
+          </Link>
+          <a href="/api/logout" className="sign-out-btn">Sign out</a>
+        </div>
+        <div className="top-stack">
+          <ProfileCompletionBanner score={user.profileScore} />
+          {isAdmin ? <BillingStatusBanner /> : <BillingNoticeForTeammates />}
+        </div>
+        <div className="main-wrap">
+          <section className="module active">{children}</section>
+        </div>
+      </div>
+    </div>
+  </body>
+
+Add these imports to layout.tsx: Link from "next/link", BillingNavIndicator, NotificationBell, AppSwitcher — importing from the same paths already used in the project.
+
+Keep the unauthenticated (no user) case exactly as it is.
+
+Only edit files inside apps/chg-rehab/. Do not touch any other folder.

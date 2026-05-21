@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import BillingNoticeForTeammates from "@/components/BillingNoticeForTeammates";
+import BillingNavIndicator from "@/components/BillingNavIndicator";
+import BillingNavBadge from "@/components/BillingNavBadge";
+import NotificationBell from "@/components/NotificationBell";
+import AppSwitcher from "@/components/AppSwitcher";
 import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -25,16 +30,53 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const isAdmin = user.role === "Admin";
 
+  const initials =
+    [(user.firstName || "")[0], (user.lastName || "")[0]]
+      .filter(Boolean)
+      .join("")
+      .toUpperCase() || (user.email || "U")[0].toUpperCase();
+
+  const fullName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.email ||
+    "User";
+
   return (
     <html lang="en">
       <body>
-        <div className="top-stack">
-          <ProfileCompletionBanner score={user.profileScore} />
+        <div className="app-shell">
           <TopNav user={user} />
-          {isAdmin ? <BillingStatusBanner /> : <BillingNoticeForTeammates />}
-        </div>
-        <div className="main-wrap">
-          <section className="module active">{children}</section>
+          <div className="main-col">
+            <div className="topbar">
+              <div className="spacer" />
+              {isAdmin ? <BillingNavIndicator /> : <BillingNavBadge />}
+              <NotificationBell />
+              <AppSwitcher
+                currentProduct="chg"
+                isInvestor={user.isInvestor ?? false}
+                isContractor={user.isContractor ?? false}
+                enabledProducts={user.accountProducts ?? []}
+              />
+              <Link
+                href="/account"
+                className="avatar-chip"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div className="avatar">{initials}</div>
+                {fullName}
+              </Link>
+              <a href="/api/logout" className="sign-out-btn">
+                Sign out
+              </a>
+            </div>
+            <div className="top-stack">
+              <ProfileCompletionBanner score={user.profileScore} />
+              {isAdmin ? <BillingStatusBanner /> : <BillingNoticeForTeammates />}
+            </div>
+            <div className="main-wrap">
+              <section className="module active">{children}</section>
+            </div>
+          </div>
         </div>
       </body>
     </html>
