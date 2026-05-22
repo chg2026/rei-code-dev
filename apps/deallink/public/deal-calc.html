@@ -433,15 +433,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 
 <!-- NAV -->
 
-<!-- DEAL BAR -->
-<div class="deal-bar">
-  <span class="db-back">&#8592; Pipeline</span>
-  <span class="db-sep">/</span>
-  <div class="db-info">
-    <div class="db-name">1847 Oak Ridge Dr &mdash; Tampa</div>
-    <div class="db-sub">Tampa, FL 33602 &nbsp;&middot;&nbsp; SFR &nbsp;&middot;&nbsp; Nicole L. &nbsp;&middot;&nbsp; Identified</div>
-  </div>
-</div>
+<!-- DEAL BAR — removed in REI Flywheel (CHG nav element) -->
 
 <!-- ROW 1 -->
 
@@ -2746,9 +2738,22 @@ const _initHold=Math.max(1,(isNaN(_rmoInit)?2:_rmoInit)+(isNaN(_smoInit)?1:Math.
 $('slider-hold').value=_initHold;
 updateSliderTrack($('slider-hold'),true);
 
+// ─── REI Flywheel: read mode from URL and switch view ───
+(function() {
+  try {
+    var urlMode = new URLSearchParams(window.location.search).get('mode') || 'flip';
+    if (urlMode === 'brrrr' && typeof switchRV === 'function') {
+      switchRV('brrrr');
+    }
+  } catch (e) {}
+})();
+
 // ─── REI Flywheel ↔ Calculator bridge ───
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'REI_PREFILL') {
+    if (e.data.mode && typeof switchRV === 'function') {
+      try { switchRV(e.data.mode === 'brrrr' ? 'brrrr' : 'flip'); } catch (err) {}
+    }
     var d = e.data.deal || {};
     if (d.calcState) {
       try { restoreCalcState(d.calcState); } catch (err) {}

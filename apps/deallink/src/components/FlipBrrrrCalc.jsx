@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function FlipBrrrrCalc({ deal, dispatch }) {
+export default function FlipBrrrrCalc({ deal, dispatch, mode = 'flip' }) {
   const iframeRef = useRef(null);
 
   function handleLoad() {
@@ -9,6 +9,7 @@ export default function FlipBrrrrCalc({ deal, dispatch }) {
     try {
       frame.contentWindow.postMessage({
         type: 'REI_PREFILL',
+        mode,
         deal: {
           purchasePrice: deal?.purchase_price || 0,
           rehabCost: deal?.rehab_budget || 0,
@@ -39,7 +40,7 @@ export default function FlipBrrrrCalc({ deal, dispatch }) {
     <div style={{ width: '100%', height: '100vh', minHeight: 700 }}>
       <iframe
         ref={iframeRef}
-        src="/deal-calc.html"
+        src={`/deal-calc.html?mode=${mode}`}
         onLoad={handleLoad}
         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
         title="Deal Calculator"

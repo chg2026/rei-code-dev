@@ -343,6 +343,11 @@ function Analyzer({ deal }) {
           })}
         </div>
 
+        {(strategy === 'flip' || strategy === 'brrrr') ? (
+          <div className="-mx-6 -mb-6">
+            <FlipBrrrrCalc deal={deal} dispatch={dispatch} mode={strategy} />
+          </div>
+        ) : (<>
         <div className="border-b border-[rgba(0,0,0,0.08)] mb-5">
           <div className="flex items-center gap-1">
             {SUBTABS.map(({ k, label }) => {
@@ -441,15 +446,11 @@ function Analyzer({ deal }) {
                     />
                   ),
                 },
-                {
-                  key: 'calc',
-                  label: 'Calculator',
-                  render: () => <FlipBrrrrCalc deal={deal} dispatch={dispatch} />,
-                },
               ]}
             />
           </div>
         </div>
+        </>)}
       </div>
     </Layout>
   );
