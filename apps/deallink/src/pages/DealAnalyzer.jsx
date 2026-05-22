@@ -424,16 +424,30 @@ function Analyzer({ deal }) {
               </>
             )}
             {strategy === 'brrrr' && <BrrrAnalysis m={m} />}
-            <Comps
-              comps={comps}
-              onAdd={handleAddComp}
-              onRemove={handleRemoveComp}
-              showModal={showCompModal}
-              setShowModal={setShowCompModal}
-              compForm={compForm}
-              setCompForm={setCompForm}
+            <ResearchTabs
+              tabs={[
+                {
+                  key: 'comps',
+                  label: 'Comps',
+                  render: () => (
+                    <Comps
+                      comps={comps}
+                      onAdd={handleAddComp}
+                      onRemove={handleRemoveComp}
+                      showModal={showCompModal}
+                      setShowModal={setShowCompModal}
+                      compForm={compForm}
+                      setCompForm={setCompForm}
+                    />
+                  ),
+                },
+                {
+                  key: 'calc',
+                  label: 'Calculator',
+                  render: () => <FlipBrrrrCalc deal={deal} dispatch={dispatch} />,
+                },
+              ]}
             />
-            <FlipBrrrrCalc deal={deal} dispatch={dispatch} />
           </div>
         </div>
       </div>
@@ -676,6 +690,51 @@ function FlipResults({ m, arv, purchasePrice }) {
         </div>
       </div>
     </>
+  );
+}
+
+function ResearchTabs({ tabs }) {
+  const [active, setActive] = React.useState(tabs[0]?.key);
+  const current = tabs.find((t) => t.key === active) || tabs[0];
+  const onKey = (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const i = tabs.findIndex((t) => t.key === active);
+    const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+    setActive(tabs[next].key);
+  };
+  return (
+    <div>
+      <div
+        role="tablist"
+        aria-label="Research view"
+        onKeyDown={onKey}
+        style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 999, overflow: 'hidden', background: 'var(--card)', marginBottom: 12 }}
+      >
+        {tabs.map((t) => {
+          const on = t.key === active;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => setActive(t.key)}
+              style={{
+                border: 'none', cursor: 'pointer', padding: '7px 16px', fontSize: 12,
+                fontFamily: 'var(--sans)', fontWeight: 600,
+                background: on ? 'var(--ink)' : 'transparent',
+                color: on ? '#fff' : 'var(--mute)',
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <div role="tabpanel">{current?.render()}</div>
+    </div>
   );
 }
 
