@@ -51,36 +51,29 @@
 .ap-sec-lbl{color:rgba(245,240,232,0.55)!important;}
 .ap-sec-lbl::after{background:rgba(255,255,255,0.10)!important;}
 .ap .fg-lbl,.ap .fg-hint,.ap .rehab-note,.ap .fin-divider{color:rgba(245,240,232,0.75)!important;}
-.ap .fw input,.ap .fw select,.ap input,.ap select{background:rgba(255,255,255,0.06)!important;color:#F5F0E8!important;-webkit-text-fill-color:#F5F0E8!important;border-color:rgba(255,255,255,0.12)!important;}
-.ap .fw input::placeholder,.ap input::placeholder{color:rgba(245,240,232,0.40)!important;-webkit-text-fill-color:rgba(245,240,232,0.40)!important;}
-.ap .fw input:-webkit-autofill,.ap input:-webkit-autofill{-webkit-text-fill-color:#F5F0E8!important;-webkit-box-shadow:0 0 0 1000px rgba(255,255,255,0.06) inset!important;}
 
 /* Hide internal FLIP/BRRRR toggle (mode is now controlled by URL param) */
 .rv-toggle,.flip-brrrr-toggle,[class*="toggle-rv"],[class*="rv-switcher"]{display:none!important;}
 .ap .fp,.ap .fs{color:rgba(245,240,232,0.55)!important;}
 .ap .tip-icon{background:rgba(245,240,232,0.18);color:var(--assumption-text);}
 
+.ap .fw input,
+.ap .fw select,
 .ap input,
-.ap select,
-.ap textarea,
-.assumption-panel input,
-.assumption-panel select,
-[class*="assumption"] input,
-[class*="assumption"] select {
+.ap select {
+  background-color: #FFFFFF !important;
   color: #1A1A1A !important;
   -webkit-text-fill-color: #1A1A1A !important;
-  background-color: #FFFFFF !important;
   border: 1px solid rgba(0,0,0,0.15) !important;
 }
 
-.ap input::placeholder,
-.assumption-panel input::placeholder {
+.ap .fw input::placeholder,
+.ap input::placeholder {
   color: rgba(0,0,0,0.35) !important;
   -webkit-text-fill-color: rgba(0,0,0,0.35) !important;
 }
 
-.ap input:-webkit-autofill,
-.ap input:-webkit-autofill:focus {
+.ap .fw input:-webkit-autofill {
   -webkit-text-fill-color: #1A1A1A !important;
   -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
 }
