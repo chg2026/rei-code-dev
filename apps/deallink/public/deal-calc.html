@@ -28,7 +28,7 @@
   --color-positive:#22863a;
   --color-negative:#c0392b;
   --color-accent:#C9973B;
-  --assumption-bg:#1C2333;
+  --assumption-bg:#18181B;
   --assumption-text:#F5F0E8;
 
   /* Re-map the original CHG vars to REI tones so the rest of the sheet picks them up */
@@ -59,6 +59,40 @@
 .rv-toggle,.flip-brrrr-toggle,[class*="toggle-rv"],[class*="rv-switcher"]{display:none!important;}
 .ap .fp,.ap .fs{color:rgba(245,240,232,0.55)!important;}
 .ap .tip-icon{background:rgba(245,240,232,0.18);color:var(--assumption-text);}
+
+.ap input,
+.ap select,
+.ap textarea,
+.assumption-panel input,
+.assumption-panel select,
+[class*="assumption"] input,
+[class*="assumption"] select {
+  color: #F5F0E8 !important;
+  -webkit-text-fill-color: #F5F0E8 !important;
+  background-color: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+.ap input::placeholder,
+.assumption-panel input::placeholder {
+  color: rgba(245,240,232,0.4) !important;
+  -webkit-text-fill-color: rgba(245,240,232,0.4) !important;
+}
+
+.ap input:-webkit-autofill,
+.ap input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #F5F0E8 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #18181B inset !important;
+}
+
+.ap .section-label,
+.ap label,
+.ap .field-label,
+.ap .inp-label,
+.assumption-panel label,
+.assumption-panel .section-label {
+  color: rgba(245,240,232,0.6) !important;
+}
 
 /* nav + tabs */
 .nl.active{border-bottom-color:#C9973B!important;}
