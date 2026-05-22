@@ -5,6 +5,7 @@ import {
   CheckCircle2, Save, Repeat, Layers, Briefcase, Building2, Search, Repeat2,
 } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
+import FlipBrrrrCalc from '../components/FlipBrrrrCalc.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { DEAL_STATUSES } from '../lib/deallink-api.js';
 
@@ -432,6 +433,7 @@ function Analyzer({ deal }) {
               compForm={compForm}
               setCompForm={setCompForm}
             />
+            <FlipBrrrrCalc deal={deal} dispatch={dispatch} />
           </div>
         </div>
       </div>
