@@ -405,13 +405,26 @@ function Step0Preview({ deal, onUnlock }) {
             <Lock className="w-4 h-4" /> View full analysis
           </button>
 
-          {(wholesaler.handle || wholesaler.name) && (
-            <p className="text-center text-xs text-[#86868b]">
-              This deal is shared by{' '}
-              <span className="text-[#b8860b] font-semibold">
-                {wholesaler.handle ? `@${wholesaler.handle}` : wholesaler.name}
-              </span>{' '}
-              on REI Flywheel
+          {wholesaler?.handle && (
+            <p style={{ fontSize: 13, color: 'var(--mute)', marginTop: 16, textAlign: 'center' }}>
+              Shared by{' '}
+              <a
+                href={`https://reiflywheel.doorine.com/p/${wholesaler.handle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--accent)', fontWeight: 600 }}
+              >
+                @{wholesaler.handle}
+              </a>
+              {' · '}
+              <a
+                href="https://reiflywheel.doorine.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--mute)', textDecoration: 'underline' }}
+              >
+                Join REI Flywheel
+              </a>
             </p>
           )}
         </div>
