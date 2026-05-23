@@ -491,12 +491,29 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
   }
 
   const admin = getSupabaseAdminClient();
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
-    .eq("id", existing.id)
-    .maybeSingle<RefreshProfile>();
-
+  let profile: RefreshProfile | null = null;
+  {
+    const { data: profileById } = await admin
+      .from("user_profiles")
+      .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
+      .eq("id", existing.id)
+      .maybeSingle<RefreshProfile>();
+    profile = profileById ?? null;
+  }
+  if (!profile) {
+    const lookupEmail = authEmail || existing.email;
+    if (lookupEmail) {
+      const { data: profileByEmail } = await admin
+        .from("user_profiles")
+        .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
+        .eq("email", lookupEmail)
+        .maybeSingle<RefreshProfile>();
+      if (profileByEmail) {
+        console.log(`[auth:diag] refreshFromSupabase | user=${existing.id} | profile_source=supabase_db_email_fallback | profile_row=found`);
+        profile = profileByEmail;
+      }
+    }
+  }
   if (!profile) {
     console.log(`[auth:diag] refreshFromSupabase | user=${existing.id} | profile_source=supabase_db | profile_row=MISSING | action=continue_with_existing_prisma_row`);
   }
