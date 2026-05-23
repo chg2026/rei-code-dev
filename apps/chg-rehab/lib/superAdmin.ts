@@ -53,7 +53,7 @@ export async function requireSuperAdmin() {
  */
 export const PLANS_BY_PRODUCT: Record<string, string[]> = {
   chg: ["starter", "professional", "enterprise"],
-  deallink: ["free", "pro"],
+  deallink: ["free", "personal", "team"],
 };
 
 export function isValidPlan(productCode: string, plan: string): boolean {
