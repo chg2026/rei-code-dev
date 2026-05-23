@@ -14,7 +14,7 @@ router.use(requireSuperAdmin)
 // table as a JSON column when Phase 5 brings real Deal Link tiers.
 const PLANS_BY_PRODUCT = {
   chg: ['starter', 'professional', 'enterprise'],
-  deallink: ['free', 'pro'],
+  deallink: ['free', 'personal', 'team'],
   'investor-portal': ['standard'],
   'contractor-portal': ['free', 'pro'],
 }
