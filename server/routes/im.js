@@ -67,13 +67,32 @@ function imDealForBuyer(d, profile) {
 
   if (profile && out.show_contact) {
     out.wholesaler = {
-      handle: profile.handle,
-      name: profile.name,
-      initials: profile.initials,
-      city: profile.city,
-      avatar_url: profile.avatar_url,
+      handle: profile.handle || null,
+      name: profile.name || null,
+      initials: profile.initials || (profile.name ? profile.name.slice(0, 2).toUpperCase() : null),
+      city: profile.city || null,
+      avatar_url: profile.avatar_url || null,
     }
   }
+
+  // Include sanitized im_config so the buyer-side IM can read
+  // latestAnalysis (analysis snapshot) and section toggles.
+  // calcState is intentionally stripped — too large and sensitive.
+  const rawCfg = d.im_config || {}
+  const la = rawCfg.latestAnalysis
+  out.im_config = {
+    sections: rawCfg.sections || {},
+    show_analyzer: rawCfg.show_analyzer,
+    latestAnalysis: la ? {
+      v: la.v,
+      strategy: la.strategy,
+      label: la.label,
+      savedAt: la.savedAt,
+      source: la.source,
+      summary: la.summary || null,
+    } : null,
+  }
+
   return out
 }
 

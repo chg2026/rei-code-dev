@@ -2838,9 +2838,12 @@ function getCalcSummary() {
     });
   }
 })();
-setInterval(function() {
+function sendSave() {
   try { window.parent.postMessage({ type: 'REI_SAVE', calcState: getCalcState(), summary: getCalcSummary() }, '*'); } catch (e) {}
-}, 5000);
+}
+// Fire once after 1.5 s (charts need time to render) then every 5 s.
+setTimeout(sendSave, 1500);
+setInterval(sendSave, 5000);
 </script>
 </body>
 </html>
