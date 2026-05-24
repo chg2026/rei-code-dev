@@ -554,28 +554,31 @@ function Analyzer({ deal }) {
               </>
             )}
             {strategy === 'brrrr' && <BrrrAnalysis m={m} />}
-            <ResearchTabs
-              tabs={[
-                {
-                  key: 'comps',
-                  label: 'Comps',
-                  render: () => (
-                    <Comps
-                      comps={comps}
-                      onAdd={handleAddComp}
-                      onRemove={handleRemoveComp}
-                      showModal={showCompModal}
-                      setShowModal={setShowCompModal}
-                      compForm={compForm}
-                      setCompForm={setCompForm}
-                    />
-                  ),
-                },
-              ]}
-            />
           </div>
         </div>
         </>)}
+
+        <div className="mt-6">
+          <ResearchTabs
+            tabs={[
+              {
+                key: 'comps',
+                label: 'Comps',
+                render: () => (
+                  <Comps
+                    comps={comps}
+                    onAdd={handleAddComp}
+                    onRemove={handleRemoveComp}
+                    showModal={showCompModal}
+                    setShowModal={setShowCompModal}
+                    compForm={compForm}
+                    setCompForm={setCompForm}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
       </div>
     </Layout>
   );
