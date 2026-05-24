@@ -467,7 +467,7 @@ function Analyzer({ deal }) {
         </div>
 
         {(strategy === 'flip_adv' || strategy === 'brrrr_adv') ? (
-          <div className="-mx-6 -mb-6">
+          <div className="-mx-6">
             <FlipBrrrrCalc deal={deal} dispatch={dispatch} mode={strategy === 'brrrr_adv' ? 'brrrr' : 'flip'} />
           </div>
         ) : strategy === 'mao' ? (
@@ -557,8 +557,7 @@ function Analyzer({ deal }) {
           </div>
         </div>
         </>)}
-
-        <div className="mt-6">
+        <div className="mt-8">
           <ResearchTabs
             tabs={[
               {
