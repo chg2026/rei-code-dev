@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import TopNav from "@/components/TopNav";
+import AvatarDropdown from "@/components/AvatarDropdown";
 import BillingStatusBanner from "@/components/BillingStatusBanner";
 import BillingNoticeForTeammates from "@/components/BillingNoticeForTeammates";
 import BillingNavIndicator from "@/components/BillingNavIndicator";
@@ -68,17 +69,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 isContractor={user.isContractor ?? false}
                 enabledProducts={user.accountProducts ?? []}
               />
-              <Link
-                href="/account"
-                className="avatar-chip"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <div className="avatar">{initials}</div>
-                {fullName}
-              </Link>
-              <a href="/api/logout" className="sign-out-btn">
-                Sign out
-              </a>
+              <AvatarDropdown initials={initials} fullName={fullName} />
             </div>
             <div className="top-stack">
               <ProfileCompletionBanner score={user.profileScore} />

@@ -70,6 +70,7 @@ export default function TopNav({ user }: { user: SessionUser }) {
   const sections: NavSection[] = [
     ...BASE_SECTIONS,
     { label: "Admin", items: adminItems },
+    { label: "Account", items: [{ href: "/account", label: "Profile Settings" }] },
   ];
 
   const isActive = (href: string) =>
