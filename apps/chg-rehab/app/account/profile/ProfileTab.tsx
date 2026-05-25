@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 // TODO: Avatar upload — apps/crm has the score field but never built upload UI.
 
@@ -15,6 +16,7 @@ export type ProfileTabInitial = {
 };
 
 export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) {
+  const router = useRouter();
   const [fullName, setFullName] = useState(initial.fullName);
   const [phone, setPhone] = useState(initial.phone);
   const [profileScore, setProfileScore] = useState<number | null>(initial.profileScore);
@@ -47,6 +49,7 @@ export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) 
       if (!res.ok || !j.ok) throw new Error(j.message || "Save failed");
       if (typeof j.profileScore === "number") setProfileScore(j.profileScore);
       flash("ok", "Profile updated");
+      router.refresh();
     } catch (err) {
       flash("err", err instanceof Error ? err.message : "Save failed");
     } finally {
