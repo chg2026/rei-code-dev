@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
-const API = "https://rei-code-dev.replit.app";
+const API = process.env.NEXT_PUBLIC_LEGACY_API_BASE_URL?.replace(/\/$/, "") || "https://rei-code-dev.replit.app";
 
 const PRODUCT_NAMES: Record<string, string> = {
   chg: "CHG Rehab",
@@ -88,6 +88,7 @@ export default function SignupClient() {
       if (!res.ok) {
         if (body.error === "already_registered") {
           setCredentialCheck({ exists: true, products: body.products || [] });
+          setLoading(false);
           return;
         }
         throw new Error(body.message || body.error || "Signup failed.");
