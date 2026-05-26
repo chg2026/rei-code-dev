@@ -16,6 +16,13 @@ function extractTokens(data) {
   return null;
 }
 
+const PRODUCT_NAMES = {
+  chg: 'CHG Rehab',
+  deallink: 'REI Flywheel',
+  'investor-portal': 'Investor Portal',
+  'contractor-portal': 'Contractor Portal',
+};
+
 export default function Signup() {
   const auth = useAuth();
   const nav = useNavigate();
@@ -34,7 +41,7 @@ export default function Signup() {
 
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState(null);
-  const [alreadyRegistered, setAlreadyRegistered] = React.useState(false);
+  const [alreadyRegistered, setAlreadyRegistered] = React.useState(null);
 
   if (!auth.loading && auth.user) {
     return <Navigate to="/onboarding" replace />;
@@ -42,7 +49,7 @@ export default function Signup() {
 
   function resetMessages() {
     setError(null);
-    setAlreadyRegistered(false);
+    setAlreadyRegistered(null);
   }
 
   async function applySession(tokens) {
@@ -74,7 +81,7 @@ export default function Signup() {
         product_code: 'deallink',
       });
       if (data?.error === 'already_registered') {
-        setAlreadyRegistered(true);
+        setAlreadyRegistered({ products: data.products || [] });
         return;
       }
       const tokens = extractTokens(data);
@@ -93,7 +100,7 @@ export default function Signup() {
     } catch (err) {
       const code = err?.response?.data?.error;
       if (code === 'already_registered') {
-        setAlreadyRegistered(true);
+        setAlreadyRegistered({ products: err?.response?.data?.products || [] });
       } else {
         setError(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Sign-up failed.');
       }
@@ -162,16 +169,32 @@ export default function Signup() {
           <p className="text-[#b8860b] text-xs uppercase tracking-widest font-mono">Sign up</p>
           <h1 className="text-2xl text-[#1d1d1f] font-bold mt-2">Create your account.</h1>
 
-          {alreadyRegistered ? (
+          {alreadyRegistered !== null ? (
             <div className="mt-8 space-y-4">
               <div className="rounded-lg border border-[#b8860b]/30 bg-[rgba(184,134,11,0.10)] p-4">
-                <p className="text-[#b8860b] text-sm font-medium">You already have a Gold Bridge account.</p>
-                <p className="text-[#3a3a3c] text-sm mt-2">Sign in with your existing credentials.</p>
+                {alreadyRegistered.products.includes('deallink') ? (
+                  <>
+                    <p className="text-[#b8860b] text-sm font-medium">You already have REI Flywheel.</p>
+                    <p className="text-[#3a3a3c] text-sm mt-2">Sign in with your existing credentials.</p>
+                  </>
+                ) : alreadyRegistered.products.length > 0 ? (
+                  <>
+                    <p className="text-[#b8860b] text-sm font-medium">You already have a Doorine account.</p>
+                    <p className="text-[#3a3a3c] text-sm mt-2">
+                      You're on {alreadyRegistered.products.map(p => PRODUCT_NAMES[p] || p).join(' and ')}. Sign in with your existing credentials to activate REI Flywheel.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[#b8860b] text-sm font-medium">You already have a Doorine account.</p>
+                    <p className="text-[#3a3a3c] text-sm mt-2">Sign in with your existing credentials.</p>
+                  </>
+                )}
               </div>
               <Link to="/login"><Button className="w-full">Go to sign in <ArrowRight className="w-4 h-4" /></Button></Link>
               <button
                 type="button"
-                onClick={() => { setAlreadyRegistered(false); setError(null); }}
+                onClick={() => { setAlreadyRegistered(null); setError(null); }}
                 className="w-full text-xs text-[#6e6e73] hover:text-[#b8860b]"
               >
                 Use a different email
