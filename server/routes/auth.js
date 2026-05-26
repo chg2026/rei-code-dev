@@ -92,13 +92,22 @@ router.post('/signup', checkSignupRateLimit, async (req, res) => {
     // block never has to fire for this case.
     const { data: existingProfile } = await supabaseAdmin
       .from('user_profiles')
-      .select('id')
+      .select('id, account_id')
       .eq('email', normalizedEmail)
       .maybeSingle()
     if (existingProfile) {
+      const { data: entitlements } = await supabaseAdmin
+        .from('account_products')
+        .select('products(code)')
+        .eq('account_id', existingProfile.account_id)
+        .eq('status', 'active')
+      const existingProducts = (entitlements || [])
+        .map(e => Array.isArray(e.products) ? e.products[0]?.code : e.products?.code)
+        .filter(Boolean)
       return res.status(409).json({
         error: 'already_registered',
-        message: 'You already have a Gold Bridge account. Use your existing credentials to sign in.',
+        message: 'You already have a Doorine account.',
+        products: existingProducts,
       })
     }
 
