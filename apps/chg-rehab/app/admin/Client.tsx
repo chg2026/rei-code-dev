@@ -1013,7 +1013,7 @@ function UserSeatsSection({
         const isMe = u.id === currentUserId;
         const isLastAdmin = u.role === "Admin" && adminCount <= 1;
         const rowBusy = pendingRoleId === u.id || pendingRemoveId === u.id;
-        const disabled = !isAdmin || rowBusy;
+        const disabled = !isAdmin || isMe || rowBusy;
         const removeDisabled = !isAdmin || isMe || isLastAdmin || rowBusy;
         const removeTitle = isMe
           ? "You can't remove yourself"
