@@ -156,23 +156,32 @@ export default function SignupClient() {
   async function handleInviteAccept(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    if (password !== confirmPassword) { setError("Passwords don't match."); return; }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/team/accept-invite`, {
+      const res = await fetch("/api/invites/use", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: inviteToken, password }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.message || body.error || "Failed to accept invite.");
-      if (body.session?.access_token) {
-        const supabase = getSupabaseBrowserClient();
-        await supabase.auth.setSession({
-          access_token: body.session.access_token,
-          refresh_token: body.session.refresh_token,
-        });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to accept invite.");
+      }
+      const supabase = getSupabaseBrowserClient();
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password,
+      });
+      if (signInErr) {
+        throw new Error("Account created but sign-in failed. Try signing in at /login.");
       }
       window.location.href = "/pipeline";
     } catch (err: unknown) {
