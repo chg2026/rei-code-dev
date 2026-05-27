@@ -79,7 +79,7 @@ export default function BillingClient({
         {
           method: "POST",
           body: JSON.stringify({
-            return_url: "https://chg.neuroaios.ai/billing",
+            return_url: "https://chg.doorine.com/billing",
           }),
         },
       );
@@ -272,8 +272,8 @@ export default function BillingClient({
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
         currentPlan={billing.plan}
-        successUrl="https://chg.neuroaios.ai/billing/success?session_id={CHECKOUT_SESSION_ID}"
-        cancelUrl="https://chg.neuroaios.ai/billing"
+        successUrl="https://chg.doorine.com/billing/success?session_id={CHECKOUT_SESSION_ID}"
+        cancelUrl="https://chg.doorine.com/billing"
       />
     </div>
   );
