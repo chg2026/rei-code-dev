@@ -1,7 +1,7 @@
 import React from 'react';
 import OnboardingCard from '../components/OnboardingCard.jsx';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, Info, ChevronRight, FileText, Upload, Download, FileImage, FileCheck2, Scroll, FileBadge, FileSignature, Eye } from 'lucide-react';
+import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, Info, ChevronRight, FileText, Upload, Download, FileImage, FileCheck2, Scroll, FileBadge, Eye } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge, Modal } from '../components/ui.jsx';
@@ -111,21 +111,39 @@ export default function DealEditor({ mode }) {
       {mode === 'edit' && existing && (
         <div className="border-b border-[rgba(0,0,0,0.08)] mb-5 flex items-center gap-6">
           {[
-            { k: 'overview', label: 'Overview' },
-            { k: 'analysis', label: 'Deal Analysis' },
-            { k: 'documents', label: 'Documents' },
-            { k: 'im',       label: 'Investment memo (IM)' },
+            { k: 'overview',   label: 'Overview' },
+            { k: 'documents',  label: 'Documents' },
+            { k: 'im_builder', label: 'IM Builder' },
+            { k: 'im_preview', label: 'IM Live Preview' },
+            { k: 'analysis',   label: 'Deal Analysis', internal: true },
           ].map((t) => {
             const active = tab === t.k;
+            const inactiveColor = t.internal
+              ? 'text-[#aeaeb2] hover:text-[#3a3a3c]'
+              : 'text-[#6e6e73] hover:text-[#3a3a3c]';
             return (
               <button
                 key={t.k}
                 onClick={() => setTab(t.k)}
-                className={`relative pb-3 text-sm font-medium transition-colors ${
-                  active ? 'text-[#1d1d1f]' : 'text-[#6e6e73] hover:text-[#3a3a3c]'
+                className={`relative pb-3 text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  active ? 'text-[#1d1d1f]' : inactiveColor
                 }`}
               >
                 {t.label}
+                {t.internal && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      background: 'rgba(0,0,0,0.07)',
+                      color: '#6e6e73',
+                      borderRadius: 99,
+                      padding: '2px 7px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    🔒 Internal
+                  </span>
+                )}
                 <span
                   className={`absolute left-0 right-0 -bottom-px h-0.5 rounded-full ${
                     active ? 'bg-[#b8860b]' : 'bg-transparent'
@@ -252,12 +270,28 @@ export default function DealEditor({ mode }) {
               <DealDocumentsSection deal={existing} show={show} />
             )}
 
-            {mode === 'edit' && existing && tab === 'im' && (
-              <DealIMSection
+            {mode === 'edit' && existing && tab === 'im_builder' && (
+              <IMMemoBuilder
                 deal={existing}
                 onSave={(patch) => dispatch({ type: 'update_deal', id: existing.id, patch, throwOnError: true })}
                 show={show}
               />
+            )}
+
+            {mode === 'edit' && existing && tab === 'im_preview' && (
+              <section className="space-y-5">
+                <div className="flex items-start justify-between gap-4 border-b border-[rgba(0,0,0,0.08)] pb-4">
+                  <div className="flex-1">
+                    <IMPublicLink deal={existing} show={show} />
+                  </div>
+                  <ShareIMButton
+                    deal={existing}
+                    onSave={(patch) => dispatch({ type: 'update_deal', id: existing.id, patch, throwOnError: true })}
+                    show={show}
+                  />
+                </div>
+                <IMLivePreview deal={existing} />
+              </section>
             )}
 
             {mode === 'edit' && existing && tab === 'analysis' && (
@@ -1315,48 +1349,67 @@ function analysisHeadline(a) {
   }
 }
 
-function DealIMSection({ deal, onSave, show }) {
-  const [sub, setSub] = React.useState('builder');
+// ─── IM Public link row ──────────────────────────────────────────────────
+// Shared between the "IM Builder" and "IM Live Preview" top-level tabs.
+// Generates the buyer-facing share URL plus a copy affordance. The
+// open-preview button is disabled until the public IM route ships.
+function IMPublicLink({ deal, show }) {
+  const [copied, setCopied] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const shareUrl = `https://doorine.com/r/${deal.id}`;
+  const previewLive = false;
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      show && show('Link copied');
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError('Could not copy — select and copy manually.');
+    }
+  }
 
   return (
-    <section className="space-y-5">
-      <div className="flex items-center justify-between gap-4 border-b border-[rgba(0,0,0,0.08)] pb-2">
-        <div className="flex items-center gap-6">
-          {[
-            { k: 'builder', label: 'Memo builder', Icon: FileSignature },
-            { k: 'preview', label: 'Live preview', Icon: Eye },
-          ].map((s) => {
-            const active = sub === s.k;
-            const Icon = s.Icon;
-            return (
-              <button
-                key={s.k}
-                onClick={() => setSub(s.k)}
-                className={`relative pb-2 flex items-center gap-2 text-sm font-medium transition-colors ${
-                  active ? 'text-[#b8860b]' : 'text-[#6e6e73] hover:text-[#3a3a3c]'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {s.label}
-                <span
-                  className={`absolute left-0 right-0 -bottom-px h-0.5 rounded-full ${
-                    active ? 'bg-[#b8860b]' : 'bg-transparent'
-                  }`}
-                />
-              </button>
-            );
-          })}
+    <div>
+      {error && (
+        <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2 rounded-lg mb-3">
+          {error}
         </div>
-        {/* Share IM lives in Live preview only — wholesalers must see what
-            buyers see before they can share. */}
-        {sub === 'preview' && (
-          <ShareIMButton deal={deal} onSave={onSave} show={show} />
+      )}
+      <p className="text-xs uppercase tracking-wider text-[#86868b] mb-2">Public link</p>
+      <div className="flex items-center gap-2">
+        <Input value={shareUrl} readOnly onFocus={(e) => e.target.select()} className="font-mono text-xs" />
+        <Button variant="secondary" onClick={copyLink} title="Copy link">
+          {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+        {previewLive ? (
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-[rgba(0,0,0,0.08)] text-[#3a3a3c] hover:text-[#b8860b] hover:border-[#b8860b]/40"
+            title="Open preview"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        ) : (
+          <span
+            className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-[rgba(0,0,0,0.08)] text-[#6e6e73] cursor-not-allowed"
+            title="The public IM page hasn't shipped yet — coming with the next sub-task."
+            aria-disabled="true"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </span>
         )}
       </div>
-
-      {sub === 'builder' && <IMMemoBuilder deal={deal} onSave={onSave} show={show} />}
-      {sub === 'preview' && <IMLivePreview deal={deal} />}
-    </section>
+      {!previewLive && (
+        <p className="text-[11px] text-[#86868b] mt-1.5">
+          The public IM page goes live with the next update — copy the link now to share once it ships.
+        </p>
+      )}
+    </div>
   );
 }
 
