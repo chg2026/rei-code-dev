@@ -1,8 +1,10 @@
 import React from 'react';
-import { ChevronUp, Trophy } from 'lucide-react';
+import { ChevronUp, Trophy, Play } from 'lucide-react';
 import { getTourState, setTourStep, TOUR_STEP_KEYS } from './OnboardingCard.jsx';
 
 const GOLD = '#b8860b';
+const GOLD_GLOW =
+  '0 0 0 1px rgba(184,134,11,0.25), 0 8px 24px rgba(184,134,11,0.35), 0 2px 8px rgba(0,0,0,0.12)';
 
 const STEP_LABELS = [
   { key: 'properties_list', label: 'Properties' },
@@ -30,6 +32,7 @@ export default function OnboardingProgressBar() {
   if (allDone && !expanded) {
     return (
       <div
+        onClick={() => setExpanded(true)}
         style={{
           position: 'fixed',
           bottom: 20,
@@ -37,22 +40,22 @@ export default function OnboardingProgressBar() {
           zIndex: 999,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 10,
           background: '#ffffff',
           border: `1.5px solid ${GOLD}`,
           borderRadius: 999,
-          padding: '8px 14px',
-          boxShadow: '0 4px 14px rgba(184,134,11,0.18)',
+          padding: '12px 22px',
+          boxShadow: GOLD_GLOW,
           cursor: 'pointer',
           fontFamily: 'var(--sans, system-ui, sans-serif)',
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#1d1d1f',
+          fontSize: 14,
+          fontWeight: 700,
+          color: GOLD,
+          transform: 'translateZ(0)',
         }}
-        onClick={() => setExpanded(true)}
       >
-        <Trophy size={15} color={GOLD} />
-        Setup complete!
+        <Trophy size={16} color={GOLD} />
+        Setup complete! 🎉
       </div>
     );
   }
@@ -68,23 +71,39 @@ export default function OnboardingProgressBar() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-start',
-        gap: 8,
+        gap: 10,
       }}
     >
       {expanded && (
         <div
           style={{
-            background: '#ffffff',
-            border: '1px solid rgba(0,0,0,0.08)',
-            borderRadius: 14,
-            boxShadow: '0 10px 28px rgba(0,0,0,0.14)',
-            padding: '12px 14px',
             width: 260,
+            borderRadius: 16,
+            background:
+              'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(255,248,220,0.95) 100%)',
+            border: '1.5px solid rgba(184,134,11,0.2)',
+            boxShadow:
+              '0 12px 40px rgba(184,134,11,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+            padding: '14px 16px',
+            backdropFilter: 'blur(8px)',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 }}>
-            Get started
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1d1d1f' }}>
+              Getting started
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GOLD }}>
+              {completeCount}/{total}
+            </div>
           </div>
+
           {STEP_LABELS.map(({ key, label }) => {
             const status = state[key];
             const isComplete = status === 'complete';
@@ -93,23 +112,23 @@ export default function OnboardingProgressBar() {
               <div
                 key={key}
                 style={{
+                  height: 36,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '6px 0',
                 }}
               >
                 <span
                   aria-hidden
                   style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: 4,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
                     border: `1.5px solid ${isComplete ? GOLD : 'rgba(0,0,0,0.2)'}`,
-                    background: isComplete ? GOLD : '#ffffff',
+                    background: isComplete ? GOLD : 'transparent',
                     color: '#ffffff',
-                    fontSize: 11,
-                    fontWeight: 700,
+                    fontSize: 12,
+                    fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -122,8 +141,8 @@ export default function OnboardingProgressBar() {
                   style={{
                     flex: 1,
                     fontSize: 13,
-                    color: isSkipped ? '#86868b' : '#1d1d1f',
-                    textDecoration: isSkipped ? 'line-through' : 'none',
+                    color: isComplete ? '#1d1d1f' : '#6e6e73',
+                    fontWeight: isComplete ? 600 : 500,
                   }}
                 >
                   {label}
@@ -132,17 +151,23 @@ export default function OnboardingProgressBar() {
                   <button
                     type="button"
                     onClick={() => setTourStep(key, undefined)}
+                    aria-label={`Replay ${label}`}
+                    title="Replay this step"
                     style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: '50%',
+                      border: `1.5px solid ${GOLD}`,
                       background: 'transparent',
-                      border: 'none',
-                      color: GOLD,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
                       padding: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0,
                     }}
                   >
-                    Redo
+                    <Play size={9} color={GOLD} fill={GOLD} style={{ marginLeft: 1 }} />
                   </button>
                 )}
               </div>
@@ -156,34 +181,67 @@ export default function OnboardingProgressBar() {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 12,
           background: '#ffffff',
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 999,
-          padding: '7px 12px',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+          border: '1.5px solid rgba(184,134,11,0.3)',
+          borderRadius: 40,
+          padding: '10px 20px',
+          boxShadow: GOLD_GLOW,
           cursor: 'pointer',
+          transform: 'translateZ(0)',
         }}
       >
-        <div
-          style={{
-            width: 80,
-            height: 5,
-            borderRadius: 999,
-            background: 'rgba(0,0,0,0.08)',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ width: `${pct}%`, height: '100%', background: GOLD, transition: 'width 240ms ease' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: GOLD,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              lineHeight: 1,
+            }}
+          >
+            Getting started
+          </span>
+          <div
+            style={{
+              width: 120,
+              height: 7,
+              borderRadius: 99,
+              background: 'rgba(184,134,11,0.15)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                background: GOLD,
+                borderRadius: 99,
+                filter: 'drop-shadow(0 0 4px rgba(184,134,11,0.6))',
+                transition: 'width 240ms ease',
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#1d1d1f',
+              lineHeight: 1,
+            }}
+          >
+            {completeCount} of {total} complete
+          </span>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#1d1d1f' }}>
-          {completeCount}/{total} done
-        </span>
         <ChevronUp
-          size={14}
-          color="#86868b"
-          style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+          size={16}
+          color={GOLD}
+          style={{
+            transform: expanded ? 'rotate(180deg)' : 'none',
+            transition: 'transform 180ms ease',
+          }}
         />
       </div>
     </div>
