@@ -1,7 +1,7 @@
 import React from 'react';
 import OnboardingCard from '../components/OnboardingCard.jsx';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, Info, ChevronRight, FileText, Upload, Download, FileImage, FileCheck2, Scroll, FileBadge, Eye } from 'lucide-react';
+import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Check, Calculator, ChevronRight, FileText, Upload, Download, FileImage, FileCheck2, Scroll, FileBadge, Eye } from 'lucide-react';
 import Layout from '../components/Layout.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge, Modal } from '../components/ui.jsx';
@@ -13,6 +13,27 @@ import PhotoUploader from '../components/PhotoUploader.jsx';
 
 const FREE_DEAL_LIMIT = 10;
 const FREE_HIDE_STREET_LIMIT = 1;
+
+function parseComps(raw) {
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    } catch {
+      list = [];
+    }
+  }
+  return list.map((c) => ({
+    id: c?.id || crypto.randomUUID(),
+    address: c?.address ?? '',
+    salePrice: c?.salePrice ?? '',
+    sqft: c?.sqft ?? '',
+    dateSold: c?.dateSold ?? '',
+  }));
+}
 
 const EMPTY = {
   addr: '', city: '', state: '', zip: '', type: 'SFR', units: 1, beds: 3, baths: 2, sqft: 1200,
@@ -32,13 +53,24 @@ export default function DealEditor({ mode }) {
   const [form, setForm] = React.useState(existing || EMPTY);
   const [error, setError] = React.useState(null);
   const [tab, setTab] = React.useState('overview');
+  const [comps, setComps] = React.useState(() => parseComps(existing?.comps));
 
   const dealCount = state.deals.length;
   const otherHiddenCount = state.deals.filter((d) => d.hideStreet && (!existing || d.id !== existing.id)).length;
   const atDealCap = isFreePlan && mode === 'new' && dealCount >= FREE_DEAL_LIMIT;
   const hideStreetLocked = isFreePlan && otherHiddenCount >= FREE_HIDE_STREET_LIMIT && !form.hideStreet;
 
-  React.useEffect(() => { if (mode === 'edit' && existing) setForm(existing); }, [mode, existing]);
+  React.useEffect(() => { if (mode === 'edit' && existing) { setForm(existing); setComps(parseComps(existing.comps)); } }, [mode, existing]);
+
+  function addComp() {
+    setComps((c) => [...c, { id: crypto.randomUUID(), address: '', salePrice: '', sqft: '', dateSold: '' }]);
+  }
+  function patchComp(cid, p) {
+    setComps((c) => c.map((x) => (x.id === cid ? { ...x, ...p } : x)));
+  }
+  function removeComp(cid) {
+    setComps((c) => c.filter((x) => x.id !== cid));
+  }
 
   if (mode === 'edit' && !state.loaded) {
     return <Layout><div className="py-32 text-center text-[#6e6e73] text-xs font-mono">Loading deal…</div></Layout>;
@@ -73,6 +105,7 @@ export default function DealEditor({ mode }) {
       sqft: Number(form.sqft) || 0,
       units: Number(form.units) || 1,
       tags: Array.isArray(form.tags) ? form.tags : [],
+      comps: JSON.stringify(comps),
     };
     if (mode === 'new') {
       dispatch({ type: 'add_deal', deal: data });
@@ -264,6 +297,55 @@ export default function DealEditor({ mode }) {
               />
             </section>
 
+            <section>
+              <h3 className="text-[#1d1d1f] font-semibold text-sm mb-1">Comparable Sales (Comps)</h3>
+              <p className="text-xs text-[#86868b] mb-3">These are visible to buyers on your public deal page.</p>
+              <div className="space-y-3">
+                {comps.map((c) => {
+                  const sp = Number(c.salePrice) || 0;
+                  const sf = Number(c.sqft) || 0;
+                  const ppsf = sf > 0 ? sp / sf : null;
+                  return (
+                    <div key={c.id} className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 items-end">
+                      <Field label="Street address">
+                        <Input value={c.address} onChange={(e) => patchComp(c.id, { address: e.target.value })} placeholder="1234 Main St" />
+                      </Field>
+                      <Field label="Sale price ($)">
+                        <Input type="number" min="0" step="1000" value={c.salePrice} onChange={(e) => patchComp(c.id, { salePrice: e.target.value })} placeholder="150000" />
+                      </Field>
+                      <Field label="Sqft">
+                        <Input type="number" min="0" value={c.sqft} onChange={(e) => patchComp(c.id, { sqft: e.target.value })} placeholder="1200" />
+                      </Field>
+                      <Field label="Price/sqft">
+                        <Input value={ppsf != null ? `$${ppsf.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'} readOnly className="bg-[rgba(0,0,0,0.04)] text-[#6e6e73]" />
+                      </Field>
+                      <Field label="Date sold">
+                        <Input type="date" value={c.dateSold} onChange={(e) => patchComp(c.id, { dateSold: e.target.value })} />
+                      </Field>
+                      <button
+                        type="button"
+                        onClick={() => removeComp(c.id)}
+                        title="Remove comp"
+                        className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-[rgba(0,0,0,0.12)] text-red-500 hover:bg-red-500/10 hover:border-red-500/40 transition-colors mb-px"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {comps.length === 0 && (
+                  <p className="text-xs text-[#86868b]">No comps added yet.</p>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={addComp}
+                className="mt-3 border-[#b8860b]/40 text-[#b8860b] hover:bg-[#b8860b]/5"
+              >
+                + Add comp
+              </Button>
+            </section>
+
             </>)}
 
             {mode === 'edit' && existing && tab === 'documents' && (
@@ -321,9 +403,7 @@ export default function DealEditor({ mode }) {
         </Card>
 
         <div className="space-y-4 lg:sticky lg:top-4">
-          {mode === 'edit' && existing && (
-            <DealAnalysisCallout deal={existing} />
-          )}
+          <MAOCalculator arv={form.arv} />
           <Card>
             <CardHeader><CardTitle>Live preview</CardTitle></CardHeader>
             <CardBody>
@@ -873,40 +953,44 @@ function SavedAnalysisReport({ analysis, deal }) {
   );
 }
 
-// Right-rail callout card. When the analyzer has been saved, shows the
-// run date with a link back to the analyzer; otherwise nudges the user
-// to run their first analysis.
-function DealAnalysisCallout({ deal }) {
-  const ts = deal.analyzerStateUpdatedAt;
-  const runDate = ts
-    ? new Date(ts).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : null;
+// Right-rail MAO Calculator. Computes the Max Allowable Offer from the
+// deal's ARV using the 70% rule (ARV × pct − rehab). Rehab and the rule
+// percentage are editable locally; ARV is pulled from the deal form.
+function MAOCalculator({ arv }) {
+  const [rehab, setRehab] = React.useState('');
+  const [pct, setPct] = React.useState(70);
+  const arvNum = Number(arv) || 0;
+  const pctNum = Number(pct) || 0;
+  const mao = arvNum * (pctNum / 100) - (Number(rehab) || 0);
 
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-[#86868b] mb-2">Deal analysis</p>
-      {runDate ? (
-        <div className="rounded-lg border-l-2 border-[#b8860b] bg-[#b8860b]/[0.06] p-3 flex items-start gap-2">
-          <Info className="w-4 h-4 text-[#b8860b] flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-[#3a3a3c] leading-relaxed">
-            Analysis was run on <span className="font-semibold text-[#b8860b]">{runDate}</span>. Edit it anytime in the{' '}
-            <Link to={`/deal-analyzer/${deal.id}`} className="text-[#b8860b] hover:text-[#b8860b] underline underline-offset-2">
-              Deal Analyzer
-            </Link>.
-          </p>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calculator className="w-4 h-4 text-[#b8860b]" /> MAO Calculator
+        </CardTitle>
+      </CardHeader>
+      <CardBody className="space-y-3">
+        <Field label="ARV ($)">
+          <Input value={arvNum.toLocaleString()} readOnly className="bg-[rgba(0,0,0,0.04)] text-[#6e6e73] font-mono" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Rule (%)">
+            <Input type="number" min="0" max="100" value={pct} onChange={(e) => setPct(e.target.value)} />
+          </Field>
+          <Field label="Rehab ($)">
+            <Input type="number" min="0" step="1000" value={rehab} onChange={(e) => setRehab(e.target.value)} placeholder="0" />
+          </Field>
         </div>
-      ) : (
-        <div className="rounded-lg border border-[rgba(0,0,0,0.08)] bg-white/40 p-3 flex items-start gap-2">
-          <Calculator className="w-4 h-4 text-[#86868b] flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-[#6e6e73] leading-relaxed">
-            No analysis saved yet.{' '}
-            <Link to={`/deal-analyzer/${deal.id}`} className="text-[#b8860b] hover:text-[#b8860b] underline underline-offset-2">
-              Run one in the Deal Analyzer
-            </Link>.
+        <div className="rounded-lg border-l-2 border-[#b8860b] bg-[#b8860b]/[0.06] p-3">
+          <p className="text-[10px] uppercase tracking-wider text-[#86868b] mb-1">Max Allowable Offer</p>
+          <p className={`font-mono text-lg font-bold ${mao >= 0 ? 'text-[#1d1d1f]' : 'text-red-500'}`}>
+            ${Math.round(mao).toLocaleString()}
           </p>
+          <p className="text-[11px] text-[#86868b] mt-1">ARV × {pctNum}% − Rehab</p>
         </div>
-      )}
-    </div>
+      </CardBody>
+    </Card>
   );
 }
 

@@ -1,0 +1,14 @@
+Two changes to apps/deallink/src/pages/DealEditor.jsx. Do both in one pass:
+Change A — MAO Calculator in right sidebar:
+The right sidebar currently shows a 'Deal Analysis' panel (with a link to run the analyzer) and below it the 'Live Preview' card. Remove the Deal Analysis panel from the sidebar entirely. In its place, render the MAO Calculator widget. The MAO Calculator already exists in this file as a component (it's currently shown on the Deal Analysis tab or elsewhere in the file — find it and reuse it). Render it at the top of the right sidebar column, above the Live Preview card. If the MAO calculator is a self-contained component already defined in this file, just move its JSX into the sidebar. Keep the Live Preview card below it exactly as it is today.
+Change B — Comps section at bottom of Overview tab:
+At the very bottom of the Overview tab content (after the Photos section, before the tab content ends), add a new Comps section. It should look and feel consistent with the rest of the form. Here's what it needs:
+
+Section header: 'Comparable Sales (Comps)' with a subline: 'These are visible to buyers on your public deal page.'
+A list of comp rows. Each row has: Street address (text input), Sale price (number input, dollar formatted), Sqft (number input), Price/sqft (read-only, auto-calculated as sale price ÷ sqft, shows '—' if sqft is 0), Date sold (date input). On the right of each row, a red trash icon button to remove that comp.
+Below the list: an '+ Add comp' button (gold, outline style matching the rest of the form).
+Store comps in local component state as an array of objects { id, address, salePrice, sqft, dateSold }. Use crypto.randomUUID() for ids.
+Persist comps as part of the deal save: add a comps field to the deal payload when the existing Save Changes / Add Deal button is clicked. The field should be a JSON array serialized as a string, stored in the existing deal object alongside the other fields.
+If the deal already has a comps field (loaded from the server), parse it on mount and populate the rows.
+
+Do not change any other tabs, styles, or files.
