@@ -32,11 +32,10 @@ export default function OnboardingProgressBar() {
   // Drag state. Once the user has dragged, we switch from fixed bottom/left
   // anchoring to absolute top/left coordinates tracked here.
   const [pos, setPos] = React.useState(null); // null = use default bottom/left anchor
-  const [dragging, setDragging] = React.useState(false);
-  const dragInfoRef = React.useRef(null);
-  const didDragRef = React.useRef(false);
+  const dragging = React.useRef(false);
+  const dragMoved = React.useRef(false);
+  const dragStart = React.useRef({ x: 0, y: 0 });
   const wrapRef = React.useRef(null);
-  const DRAG_THRESHOLD = 4;
 
   React.useEffect(() => {
     const onUpdate = () => {
@@ -48,28 +47,23 @@ export default function OnboardingProgressBar() {
   }, []);
 
   React.useEffect(() => {
-    if (!dragging) return;
     const onMove = (e) => {
-      const info = dragInfoRef.current;
-      if (!info) return;
-      const dx = e.clientX - info.startX;
-      const dy = e.clientY - info.startY;
-      if (!didDragRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      didDragRef.current = true;
-      const w = wrapRef.current ? wrapRef.current.offsetWidth : 220;
-      const h = wrapRef.current ? wrapRef.current.offsetHeight : 60;
-      const maxX = Math.max(0, window.innerWidth - w);
-      const maxY = Math.max(0, window.innerHeight - h);
-      const nextX = Math.min(maxX, Math.max(0, e.clientX - info.offsetX));
-      const nextY = Math.min(maxY, Math.max(0, e.clientY - info.offsetY));
+      if (!dragging.current) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      if (!dragMoved.current && Math.hypot(dx, dy) <= 4) return;
+      dragMoved.current = true;
+      const rect = wrapRef.current ? wrapRef.current.getBoundingClientRect() : null;
+      if (!rect) return;
+      const maxX = Math.max(0, window.innerWidth - rect.width);
+      const maxY = Math.max(0, window.innerHeight - rect.height);
+      const nextX = Math.min(maxX, Math.max(0, rect.left + dx));
+      const nextY = Math.min(maxY, Math.max(0, rect.top + dy));
+      dragStart.current = { x: e.clientX, y: e.clientY };
       setPos({ x: nextX, y: nextY });
     };
     const onUp = () => {
-      setDragging(false);
-      dragInfoRef.current = null;
-      // didDragRef is intentionally left as-is so the synthetic click
-      // that fires immediately after mouseup can read it and decide
-      // whether to toggle. It is reset on the next mousedown.
+      dragging.current = false;
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -77,24 +71,7 @@ export default function OnboardingProgressBar() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [dragging]);
-
-  const startDrag = (e) => {
-    if (e.button !== 0) return;
-    const rect = wrapRef.current ? wrapRef.current.getBoundingClientRect() : null;
-    if (!rect) return;
-    // On first drag, seed pos from the current rendered rect so the pill
-    // doesn't jump from its bottom-anchored origin.
-    if (!pos) setPos({ x: rect.left, y: rect.top });
-    dragInfoRef.current = {
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-      startX: e.clientX,
-      startY: e.clientY,
-    };
-    didDragRef.current = false;
-    setDragging(true);
-  };
+  }, []);
 
   if (hidden) return null;
 
@@ -114,7 +91,7 @@ export default function OnboardingProgressBar() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: 10,
-        userSelect: dragging ? 'none' : 'auto',
+        userSelect: 'none',
       }
     : {
         position: 'fixed',
@@ -126,17 +103,19 @@ export default function OnboardingProgressBar() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: 10,
-        userSelect: dragging ? 'none' : 'auto',
+        userSelect: 'none',
       };
-
-  const dragCursor = dragging ? 'grabbing' : 'grab';
 
   if (allDone && !expanded) {
     return (
       <div ref={wrapRef} style={wrapperStyle}>
         <div
-          onMouseDown={startDrag}
-          onClick={() => { if (!didDragRef.current) setExpanded(true); }}
+          onMouseDown={(e) => {
+            dragging.current = true;
+            dragMoved.current = false;
+            dragStart.current = { x: e.clientX, y: e.clientY };
+          }}
+          onClick={() => { if (!dragMoved.current) setExpanded(true); }}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -146,7 +125,7 @@ export default function OnboardingProgressBar() {
             borderRadius: 999,
             padding: '12px 22px',
             boxShadow: GOLD_GLOW,
-            cursor: dragCursor,
+            cursor: 'grab',
             fontSize: 14,
             fontWeight: 700,
             color: GOLD,
@@ -274,8 +253,12 @@ export default function OnboardingProgressBar() {
       )}
 
       <div
-        onMouseDown={startDrag}
-        onClick={() => { if (!didDragRef.current) setExpanded((v) => !v); }}
+        onMouseDown={(e) => {
+          dragging.current = true;
+          dragMoved.current = false;
+          dragStart.current = { x: e.clientX, y: e.clientY };
+        }}
+        onClick={() => { if (!dragMoved.current) setExpanded((v) => !v); }}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -285,7 +268,7 @@ export default function OnboardingProgressBar() {
           borderRadius: 40,
           padding: '10px 20px',
           boxShadow: GOLD_GLOW,
-          cursor: dragCursor,
+          cursor: 'grab',
           transform: 'translateZ(0)',
         }}
       >
