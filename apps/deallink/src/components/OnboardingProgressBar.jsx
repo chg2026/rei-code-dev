@@ -17,6 +17,16 @@ const STEP_LABELS = [
 export default function OnboardingProgressBar() {
   const [state, setState] = React.useState(() => getTourState());
   const [expanded, setExpanded] = React.useState(false);
+  const [hoverKey, setHoverKey] = React.useState(null);
+
+  // Drag state. Once the user has dragged, we switch from fixed bottom/left
+  // anchoring to absolute top/left coordinates tracked here.
+  const [pos, setPos] = React.useState(null); // null = use default bottom/left anchor
+  const [dragging, setDragging] = React.useState(false);
+  const dragInfoRef = React.useRef(null);
+  const didDragRef = React.useRef(false);
+  const wrapRef = React.useRef(null);
+  const DRAG_THRESHOLD = 4;
 
   React.useEffect(() => {
     const onUpdate = () => setState(getTourState());
@@ -24,45 +34,82 @@ export default function OnboardingProgressBar() {
     return () => window.removeEventListener('rei_tour_update', onUpdate);
   }, []);
 
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      const info = dragInfoRef.current;
+      if (!info) return;
+      const dx = e.clientX - info.startX;
+      const dy = e.clientY - info.startY;
+      if (!didDragRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      didDragRef.current = true;
+      const w = wrapRef.current ? wrapRef.current.offsetWidth : 220;
+      const h = wrapRef.current ? wrapRef.current.offsetHeight : 60;
+      const maxX = Math.max(0, window.innerWidth - w);
+      const maxY = Math.max(0, window.innerHeight - h);
+      const nextX = Math.min(maxX, Math.max(0, e.clientX - info.offsetX));
+      const nextY = Math.min(maxY, Math.max(0, e.clientY - info.offsetY));
+      setPos({ x: nextX, y: nextY });
+    };
+    const onUp = () => {
+      setDragging(false);
+      dragInfoRef.current = null;
+      // Leave didDragRef set so the upcoming click handler can suppress
+      // itself; the click handler clears it after reading.
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [dragging]);
+
+  const startDrag = (e) => {
+    if (e.button !== 0) return;
+    const rect = wrapRef.current ? wrapRef.current.getBoundingClientRect() : null;
+    if (!rect) return;
+    // On first drag, seed pos from the current rendered rect so the pill
+    // doesn't jump from its bottom-anchored origin.
+    if (!pos) setPos({ x: rect.left, y: rect.top });
+    dragInfoRef.current = {
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      startX: e.clientX,
+      startY: e.clientY,
+    };
+    didDragRef.current = false;
+    setDragging(true);
+    e.preventDefault();
+  };
+
+  const consumeClickAfterDrag = () => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return true;
+    }
+    return false;
+  };
+
   const total = TOUR_STEP_KEYS.length;
   const completeCount = TOUR_STEP_KEYS.filter((k) => state[k] === 'complete').length;
   const allDone = completeCount === total;
   const pct = (completeCount / total) * 100;
 
-  if (allDone && !expanded) {
-    return (
-      <div
-        onClick={() => setExpanded(true)}
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          left: 20,
-          zIndex: 999,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 10,
-          background: '#ffffff',
-          border: `1.5px solid ${GOLD}`,
-          borderRadius: 999,
-          padding: '12px 22px',
-          boxShadow: GOLD_GLOW,
-          cursor: 'pointer',
-          fontFamily: 'var(--sans, system-ui, sans-serif)',
-          fontSize: 14,
-          fontWeight: 700,
-          color: GOLD,
-          transform: 'translateZ(0)',
-        }}
-      >
-        <Trophy size={16} color={GOLD} />
-        Setup complete! 🎉
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
+  const wrapperStyle = pos
+    ? {
+        position: 'fixed',
+        top: pos.y,
+        left: pos.x,
+        zIndex: 999,
+        fontFamily: 'var(--sans, system-ui, sans-serif)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 10,
+        userSelect: dragging ? 'none' : 'auto',
+      }
+    : {
         position: 'fixed',
         bottom: 20,
         left: 20,
@@ -72,8 +119,46 @@ export default function OnboardingProgressBar() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: 10,
-      }}
-    >
+        userSelect: dragging ? 'none' : 'auto',
+      };
+
+  const dragCursor = dragging ? 'grabbing' : 'grab';
+
+  if (allDone && !expanded) {
+    return (
+      <div ref={wrapRef} style={wrapperStyle}>
+        <div
+          onMouseDown={startDrag}
+          onClick={(e) => {
+            if (consumeClickAfterDrag()) return;
+            e.stopPropagation();
+            setExpanded(true);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            background: '#ffffff',
+            border: `1.5px solid ${GOLD}`,
+            borderRadius: 999,
+            padding: '12px 22px',
+            boxShadow: GOLD_GLOW,
+            cursor: dragCursor,
+            fontSize: 14,
+            fontWeight: 700,
+            color: GOLD,
+            transform: 'translateZ(0)',
+          }}
+        >
+          <Trophy size={16} color={GOLD} />
+          Setup complete! 🎉
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={wrapRef} style={wrapperStyle}>
       {expanded && (
         <div
           style={{
@@ -138,11 +223,20 @@ export default function OnboardingProgressBar() {
                   {isComplete ? '✓' : ''}
                 </span>
                 <span
+                  onClick={isComplete ? () => setTourStep(key, undefined) : undefined}
+                  onMouseEnter={isComplete ? () => setHoverKey(key) : undefined}
+                  onMouseLeave={isComplete ? () => setHoverKey(null) : undefined}
+                  title={isComplete ? 'Click to rewatch' : undefined}
                   style={{
                     flex: 1,
                     fontSize: 13,
                     color: isComplete ? '#1d1d1f' : '#6e6e73',
                     fontWeight: isComplete ? 600 : 500,
+                    cursor: isComplete ? 'pointer' : 'default',
+                    textDecoration:
+                      isComplete && hoverKey === key ? 'underline' : 'none',
+                    textDecorationColor: GOLD,
+                    textUnderlineOffset: 2,
                   }}
                 >
                   {label}
@@ -177,7 +271,12 @@ export default function OnboardingProgressBar() {
       )}
 
       <div
-        onClick={() => setExpanded((v) => !v)}
+        onMouseDown={startDrag}
+        onClick={(e) => {
+          if (consumeClickAfterDrag()) return;
+          e.stopPropagation();
+          setExpanded((v) => !v);
+        }}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -187,7 +286,7 @@ export default function OnboardingProgressBar() {
           borderRadius: 40,
           padding: '10px 20px',
           boxShadow: GOLD_GLOW,
-          cursor: 'pointer',
+          cursor: dragCursor,
           transform: 'translateZ(0)',
         }}
       >
