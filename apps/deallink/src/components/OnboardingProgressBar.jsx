@@ -14,8 +14,18 @@ const STEP_LABELS = [
   { key: 'deal_im', label: 'Investment memo' },
 ];
 
+function readHidden() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem('rei_flywheel_tour_hidden') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function OnboardingProgressBar() {
   const [state, setState] = React.useState(() => getTourState());
+  const [hidden, setHidden] = React.useState(() => readHidden());
   const [expanded, setExpanded] = React.useState(false);
   const [hoverKey, setHoverKey] = React.useState(null);
 
@@ -29,7 +39,10 @@ export default function OnboardingProgressBar() {
   const DRAG_THRESHOLD = 4;
 
   React.useEffect(() => {
-    const onUpdate = () => setState(getTourState());
+    const onUpdate = () => {
+      setState(getTourState());
+      setHidden(readHidden());
+    };
     window.addEventListener('rei_tour_update', onUpdate);
     return () => window.removeEventListener('rei_tour_update', onUpdate);
   }, []);
@@ -90,6 +103,8 @@ export default function OnboardingProgressBar() {
     }
     return false;
   };
+
+  if (hidden) return null;
 
   const total = TOUR_STEP_KEYS.length;
   const completeCount = TOUR_STEP_KEYS.filter((k) => state[k] === 'complete').length;

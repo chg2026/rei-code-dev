@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, Kanban, FileText, BarChart3, Bell, ChevronRight,
   Menu, X, Zap, Globe, Handshake, UserCheck, Eye, LogOut, ExternalLink, Settings,
-  ListChecks, Upload, Calculator, CreditCard, Copy, Check,
+  ListChecks, Upload, Calculator, CreditCard, Copy, Check, User, BookOpen,
 } from 'lucide-react';
 import OnboardingProgressBar from './OnboardingProgressBar.jsx';
+import { resetTour } from './OnboardingCard.jsx';
 import { useStore } from '../store.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import AppSwitcher from './AppSwitcher.jsx';
@@ -80,6 +81,134 @@ function ShareHandlePill({ handle }) {
       >
         {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
       </button>
+    </div>
+  );
+}
+
+function UserMenu({ initials, onEditProfile, onSignOut }) {
+  const [open, setOpen] = React.useState(false);
+  const [hover, setHover] = React.useState(false);
+  const [hoverItem, setHoverItem] = React.useState(null);
+  const [tourHidden, setTourHidden] = React.useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('rei_flywheel_tour_hidden') === '1';
+  });
+  const wrapRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const toggleTour = () => {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem('rei_flywheel_tour_hidden') === '1') {
+      window.localStorage.removeItem('rei_flywheel_tour_hidden');
+      resetTour();
+      setTourHidden(false);
+    } else {
+      window.localStorage.setItem('rei_flywheel_tour_hidden', '1');
+      window.dispatchEvent(new Event('rei_tour_update'));
+      setTourHidden(true);
+    }
+    setOpen(false);
+  };
+
+  const itemStyle = (key, danger) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '8px 12px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    color: danger ? '#c81e1e' : '#1d1d1f',
+    background: hoverItem === key ? 'rgba(0,0,0,0.04)' : 'transparent',
+    cursor: 'pointer',
+    border: 'none',
+    width: '100%',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+  });
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        aria-label="Account menu"
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          background: '#b8860b',
+          color: '#ffffff',
+          fontWeight: 700,
+          fontSize: 13,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: 'none',
+          cursor: 'pointer',
+          boxShadow: hover || open ? '0 0 0 2px rgba(184,134,11,0.4)' : 'none',
+          transition: 'box-shadow 160ms ease',
+          padding: 0,
+        }}
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 44,
+            right: 0,
+            width: 200,
+            background: '#ffffff',
+            borderRadius: 12,
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+            padding: 6,
+            zIndex: 1001,
+            fontFamily: 'var(--sans, system-ui, sans-serif)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onEditProfile(); }}
+            onMouseEnter={() => setHoverItem('profile')}
+            onMouseLeave={() => setHoverItem(null)}
+            style={itemStyle('profile', false)}
+          >
+            <User size={15} /> Edit profile
+          </button>
+          <button
+            type="button"
+            onClick={toggleTour}
+            onMouseEnter={() => setHoverItem('tour')}
+            onMouseLeave={() => setHoverItem(null)}
+            style={itemStyle('tour', false)}
+          >
+            <BookOpen size={15} /> {tourHidden ? 'Show onboarding' : 'Hide onboarding'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onSignOut(); }}
+            onMouseEnter={() => setHoverItem('signout')}
+            onMouseLeave={() => setHoverItem(null)}
+            style={itemStyle('signout', true)}
+          >
+            <LogOut size={15} color="#c81e1e" /> Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -189,18 +318,11 @@ export default function Layout({ children }) {
             <Bell className="w-5 h-5" />
             {state.leads?.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#b8860b] rounded-full" />}
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#b8860b] flex items-center justify-center text-white font-bold text-sm">{initials}</div>
-            <span className="text-[#1d1d1f] text-sm font-medium hidden sm:block">{profile.name || auth.user?.email || 'Admin'}</span>
-          </div>
-          <button
-            onClick={async () => { await dispatch({ type: 'sign_out' }); nav('/'); }}
-            className="text-[#6e6e73] hover:text-[#1d1d1f] text-xs flex items-center gap-1.5"
-            title="Sign out"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Sign out</span>
-          </button>
+          <UserMenu
+            initials={initials}
+            onEditProfile={() => nav('/settings')}
+            onSignOut={async () => { await dispatch({ type: 'sign_out' }); nav('/'); }}
+          />
         </header>
 
         <main className="flex-1 overflow-auto bg-[#f5f5f7] p-4 md:p-6">
