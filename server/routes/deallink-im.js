@@ -42,6 +42,7 @@
 const express = require('express')
 const router  = express.Router()
 const { supabaseAdmin, supabaseAnon } = require('../middleware/auth')
+const { createNotification, sendEmailNotification } = require('../services/notifications')
 
 const PHONE_RE = /^\+1[2-9]\d{9}$/
 const FREE_TTL_MS = 24 * 60 * 60 * 1000  // 24 hours
@@ -358,10 +359,10 @@ router.post('/:dealId/offer', async (req, res) => {
   }
 
   try {
-    // Fetch deal to get account_id.
+    // Fetch deal to get account_id and address.
     const { data: deal, error: dealErr } = await db
       .from('deallink_deals')
-      .select('id, account_id')
+      .select('id, account_id, addr')
       .eq('id', dealId)
       .maybeSingle()
     if (dealErr) return res.status(500).json({ error: dealErr.message })
@@ -398,6 +399,49 @@ router.post('/:dealId/offer', async (req, res) => {
       .eq('id', buyer_id)
 
     res.json({ ok: true, offer_id: offer.id })
+
+    // Fire-and-forget: notify the deal owner that an offer was received.
+    ;(async () => {
+      try {
+        if (!supabaseAdmin) return
+
+        const { data: owner } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id, email')
+          .eq('account_id', deal.account_id)
+          .eq('is_account_admin', true)
+          .maybeSingle()
+
+        if (!owner?.id || !owner?.email) return
+
+        const dealAddr = deal.addr || 'your deal'
+        const offerAmount = amount ? `$${Number(amount).toLocaleString()}` : 'an undisclosed amount'
+        const adminUrl = `${process.env.VITE_DEALLINK_URL || 'https://reiflywheel.doorine.com'}/admin`
+
+        await createNotification(
+          owner.id,
+          'offer_received',
+          'New offer received',
+          `You received a ${offerAmount} offer on ${dealAddr}`,
+          { deal_id: dealId, offer_amount: amount || null, offer_id: offer.id }
+        )
+
+        await sendEmailNotification(
+          owner.email,
+          'New offer on your deal — REI Flywheel',
+          `<p>Hi,</p>
+<p>You received a new offer on <strong>${dealAddr}</strong>.</p>
+<ul>
+  <li><strong>Offer amount:</strong> ${offerAmount}</li>
+  <li><strong>Deal:</strong> ${dealAddr}</li>
+</ul>
+<p><a href="${adminUrl}">View the offer in REI Flywheel</a></p>
+<p>— The REI Flywheel team</p>`
+        )
+      } catch (notifyErr) {
+        console.error('[deallink-im/offer_received] Notification error:', notifyErr.message)
+      }
+    })()
   } catch (e) {
     console.error('[deallink-im/offer] Error:', e.message)
     res.status(500).json({ error: 'Failed to submit offer.' })
