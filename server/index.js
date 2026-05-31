@@ -323,4 +323,70 @@ cron.schedule('0 8 * * 1', async () => {
   }
 })
 
+// Weekly market activity alert — runs every Monday at 9:00 AM UTC.
+// Notifies all REI Flywheel users of new marketplace deals posted this week.
+cron.schedule('0 9 * * 1', async () => {
+  try {
+    const { supabaseAdmin } = require('./middleware/auth')
+    if (!supabaseAdmin) return
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const marketplaceUrl = `${process.env.VITE_DEALLINK_URL || 'https://reiflywheel.doorine.com'}/marketplace`
+
+    // Count new marketplace-visible deals posted this week.
+    const { count: dealCount, error: countErr } = await supabaseAdmin
+      .from('deallink_deals')
+      .select('*', { count: 'exact', head: true })
+      .eq('marketplace_visible', true)
+      .gte('created_at', sevenDaysAgo)
+
+    if (countErr) {
+      console.error('[market-alert-cron] Deal count error:', countErr.message)
+      return
+    }
+
+    // Nothing new this week — skip entirely.
+    if (!dealCount) return
+
+    // Fetch all active REI Flywheel users.
+    const { data: profiles, error: profilesErr } = await supabaseAdmin
+      .from('deallink_profiles')
+      .select('account_id, handle')
+
+    if (profilesErr) {
+      console.error('[market-alert-cron] Failed to fetch profiles:', profilesErr.message)
+      return
+    }
+    if (!profiles?.length) return
+
+    for (const profile of profiles) {
+      try {
+        const { data: admin } = await supabaseAdmin
+          .from('user_profiles')
+          .select('email')
+          .eq('account_id', profile.account_id)
+          .eq('is_account_admin', true)
+          .maybeSingle()
+
+        if (!admin?.email) continue
+
+        await sendEmailNotification(
+          admin.email,
+          `${dealCount} new deal${dealCount === 1 ? '' : 's'} posted in your market this week — REI Flywheel`,
+          `<p>Hi${profile.handle ? ' @' + profile.handle : ''},</p>
+<p><strong>${dealCount} new deal${dealCount === 1 ? '' : 's'}</strong> ${dealCount === 1 ? 'was' : 'were'} posted to the REI Flywheel marketplace this week.</p>
+<p><a href="${marketplaceUrl}">Browse new deals →</a></p>
+<p style="color:#999;font-size:12px">— The REI Flywheel team</p>`
+        )
+      } catch (userErr) {
+        console.error(`[market-alert-cron] Error for account ${profile.account_id}:`, userErr.message)
+      }
+    }
+
+    console.log(`[market-alert-cron] Sent market alert to ${profiles.length} users (new deals=${dealCount})`)
+  } catch (err) {
+    console.error('[market-alert-cron] Fatal error:', err.message)
+  }
+})
+
 module.exports = app
