@@ -5,6 +5,14 @@ import { useStore, useToast } from '../store.jsx';
 import { Card, Button, Input, Modal, Field, Select, Textarea, PageHeader } from '../components/ui.jsx';
 import PhoneInput, { normalizePhone } from '../components/PhoneInput.jsx';
 import { initialsOf } from '../lib/utils.js';
+import MilestoneCard from '../components/MilestoneCard.jsx';
+
+// Buyer-list milestones, highest-first so we surface the top threshold crossed.
+const BUYER_MILESTONES = [
+  { count: 500, type: 'buyer_list_500' },
+  { count: 100, type: 'buyer_list_100' },
+  { count: 50, type: 'buyer_list_50' },
+];
 
 const TYPE_COLORS = {
   'Cash Buyer': 'bg-green-400/20 text-green-300',
@@ -22,8 +30,21 @@ export default function Buyers() {
   const [search, setSearch] = React.useState('');
   const [typeFilter, setTypeFilter] = React.useState('All');
   const [showModal, setShowModal] = React.useState(false);
+  const [milestone, setMilestone] = React.useState(null);
 
   const buyers = state.buyers;
+
+  React.useEffect(() => {
+    const n = buyers.length;
+    const crossed = BUYER_MILESTONES.filter((m) => n >= m.count);
+    const next = crossed.find((m) => !localStorage.getItem(`milestone_${m.type}`));
+    if (next) {
+      // Mark every crossed threshold as shown so lower ones don't pop later.
+      crossed.forEach((m) => localStorage.setItem(`milestone_${m.type}`, 'true'));
+      setMilestone({ type: next.type, value: n });
+    }
+  }, [buyers.length]);
+
   const filtered = buyers.filter((b) => {
     const q = search.toLowerCase();
     const matchSearch = !q || b.name.toLowerCase().includes(q) || (b.email || '').toLowerCase().includes(q);
@@ -115,6 +136,13 @@ export default function Buyers() {
       )}
 
       <AddBuyerModal open={showModal} onClose={() => setShowModal(false)} onSave={(b) => { dispatch({ type: 'add_buyer', buyer: b }); show('Buyer added'); setShowModal(false); }} />
+      {milestone && (
+        <MilestoneCard
+          milestone={milestone}
+          profile={state.profile}
+          onClose={() => setMilestone(null)}
+        />
+      )}
       {node}
     </Layout>
   );

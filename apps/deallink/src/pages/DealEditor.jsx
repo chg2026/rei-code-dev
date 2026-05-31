@@ -5,6 +5,7 @@ import { ArrowLeft, Trash2, Image as ImageIcon, Share2, Copy, ExternalLink, Chec
 import Layout from '../components/Layout.jsx';
 import DealDebutModal from '../components/DealDebutModal.jsx';
 import DealHighlightCard from '../components/DealHighlightCard.jsx';
+import MilestoneCard from '../components/MilestoneCard.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Card, CardHeader, CardTitle, CardBody, Button, Input, Select, Textarea, Field, StatusBadge, Modal } from '../components/ui.jsx';
 import { DEAL_STATUSES, DealLinkAPI, DOCUMENT_CATEGORIES } from '../lib/deallink-api.js';
@@ -59,6 +60,7 @@ export default function DealEditor({ mode }) {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [debut, setDebut] = React.useState({ open: false, address: '' });
   const [highlightOpen, setHighlightOpen] = React.useState(false);
+  const [milestone, setMilestone] = React.useState(null);
 
   const dealCount = state.deals.length;
   const otherHiddenCount = state.deals.filter((d) => d.hideStreet && (!existing || d.id !== existing.id)).length;
@@ -123,8 +125,14 @@ export default function DealEditor({ mode }) {
         return;
       }
     } else {
+      const wasClosed = existing.status === 'Closed';
       dispatch({ type: 'update_deal', id: existing.id, patch: data });
       show('Saved');
+      if (data.status === 'Closed' && !wasClosed && !localStorage.getItem('milestone_first_deal_closed')) {
+        localStorage.setItem('milestone_first_deal_closed', 'true');
+        setMilestone({ type: 'first_deal_closed' });
+        return;
+      }
     }
     nav('/admin');
   }
@@ -497,6 +505,13 @@ export default function DealEditor({ mode }) {
           deal={existing}
           profile={state.profile}
           onClose={() => setHighlightOpen(false)}
+        />
+      )}
+      {milestone && (
+        <MilestoneCard
+          milestone={milestone}
+          profile={state.profile}
+          onClose={() => { setMilestone(null); nav('/admin'); }}
         />
       )}
       {node}
