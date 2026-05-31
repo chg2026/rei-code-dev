@@ -391,4 +391,102 @@ cron.schedule('0 9 * * 1', async () => {
   }
 })
 
+// Ambassador status check — runs every day at 10:00 AM UTC.
+// Awards Ambassador badge to users who hit all three qualifying thresholds.
+cron.schedule('0 10 * * *', async () => {
+  try {
+    const { supabaseAdmin } = require('./middleware/auth')
+    if (!supabaseAdmin) return
+
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: profiles, error: profilesErr } = await supabaseAdmin
+      .from('deallink_profiles')
+      .select('user_id, account_id')
+
+    if (profilesErr) {
+      console.error('[ambassador-cron] Failed to fetch profiles:', profilesErr.message)
+      return
+    }
+    if (!profiles?.length) return
+
+    let awarded = 0
+
+    for (const profile of profiles) {
+      try {
+        // Check all three conditions in parallel.
+        const [referralsRes, dealsRes, userRes] = await Promise.all([
+          supabaseAdmin
+            .from('deallink_referrals')
+            .select('*', { count: 'exact', head: true })
+            .eq('referrer_id', profile.user_id)
+            .eq('status', 'activated'),
+          supabaseAdmin
+            .from('deallink_deals')
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', profile.account_id)
+            .neq('status', 'Dead'),
+          supabaseAdmin
+            .from('user_profiles')
+            .select('email, created_at')
+            .eq('id', profile.user_id)
+            .maybeSingle(),
+        ])
+
+        const referralCount = referralsRes.count ?? 0
+        const dealCount = dealsRes.count ?? 0
+        const userProfile = userRes.data
+
+        if (referralCount < 10) continue
+        if (dealCount < 5) continue
+        if (!userProfile?.created_at) continue
+        if (new Date(userProfile.created_at) > new Date(sixtyDaysAgo)) continue
+
+        // Check if badge already exists.
+        const { data: existing } = await supabaseAdmin
+          .from('deallink_badges')
+          .select('id')
+          .eq('user_id', profile.user_id)
+          .eq('badge_type', 'ambassador')
+          .maybeSingle()
+
+        if (existing) continue
+
+        // Award the badge.
+        await supabaseAdmin.from('deallink_badges').insert({
+          user_id: profile.user_id,
+          badge_type: 'ambassador',
+        })
+
+        // In-app notification.
+        await createNotification(profile.user_id, {
+          type: 'ambassador_awarded',
+          title: "You're now an Ambassador!",
+          body: "You've earned Ambassador status on REI Flywheel.",
+        })
+
+        // Email notification.
+        if (userProfile.email) {
+          await sendEmailNotification(
+            userProfile.email,
+            "You're a REI Flywheel Ambassador 🏆",
+            `<p>Congratulations!</p>
+<p>You've officially earned <strong>Ambassador status</strong> on REI Flywheel.</p>
+<p>This badge recognises your 10+ active referrals, 5+ live deals, and 60+ days on the platform. Thank you for being one of our most valued members.</p>
+<p style="color:#999;font-size:12px">— The REI Flywheel team</p>`
+          )
+        }
+
+        awarded++
+      } catch (userErr) {
+        console.error(`[ambassador-cron] Error for user ${profile.user_id}:`, userErr.message)
+      }
+    }
+
+    console.log(`[ambassador-cron] Checked ${profiles.length} users, awarded ${awarded} Ambassador badge(s)`)
+  } catch (err) {
+    console.error('[ambassador-cron] Fatal error:', err.message)
+  }
+})
+
 module.exports = app
