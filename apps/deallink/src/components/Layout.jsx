@@ -41,6 +41,7 @@ const navGroups = [
   ]},
   { label: 'Reports', items: [
     { label: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { label: 'Content Hub', path: '/content-hub', icon: BookOpen },
   ]},
   { label: 'Account', items: [
     { label: 'Billing', path: '/billing', icon: CreditCard },

@@ -31,6 +31,7 @@ import Buyers from './pages/Buyers.jsx';
 import Offers from './pages/Offers.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Marketplace from './pages/Marketplace.jsx';
+import ContentHub from './pages/ContentHub.jsx';
 import Billing from './pages/Billing.jsx';
 import BillingSuccess from './pages/BillingSuccess.jsx';
 
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/offers" element={<Admin><Offers /></Admin>} />
         <Route path="/analytics" element={<Admin><Analytics /></Admin>} />
         <Route path="/marketplace" element={<Admin><Marketplace /></Admin>} />
+        <Route path="/content-hub" element={<Admin><ContentHub /></Admin>} />
 
         <Route path="/deal-blast" element={<Admin><ProGate pageTitle="AI Deal Blast"><DealBlast /></ProGate></Admin>} />
         <Route path="/god-mode" element={<Admin><ProGate pageTitle="God Mode"><GodMode /></ProGate></Admin>} />
