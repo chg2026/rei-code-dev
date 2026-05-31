@@ -13,6 +13,7 @@ import AdminLeads from './pages/AdminLeads.jsx';
 import AdminProfile from './pages/AdminProfile.jsx';
 import DealEditor from './pages/DealEditor.jsx';
 import CsvImport from './pages/CsvImport.jsx';
+import Leaderboard from './pages/Leaderboard.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 // Authed admin pages share a StoreProvider so /api/deallink/{profile,deals,leads}
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/admin/deal/new" element={<Admin><DealEditor mode="new" /></Admin>} />
         <Route path="/admin/deal/:id" element={<Admin><DealEditor mode="edit" /></Admin>} />
         <Route path="/admin/import" element={<Admin><CsvImport /></Admin>} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/p/:handle" element={<PublicProfile />} />
         <Route path="/p/:handle/:dealId" element={<DealDetail />} />
         <Route path="/profile" element={<Navigate to="/" replace />} />

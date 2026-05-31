@@ -31,6 +31,7 @@ export default function AdminShell({ children, tab }) {
     { id: 'deals', label: 'Deals', to: '/admin' },
     { id: 'leads', label: 'Leads', to: '/admin/leads' },
     { id: 'profile', label: 'Profile', to: '/admin/profile' },
+    { id: 'leaderboard', label: 'Leaderboard', to: '/leaderboard' },
   ];
 
   const profileUrl = `/p/${state.profile.handle}`;
