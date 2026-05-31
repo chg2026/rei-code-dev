@@ -8,6 +8,7 @@
 
 const express = require('express')
 const { supabaseAdmin } = require('../middleware/auth')
+const { createNotification, sendEmailNotification } = require('../services/notifications')
 
 const router = express.Router()
 
@@ -124,6 +125,93 @@ router.post('/deals', async (req, res) => {
       )
     } catch (e) {
       console.error('[deallink/stats] last_deal_action_at update error (POST /deals):', e.message)
+    }
+  })()
+  // Alert matching engine — fire-and-forget, never blocks the response.
+  ;(async () => {
+    if (!supabaseAdmin || !data) return
+    try {
+      const deal = data
+      const marketplaceUrl = `${process.env.VITE_DEALLINK_URL || 'https://reiflywheel.doorine.com'}/marketplace`
+
+      const { data: alerts, error: alertsErr } = await supabaseAdmin
+        .from('deallink_market_alerts')
+        .select('*')
+        .eq('active', true)
+
+      if (alertsErr || !alerts?.length) return
+
+      for (const alert of alerts) {
+        try {
+          // --- Geography match ---
+          const geo = alert.geography || {}
+          const geoCity = (geo.city || '').trim().toLowerCase()
+          const geoZip = (geo.zip || '').trim()
+          const dealCity = (deal.city || '').trim().toLowerCase()
+          const dealZip = (deal.zip || '').trim()
+
+          const geoMatch =
+            (geoCity && dealCity && dealCity === geoCity) ||
+            (geoZip && dealZip && dealZip === geoZip)
+
+          if (!geoMatch) continue
+
+          // --- Type-specific match rules ---
+          if (alert.alert_type === 'buyer') {
+            // Property type filter
+            if (Array.isArray(alert.property_types) && alert.property_types.length) {
+              if (!alert.property_types.includes(deal.type)) continue
+            }
+            // Price range filter
+            const ask = parseFloat(deal.ask) || 0
+            if (alert.price_min != null && ask < parseFloat(alert.price_min)) continue
+            if (alert.price_max != null && ask > parseFloat(alert.price_max)) continue
+            // strategy — no field on deals yet, skip
+          } else if (alert.alert_type === 'wholesaler_jv') {
+            if (!deal.marketplace_visible) continue
+          } else {
+            // Unknown alert type — skip
+            continue
+          }
+
+          // --- Fetch recipient email ---
+          const { data: profile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('email')
+            .eq('id', alert.user_id)
+            .maybeSingle()
+
+          if (!profile?.email) continue
+
+          const addrDisplay = deal.hide_street ? maskAddr(deal.addr) : (deal.addr || 'Address on file')
+          const askDisplay = deal.ask ? `$${Number(deal.ask).toLocaleString()}` : 'N/A'
+          const typeDisplay = deal.type || 'Property'
+          const notifBody = `${addrDisplay} — ${typeDisplay} asking ${askDisplay}`
+
+          // In-app notification
+          await createNotification(alert.user_id, {
+            type: 'market_alert',
+            title: 'New deal in your market',
+            body: notifBody,
+            metadata: { deal_id: deal.id },
+          })
+
+          // Email notification
+          await sendEmailNotification(
+            profile.email,
+            'New deal in your market — REI Flywheel',
+            `<p>A new deal matching your alert was just posted.</p>
+<p><strong>${addrDisplay}</strong><br>
+${typeDisplay} &mdash; Asking ${askDisplay}</p>
+<p><a href="${marketplaceUrl}">Browse deals on REI Flywheel →</a></p>
+<p style="color:#999;font-size:12px">— The REI Flywheel team</p>`
+          )
+        } catch (alertErr) {
+          console.error(`[deallink/alert-match] Error processing alert ${alert.id}:`, alertErr.message)
+        }
+      }
+    } catch (err) {
+      console.error('[deallink/alert-match] Fatal error:', err.message)
     }
   })()
 })
