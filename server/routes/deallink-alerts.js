@@ -41,7 +41,8 @@ router.get('/', requireAuth, async (req, res) => {
 router.post('/', requireAuth, async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   try {
-    const row = { ...pickAlert(req.body), user_id: req.user.id, active: true }
+    const geography = { city: req.body.city || null, zip: req.body.zip || null }
+    const row = { ...pickAlert(req.body), geography, user_id: req.user.id, active: true }
 
     const { data, error } = await db
       .from('deallink_market_alerts')
