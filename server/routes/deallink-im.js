@@ -230,29 +230,43 @@ router.post('/:dealId/verify-otp', async (req, res) => {
     const expiresAt = isFree ? new Date(Date.now() + FREE_TTL_MS).toISOString() : null
     const now = new Date().toISOString()
 
-    // Upsert buyer record.
-    const { data: buyer, error: buyerErr } = await db
+    // Check for an existing buyer with this phone number (any account) before
+    // creating a new record — prevents cross-wholesaler duplicates.
+    const { data: existingBuyer } = await db
       .from('deallink_buyers')
-      .upsert(
-        {
-          account_id:       deal.account_id,
-          phone,
-          first_name:       buyerFirstName,
-          last_name:        buyerLastName,
-          name:             buyerName,
-          source_deal_id:   dealId,
-          source:           'im-link',
-          im_registered_at: now,
-          expires_at:       expiresAt,
-        },
-        { onConflict: 'account_id,phone' }
-      )
       .select('id')
+      .eq('phone', phone)
       .maybeSingle()
 
-    if (buyerErr) {
-      console.error('[deallink-im/verify-otp] Buyer upsert error:', buyerErr.message)
-      return res.status(500).json({ error: 'Failed to register buyer.' })
+    let buyer = existingBuyer
+
+    if (!existingBuyer) {
+      // No existing buyer — upsert within this wholesaler's account.
+      const { data: upsertedBuyer, error: buyerErr } = await db
+        .from('deallink_buyers')
+        .upsert(
+          {
+            account_id:       deal.account_id,
+            phone,
+            first_name:       buyerFirstName,
+            last_name:        buyerLastName,
+            name:             buyerName,
+            source_deal_id:   dealId,
+            source:           'im-link',
+            im_registered_at: now,
+            expires_at:       expiresAt,
+          },
+          { onConflict: 'account_id,phone' }
+        )
+        .select('id')
+        .maybeSingle()
+
+      if (buyerErr) {
+        console.error('[deallink-im/verify-otp] Buyer upsert error:', buyerErr.message)
+        return res.status(500).json({ error: 'Failed to register buyer.' })
+      }
+
+      buyer = upsertedBuyer
     }
 
     // ── Provision a Deal Link free account for the buyer (if not already set up) ──
