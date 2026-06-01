@@ -131,7 +131,14 @@ export default function IMPage({ deal, buyer, onUnlockWholesaler }) {
               </div>
               <div className="min-w-0">
                 <div className="text-[#1d1d1f] font-semibold truncate">{deal.wholesaler.name}</div>
-                <div className="text-xs text-[#6e6e73] truncate">@{deal.wholesaler.handle} {deal.wholesaler.city ? `· ${deal.wholesaler.city}` : ''}</div>
+                <div className="text-xs text-[#6e6e73] truncate">
+                  <a
+                    href={`${import.meta.env.VITE_DEALLINK_URL}/p/${deal.wholesaler.handle}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#b8860b] hover:underline"
+                  >@{deal.wholesaler.handle}</a> {deal.wholesaler.city ? `· ${deal.wholesaler.city}` : ''}
+                </div>
               </div>
             </div>
             <button
