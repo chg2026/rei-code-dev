@@ -74,6 +74,7 @@ app.get('/r/:handle', async (req, res) => {
       siteName: 'REI Flywheel',
     }))
   } catch (_) {
+    console.error('[OG /r/]', _.message || _, _.stack)
     return res.send(ogHtml({
       title:    `REI Flywheel — Off-Market Deals`,
       description: 'Browse off-market real estate deals from wholesalers on REI Flywheel.',
@@ -113,6 +114,7 @@ app.get('/im/:dealId', async (req, res) => {
       siteName: 'REI Flywheel',
     }))
   } catch (_) {
+    console.error('[OG /im/]', _.message || _, _.stack)
     return res.send(ogHtml({
       title:    'Off-Market Deal — REI Flywheel',
       description: 'View this exclusive off-market real estate deal on REI Flywheel.',
