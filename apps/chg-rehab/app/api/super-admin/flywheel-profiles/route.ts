@@ -1,52 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/superAdmin";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Base URL of the shared Gold Bridge Express server that hosts the
- * Deal Link admin API (`/api/deallink/admin/*`). Mirrors the resolution
- * logic in `lib/legacyAdminProxy.ts`.
- */
-function legacyBaseUrl(): string {
-  const explicit = process.env.LEGACY_API_BASE_URL?.trim();
-  if (explicit) return explicit.replace(/\/+$/, "");
-  return "http://localhost:8080";
+function goldBridgeUrl(): string {
+  return (process.env.LEGACY_API_BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const gate = await requireSuperAdmin();
   if (gate instanceof NextResponse) return gate;
 
   const supabase = await getSupabaseServerClient();
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) {
+  if (!session?.access_token) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
-  const url = legacyBaseUrl() + "/api/deallink/admin/profiles" + (req.nextUrl.search || "");
-
-  let upstream: Response;
   try {
-    upstream = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+    const upstream = await fetch(`${goldBridgeUrl()}/api/deallink/admin/profiles`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
       cache: "no-store",
     });
-  } catch (e) {
-    console.error("[super-admin flywheel-profiles] upstream fetch failed:", (e as Error).message);
+    const body = await upstream.arrayBuffer();
+    return new NextResponse(body, {
+      status: upstream.status,
+      headers: { "content-type": upstream.headers.get("content-type") || "application/json" },
+    });
+  } catch {
     return NextResponse.json({ error: "Admin backend unreachable." }, { status: 502 });
   }
-
-  const buf = await upstream.arrayBuffer();
-  const contentType = upstream.headers.get("content-type") || "application/json";
-  return new NextResponse(buf, {
-    status: upstream.status,
-    headers: { "content-type": contentType },
-  });
 }
