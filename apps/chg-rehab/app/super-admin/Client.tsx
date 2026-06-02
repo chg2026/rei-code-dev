@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-type TabId = "overview" | "accounts" | "users" | "roles" | "products" | "contractor-portal";
+type TabId = "overview" | "accounts" | "users" | "roles" | "products" | "contractor-portal" | "flywheel-buyers";
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "accounts", label: "Accounts" },
@@ -9,6 +9,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "roles", label: "Roles & Permissions" },
   { id: "products", label: "Products" },
   { id: "contractor-portal", label: "Contractor Portal" },
+  { id: "flywheel-buyers", label: "REI Flywheel Buyers" },
 ];
 
 const PLANS_BY_PRODUCT: Record<string, string[]> = {
@@ -121,6 +122,7 @@ export default function SuperAdminClient({ currentUserId }: { currentUserId: str
       {tab === "roles" && <RolesTab onOk={toast.ok} onError={toast.err} />}
       {tab === "products" && <ProductsTab onOk={toast.ok} onError={toast.err} />}
       {tab === "contractor-portal" && <ContractorPortalTab onError={toast.err} />}
+      {tab === "flywheel-buyers" && <FlywheelBuyersTab onError={toast.err} />}
 
       {toast.node}
     </div>
@@ -1999,6 +2001,86 @@ function ContractorPortalTab({ onError }: { onError: (t: string) => void }) {
           </table>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── REI Flywheel Buyers ─────────────────────────────────────────────────────
+type FlywheelBuyer = {
+  id: string;
+  account_id: string;
+  name: string | null;
+  phone: string | null;
+  source: string | null;
+  im_registered_at: string | null;
+  created_at: string;
+  wholesaler: { handle: string; name: string } | null;
+};
+
+function FlywheelBuyersTab({ onError }: { onError: (t: string) => void }) {
+  const [buyers, setBuyers] = useState<FlywheelBuyer[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const d = await apiFetch<{ buyers: FlywheelBuyer[] }>("/api/super-admin/flywheel-buyers");
+        if (!cancelled) setBuyers(d.buyers);
+      } catch (e) {
+        if (!cancelled) onError(`Load failed: ${(e as Error).message}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onError]);
+
+  if (loading) return <div style={{ padding: 24, color: "#6b7280" }}>Loading buyers…</div>;
+  if (!buyers) return <div style={{ padding: 24, color: "#b91c1c" }}>Failed to load.</div>;
+
+  const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", marginBottom: 14 }}>
+        Every buyer captured across all REI Flywheel wholesaler profiles.
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#fafafa" }}>
+              {["Name", "Phone", "Wholesaler", "Source", "Registered", "Joined"].map((h) => (
+                <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {buyers.map((b) => (
+              <tr key={b.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{b.name || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{b.phone || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>
+                  {b.wholesaler ? (
+                    <>
+                      <div style={{ fontWeight: 600 }}>{b.wholesaler.name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>@{b.wholesaler.handle}</div>
+                    </>
+                  ) : "—"}
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{b.source || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{fmtDate(b.im_registered_at)}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{fmtDate(b.created_at)}</td>
+              </tr>
+            ))}
+            {buyers.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No buyers yet.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
