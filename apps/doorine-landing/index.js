@@ -49,7 +49,7 @@ function ogHtml({ title, description, image, url, siteName }) {
 // Profile link — doorine.com/r/:handle
 app.get('/r/:handle', async (req, res) => {
   if (!isCrawler(req)) {
-    return res.redirect(301, `${FLYWHEEL_URL}/p/${req.params.handle}`)
+    return res.redirect(302, `${FLYWHEEL_URL}/p/${req.params.handle}`)
   }
 
   const canonicalUrl = `${FLYWHEEL_URL}/p/${req.params.handle}`
@@ -87,7 +87,7 @@ app.get('/r/:handle', async (req, res) => {
 // Deal IM link — doorine.com/im/:dealId
 app.get('/im/:dealId', async (req, res) => {
   if (!isCrawler(req)) {
-    return res.redirect(301, `${FLYWHEEL_URL}/im/${req.params.dealId}`)
+    return res.redirect(302, `${FLYWHEEL_URL}/im/${req.params.dealId}`)
   }
 
   const canonicalUrl = `${FLYWHEEL_URL}/im/${req.params.dealId}`
