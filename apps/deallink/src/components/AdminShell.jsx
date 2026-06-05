@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store.jsx';
-import { Avatar } from './ui.jsx';
+
 import NotificationBell from './NotificationBell.jsx';
 
 export default function AdminShell({ children, tab }) {
@@ -55,7 +55,7 @@ export default function AdminShell({ children, tab }) {
             onClick={() => { dispatch({ type: 'sign_out' }); nav('/'); }}
           >Sign out</button>
           <NotificationBell userId={state.profile?.id} />
-          <Avatar size={28} initials={state.profile.initials} />
+          <span style={{ width:28, height:28, borderRadius:'50%', background:'#b8860b', color:'#fff', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{state.profile.initials}</span>
         </div>
       </div>
       {children}
