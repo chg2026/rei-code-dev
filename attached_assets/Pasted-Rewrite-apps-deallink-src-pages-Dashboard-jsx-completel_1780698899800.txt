@@ -1,3 +1,5 @@
+Rewrite apps/deallink/src/pages/Dashboard.jsx completely. Replace the entire file with this content:
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -358,3 +360,5 @@ export default function Dashboard() {
     </Layout>
   );
 }
+
+Only edit apps/deallink/src/pages/Dashboard.jsx. Do not touch any other file. Confirm the build passes and show me any errors if it fails.
