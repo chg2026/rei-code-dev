@@ -1,0 +1,209 @@
+Do exactly two things. No other files should be touched.
+
+─────────────────────────────────────────
+THING 1 — Create a new file:
+apps/deallink/src/components/NotificationBell.jsx
+─────────────────────────────────────────
+
+Use this exact content:
+
+import React from 'react';
+import { Bell } from 'lucide-react';
+import api from '../lib/api.js';
+import { supabase } from '../lib/supabase.js';
+
+function relTime(ts) {
+  if (!ts) return '';
+  const diff = Math.max(0, Date.now() - new Date(ts).getTime());
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+export default function NotificationBell({ userId }) {
+  const [open, setOpen] = React.useState(false);
+  const [count, setCount] = React.useState(0);
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const wrapRef = React.useRef(null);
+
+  const fetchCount = React.useCallback(async () => {
+    try {
+      const { data } = await api.get('/deallink/notifications/unread-count');
+      setCount(Number(data?.count || 0));
+    } catch { /* ignore */ }
+  }, []);
+
+  const fetchList = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/deallink/notifications');
+      setItems(Array.isArray(data) ? data : []);
+    } catch { setItems([]); }
+    finally { setLoading(false); }
+  }, []);
+
+  React.useEffect(() => { fetchCount(); }, [fetchCount]);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`notif:${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public',
+        table: 'deallink_notifications',
+        filter: `user_id=eq.${userId}`,
+      }, () => { setCount(c => c + 1); })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [userId]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const toggle = () => {
+    setOpen(v => {
+      if (!v) fetchList();
+      return !v;
+    });
+  };
+
+  const markAllRead = async () => {
+    try { await api.post('/deallink/notifications/mark-all-read'); } catch { return; }
+    setCount(0);
+    setItems(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const priority = items.filter(n => ['offer_received', 'contract_deadline'].includes(n.type));
+  const activity = items.filter(n => !['offer_received', 'contract_deadline'].includes(n.type));
+  const hasBoth = priority.length > 0 && activity.length > 0;
+
+  const renderItem = (n, i) => {
+    const isRead = n.read ?? false;
+    const isPriority = ['offer_received', 'contract_deadline'].includes(n.type);
+    const cnt = n.count || 1;
+    return (
+      <div key={n.id ?? i} style={{
+        padding: '10px 14px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: isRead ? 'transparent' : isPriority ? 'rgba(52,120,246,0.10)' : 'rgba(184,134,11,0.08)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <p style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: 0, flex: 1 }}>
+                {n.title || 'Notification'}
+              </p>
+              {cnt > 1 && (
+                <span style={{
+                  background: isPriority ? '#3478f6' : '#b8860b',
+                  color: '#fff', fontSize: 10, fontWeight: 700,
+                  borderRadius: 999, padding: '1px 6px', flexShrink: 0,
+                }}>{cnt}</span>
+              )}
+              {!isRead && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: isPriority ? '#3478f6' : '#b8860b', flexShrink: 0,
+                }} />
+              )}
+            </div>
+            {n.body && <p style={{ color: '#c7c7cc', fontSize: 12, margin: '2px 0 0' }}>{n.body}</p>}
+            <p style={{ color: '#86868b', fontSize: 11, margin: '4px 0 0' }}>{relTime(n.created_at)}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={toggle}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', position: 'relative', padding: 4, display: 'flex', alignItems: 'center', color: 'var(--mute)' }}
+        aria-label="Notifications"
+      >
+        <Bell size={18} />
+        {count > 0 && (
+          <span style={{
+            position: 'absolute', top: -2, right: -2,
+            minWidth: 16, height: 16, padding: '0 4px',
+            background: '#b8860b', color: '#fff',
+            borderRadius: 999, fontSize: 10, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{count > 99 ? '99+' : count}</span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 36, right: 0, width: 300,
+          background: '#1d1d1f', borderRadius: 10,
+          border: '1px solid rgba(184,134,11,0.25)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+          zIndex: 1001, overflow: 'hidden',
+          fontFamily: 'inherit',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Notifications</span>
+            <button onClick={markAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b8860b', fontSize: 12, fontWeight: 600, padding: 0, fontFamily: 'inherit' }}>
+              Mark all read
+            </button>
+          </div>
+          <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+            {loading ? (
+              <p style={{ color: '#86868b', fontSize: 13, padding: '16px 14px', textAlign: 'center' }}>Loading…</p>
+            ) : items.length === 0 ? (
+              <p style={{ color: '#86868b', fontSize: 13, padding: '16px 14px', textAlign: 'center' }}>No notifications yet</p>
+            ) : (
+              <>
+                {priority.length > 0 && (
+                  <>
+                    {hasBoth && <div style={{ padding: '5px 14px 3px', fontSize: 10, fontWeight: 700, color: '#3478f6', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(52,120,246,0.06)' }}>Offers & Alerts</div>}
+                    {priority.map(renderItem)}
+                  </>
+                )}
+                {activity.length > 0 && (
+                  <>
+                    {hasBoth && <div style={{ padding: '5px 14px 3px', fontSize: 10, fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.08em', borderTop: priority.length > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>Activity</div>}
+                    {activity.map(renderItem)}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+─────────────────────────────────────────
+THING 2 — Edit apps/deallink/src/components/AdminShell.jsx
+─────────────────────────────────────────
+
+Add this import at the top of the file, after the existing imports:
+  import NotificationBell from './NotificationBell.jsx';
+
+Then find the <div className="right"> section. It currently contains:
+  <Link to={profileUrl} ...>
+  <button ... >Sign out</button>
+  <Avatar ... />
+
+Add <NotificationBell userId={state.profile?.id} /> immediately before the <Avatar> element, so the order becomes:
+  profile link → sign out button → NotificationBell → Avatar
+
+Do not change anything else in AdminShell.jsx.
+
+After both changes, confirm: (1) the new file was created, (2) what the updated .right div looks like in AdminShell.jsx.

@@ -8,6 +8,7 @@
 
 const express = require('express')
 const { supabaseAdmin } = require('../middleware/auth')
+const { createNotification, sendEmailNotification } = require('../services/notifications')
 
 const router = express.Router()
 
@@ -20,11 +21,18 @@ function dbOrFail(res) {
 }
 
 function accountIdFor(req) {
+  // Super admins acting on behalf of another account may pass ?account_id.
   if (req.user?.is_super_admin && req.query?.account_id) return req.query.account_id
   return req.account_filter || req.user?.account_id || null
 }
 
+function maskAddr(addr) {
+  return String(addr || '').replace(/^\d+\s+/, '— ')
+}
+
 // ─── PROFILE ──────────────────────────────────────────────────────────────
+// Single row per account. GET returns null if the user hasn't claimed a
+// handle yet — front-end then routes to /onboarding.
 
 router.get('/profile', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
@@ -46,13 +54,14 @@ router.put('/profile', async (req, res) => {
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
 
-  const allowed = ['handle', 'name', 'initials', 'bio', 'city', 'email', 'featured_id', 'onboarding', 'marketplace_opt_in', 'avatar_url', 'background_type', 'background_value', 'social_links']
+  const allowed = ['handle', 'name', 'initials', 'bio', 'city', 'email', 'featured_id', 'onboarding', 'marketplace_opt_in', 'avatar_url', 'background_type', 'background_value', 'social_links', 'radius', 'gradient_enabled', 'tone', 'accent_color']
   const patch = { account_id: accountId }
   for (const k of allowed) if (k in req.body) patch[k] = req.body[k]
 
   if (patch.handle) patch.handle = String(patch.handle).toLowerCase().trim()
   if (!patch.handle) return res.status(400).json({ error: 'handle is required.' })
 
+  // upsert by account_id; UNIQUE(handle) guards against handle collisions.
   const { data, error } = await db
     .from('deallink_profiles')
     .upsert(patch, { onConflict: 'account_id' })
@@ -69,22 +78,15 @@ router.put('/profile', async (req, res) => {
 // ─── DEALS ────────────────────────────────────────────────────────────────
 
 const DEAL_FIELDS = [
-  'addr', 'city', 'state', 'zip', 'type', 'units', 'beds', 'baths', 'sqft',
-  'ask', 'arv', 'occ', 'access', 'status', 'notes', 'description', 'photo_url',
-  'tags', 'hide_street', 'is_new', 'analyzer_state', 'im_config',
-  'marketplace_visible',
+  'addr', 'city', 'zip', 'type', 'units', 'beds', 'baths', 'sqft',
+  'ask', 'arv', 'occ', 'access', 'status', 'notes', 'hide_street', 'is_new',
+  'analyzer_state', 'analyzer_state_updated_at', 'im_config',
+  'photos', 'marketplace_visible', 'contract_date',
 ]
-
-const VALID_STATUSES = new Set(['New', 'Marketed', 'Under Contract', 'Closed', 'Dead'])
 
 function pickDeal(body) {
   const out = {}
   for (const k of DEAL_FIELDS) if (k in body) out[k] = body[k]
-  if ('status' in out && !VALID_STATUSES.has(out.status)) {
-    // Translate legacy values from older clients.
-    const legacy = { active: 'Marketed', pending: 'Under Contract', sold: 'Closed' }
-    out.status = legacy[out.status] || 'New'
-  }
   return out
 }
 
@@ -114,6 +116,172 @@ router.post('/deals', async (req, res) => {
   const { data, error } = await db.from('deallink_deals').insert(row).select().single()
   if (error) return res.status(500).json({ error: error.message })
   res.status(201).json({ deal: data })
+  ;(async () => {
+    try {
+      if (!supabaseAdmin || !req.user?.id) return
+      await supabaseAdmin.from('deallink_user_stats').upsert(
+        { user_id: req.user.id, last_deal_action_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    } catch (e) {
+      console.error('[deallink/stats] last_deal_action_at update error (POST /deals):', e.message)
+    }
+    // Referral activation — runs only when this is the user's first deal.
+    try {
+      if (!supabaseAdmin || !req.user?.id || !accountId) return
+
+      const { count: totalDeals } = await supabaseAdmin
+        .from('deallink_deals')
+        .select('*', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+
+      if (totalDeals !== 1) return
+
+      // Find a pending referral for this user.
+      const { data: referral } = await supabaseAdmin
+        .from('deallink_referrals')
+        .select('id, referrer_id')
+        .eq('referred_user_id', req.user.id)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (!referral) return
+
+      // Activate the referral.
+      await supabaseAdmin
+        .from('deallink_referrals')
+        .update({ status: 'activated', activated_at: new Date().toISOString() })
+        .eq('id', referral.id)
+
+      // Count referrer's total activated referrals (including this one).
+      const { count: activatedCount } = await supabaseAdmin
+        .from('deallink_referrals')
+        .select('*', { count: 'exact', head: true })
+        .eq('referrer_id', referral.referrer_id)
+        .eq('status', 'activated')
+
+      // Award tier badges if threshold is hit and badge not yet awarded.
+      const BADGE_TIERS = [
+        { threshold: 3, badge_type: 'founding_member' },
+        { threshold: 5, badge_type: 'verified' },
+        { threshold: 10, badge_type: 'ambassador' },
+      ]
+
+      for (const tier of BADGE_TIERS) {
+        if (activatedCount === tier.threshold) {
+          const { data: existing } = await supabaseAdmin
+            .from('deallink_badges')
+            .select('id')
+            .eq('user_id', referral.referrer_id)
+            .eq('badge_type', tier.badge_type)
+            .maybeSingle()
+
+          if (!existing) {
+            await supabaseAdmin.from('deallink_badges').insert({
+              user_id: referral.referrer_id,
+              badge_type: tier.badge_type,
+            })
+          }
+        }
+      }
+
+      // Notify the referrer.
+      await createNotification(referral.referrer_id, {
+        type: 'referral_activated',
+        title: 'Your referral is now active!',
+        body: 'Someone you referred just posted their first deal.',
+      })
+    } catch (refErr) {
+      console.error('[deallink/referral-activation] Error:', refErr.message)
+    }
+  })()
+  // Alert matching engine — fire-and-forget, never blocks the response.
+  ;(async () => {
+    if (!supabaseAdmin || !data) return
+    try {
+      const deal = data
+      const marketplaceUrl = `${process.env.VITE_DEALLINK_URL || 'https://reiflywheel.doorine.com'}/marketplace`
+
+      const { data: alerts, error: alertsErr } = await supabaseAdmin
+        .from('deallink_market_alerts')
+        .select('*')
+        .eq('active', true)
+
+      if (alertsErr || !alerts?.length) return
+
+      for (const alert of alerts) {
+        try {
+          // --- Geography match ---
+          const geo = alert.geography || {}
+          const geoCity = (geo.city || '').trim().toLowerCase()
+          const geoZip = (geo.zip || '').trim()
+          const dealCity = (deal.city || '').trim().toLowerCase()
+          const dealZip = (deal.zip || '').trim()
+
+          const geoMatch =
+            (geoCity && dealCity && dealCity === geoCity) ||
+            (geoZip && dealZip && dealZip === geoZip)
+
+          if (!geoMatch) continue
+
+          // --- Type-specific match rules ---
+          if (alert.alert_type === 'buyer') {
+            // Property type filter
+            if (Array.isArray(alert.property_types) && alert.property_types.length) {
+              if (!alert.property_types.includes(deal.type)) continue
+            }
+            // Price range filter
+            const ask = parseFloat(deal.ask) || 0
+            if (alert.price_min != null && ask < parseFloat(alert.price_min)) continue
+            if (alert.price_max != null && ask > parseFloat(alert.price_max)) continue
+            // strategy — no field on deals yet, skip
+          } else if (alert.alert_type === 'wholesaler_jv') {
+            if (!deal.marketplace_visible) continue
+          } else {
+            // Unknown alert type — skip
+            continue
+          }
+
+          // --- Fetch recipient email ---
+          const { data: profile } = await supabaseAdmin
+            .from('user_profiles')
+            .select('email')
+            .eq('id', alert.user_id)
+            .maybeSingle()
+
+          if (!profile?.email) continue
+
+          const addrDisplay = deal.hide_street ? maskAddr(deal.addr) : (deal.addr || 'Address on file')
+          const askDisplay = deal.ask ? `$${Number(deal.ask).toLocaleString()}` : 'N/A'
+          const typeDisplay = deal.type || 'Property'
+          const notifBody = `${addrDisplay} — ${typeDisplay} asking ${askDisplay}`
+
+          // In-app notification
+          await createNotification(alert.user_id, {
+            type: 'market_alert',
+            title: 'New deal in your market',
+            body: notifBody,
+            metadata: { deal_id: deal.id },
+          })
+
+          // Email notification
+          await sendEmailNotification(
+            profile.email,
+            'New deal in your market — REI Flywheel',
+            `<p>A new deal matching your alert was just posted.</p>
+<p><strong>${addrDisplay}</strong><br>
+${typeDisplay} &mdash; Asking ${askDisplay}</p>
+<p><a href="${marketplaceUrl}">Browse deals on REI Flywheel →</a></p>
+<p style="color:#999;font-size:12px">— The REI Flywheel team</p>`
+          )
+        } catch (alertErr) {
+          console.error(`[deallink/alert-match] Error processing alert ${alert.id}:`, alertErr.message)
+        }
+      }
+    } catch (err) {
+      console.error('[deallink/alert-match] Fatal error:', err.message)
+    }
+  })()
 })
 
 router.post('/deals/bulk', async (req, res) => {
@@ -127,6 +295,17 @@ router.post('/deals/bulk', async (req, res) => {
   const { data, error } = await db.from('deallink_deals').insert(rows).select()
   if (error) return res.status(500).json({ error: error.message })
   res.status(201).json({ deals: data || [] })
+  ;(async () => {
+    try {
+      if (!supabaseAdmin || !req.user?.id) return
+      await supabaseAdmin.from('deallink_user_stats').upsert(
+        { user_id: req.user.id, last_deal_action_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    } catch (e) {
+      console.error('[deallink/stats] last_deal_action_at update error (POST /deals/bulk):', e.message)
+    }
+  })()
 })
 
 router.patch('/deals/:id', async (req, res) => {
@@ -134,16 +313,9 @@ router.patch('/deals/:id', async (req, res) => {
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
 
-  const patch = pickDeal(req.body)
-  // Whenever the client writes (or clears) analyzer_state, stamp the
-  // server-side "last saved" timestamp so the editor can show relative time.
-  if ('analyzer_state' in patch) {
-    patch.analyzer_state_updated_at = patch.analyzer_state == null ? null : new Date().toISOString()
-  }
-
   const { data, error } = await db
     .from('deallink_deals')
-    .update(patch)
+    .update(pickDeal(req.body))
     .eq('id', req.params.id)
     .eq('account_id', accountId)
     .select()
@@ -152,46 +324,23 @@ router.patch('/deals/:id', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message })
   if (!data) return res.status(404).json({ error: 'Deal not found.' })
   res.json({ deal: data })
+  ;(async () => {
+    try {
+      if (!supabaseAdmin || !req.user?.id) return
+      await supabaseAdmin.from('deallink_user_stats').upsert(
+        { user_id: req.user.id, last_deal_action_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    } catch (e) {
+      console.error('[deallink/stats] last_deal_action_at update error (PATCH /deals/:id):', e.message)
+    }
+  })()
 })
 
 router.delete('/deals/:id', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-
-  // Null any offers' deal_id first — the composite FK
-  // (deal_id, account_id) → deallink_deals is ON DELETE NO ACTION to
-  // preserve cross-tenant integrity (see 20260514000000 migration), so
-  // we must clear the ref ourselves. Offers carry denormalized
-  // buyer_name and survive parent removal by design.
-  const { error: nErr } = await db
-    .from('deallink_offers')
-    .update({ deal_id: null })
-    .eq('deal_id', req.params.id)
-    .eq('account_id', accountId)
-  if (nErr) return res.status(500).json({ error: nErr.message })
-
-  // Clean up any documents in Supabase Storage before the row delete.
-  // The deallink_documents → deallink_deals FK is ON DELETE CASCADE so the
-  // metadata rows go automatically — but storage objects don't, and would
-  // be orphaned in the bucket forever otherwise. Best-effort: log and
-  // continue if storage removal fails so the deal can still be deleted.
-  const { data: docs, error: docErr } = await db
-    .from('deallink_documents')
-    .select('storage_path')
-    .eq('deal_id', req.params.id)
-    .eq('account_id', accountId)
-  if (docErr) return res.status(500).json({ error: docErr.message })
-  const paths = (docs || []).map((d) => d.storage_path).filter(Boolean)
-  if (paths.length) {
-    const { error: rmErr } = await db.storage.from('deallink-documents').remove(paths)
-    if (rmErr) {
-      // eslint-disable-next-line no-console
-      console.error('[deallink] failed to remove storage objects on deal delete', {
-        dealId: req.params.id, accountId, count: paths.length, err: rmErr.message,
-      })
-    }
-  }
 
   const { error } = await db
     .from('deallink_deals')
@@ -203,113 +352,177 @@ router.delete('/deals/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
-// ─── INVESTMENT MEMORANDUM (IM) — Module 1 (wholesaler-side) ─────────────
-// Generates a public slug for a deal and lets the wholesaler toggle which
-// fields appear on the buyer-facing IM page. Buyer auth, SMS gate, and the
-// buyer-safe IM read endpoint are separate modules.
+// ─── DEAL DOCUMENTS ───────────────────────────────────────────────────────
+// Metadata stored in deallink_documents; files in Supabase Storage bucket
+// 'deal-photos' under deals/{dealId}/docs/.
+//
+// Required table (apply via Supabase SQL editor):
+//
+//   CREATE TABLE IF NOT EXISTS public.deallink_documents (
+//     id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+//     deal_id    UUID        NOT NULL,
+//     account_id UUID        NOT NULL,
+//     filename   TEXT        NOT NULL,
+//     path       TEXT        NOT NULL,
+//     size       BIGINT,
+//     mime_type  TEXT,
+//     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+//   );
 
-const IM_TOGGLE_FIELDS = new Set([
-  'im_show_arv', 'im_show_asking', 'im_show_repair',
-  'im_show_mao', 'im_show_contact', 'im_show_street_number',
-])
+const DOC_BUCKET = 'deal-photos'
 
-function slugifyDeal(deal) {
-  const parts = [deal.addr || '', deal.city || '']
-    .join(' ')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')   // strip accents
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return parts || 'deal'
-}
-
-// POST /api/deallink/deals/:id/im/share
-// Generates and persists im_slug if not yet set; returns the slug.
-// Idempotent — calling twice returns the same slug.
-router.post('/deals/:id/im/share', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-
-  const { data: deal, error: dErr } = await db
-    .from('deallink_deals')
-    .select('id, addr, city, im_slug')
-    .eq('id', req.params.id)
-    .eq('account_id', accountId)
-    .maybeSingle()
-  if (dErr) return res.status(500).json({ error: dErr.message })
-  if (!deal) return res.status(404).json({ error: 'Deal not found.' })
-
-  if (deal.im_slug) return res.json({ slug: deal.im_slug })
-
-  // Resolve uniqueness by appending -2, -3, … on collision. Cap retries.
-  const base = slugifyDeal(deal)
-  for (let i = 0; i < 25; i++) {
-    const candidate = i === 0 ? base : `${base}-${i + 1}`
-    const { data: clash, error: cErr } = await db
-      .from('deallink_deals')
-      .select('id')
-      .eq('im_slug', candidate)
-      .maybeSingle()
-    if (cErr) return res.status(500).json({ error: cErr.message })
-    if (clash) continue
-
-    const { data: updated, error: uErr } = await db
-      .from('deallink_deals')
-      .update({ im_slug: candidate })
-      .eq('id', deal.id)
-      .eq('account_id', accountId)
-      .is('im_slug', null)            // race-safe: only set if still null
-      .select('im_slug')
-      .maybeSingle()
-    if (uErr) {
-      // Unique-violation race — another concurrent share won; refetch.
-      if (uErr.code === '23505') continue
-      return res.status(500).json({ error: uErr.message })
-    }
-    if (!updated) {
-      // Another request claimed a slug for this deal between our SELECT
-      // and UPDATE — refetch and return whatever's there.
-      const { data: fresh } = await db
-        .from('deallink_deals')
-        .select('im_slug')
-        .eq('id', deal.id)
-        .eq('account_id', accountId)
-        .maybeSingle()
-      if (fresh?.im_slug) return res.json({ slug: fresh.im_slug })
-      continue
-    }
-    return res.json({ slug: updated.im_slug })
-  }
-  return res.status(500).json({ error: 'Failed to generate a unique slug.' })
-})
-
-// PATCH /api/deallink/deals/:id/im/toggles
-// Body: any subset of im_show_arv|asking|repair|mao|contact|street_number.
-router.patch('/deals/:id/im/toggles', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-
-  const patch = {}
-  for (const k of Object.keys(req.body || {})) {
-    if (IM_TOGGLE_FIELDS.has(k)) patch[k] = !!req.body[k]
-  }
-  if (Object.keys(patch).length === 0) {
-    return res.status(400).json({ error: 'No valid IM toggle fields supplied.' })
-  }
-
+// Verify the deal belongs to the caller's account.
+async function assertDealOwner(db, dealId, accountId) {
   const { data, error } = await db
     .from('deallink_deals')
-    .update(patch)
-    .eq('id', req.params.id)
+    .select('id')
+    .eq('id', dealId)
     .eq('account_id', accountId)
-    .select('id, im_slug, im_show_arv, im_show_asking, im_show_repair, im_show_mao, im_show_contact, im_show_street_number')
     .maybeSingle()
-  if (error) return res.status(500).json({ error: error.message })
-  if (!data) return res.status(404).json({ error: 'Deal not found.' })
-  res.json({ deal: data })
+  if (error) throw error
+  return !!data
+}
+
+// GET /api/deallink/deals/:dealId/documents
+router.get('/deals/:dealId/documents', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data, error } = await db
+      .from('deallink_documents')
+      .select('*')
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false })
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ documents: data || [] })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/deallink/deals/:dealId/documents/signed-upload
+router.post('/deals/:dealId/documents/signed-upload', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  const { filename } = req.body
+  if (!filename) return res.status(400).json({ error: 'filename is required.' })
+
+  try {
+    const owned = await assertDealOwner(db, req.params.dealId, accountId)
+    if (!owned) return res.status(404).json({ error: 'Deal not found.' })
+
+    const storagePath = `deals/${req.params.dealId}/docs/${Date.now()}-${filename}`
+    const { data, error } = await db.storage
+      .from(DOC_BUCKET)
+      .createSignedUploadUrl(storagePath)
+    if (error) return res.status(500).json({ error: error.message })
+
+    res.json({ signedUrl: data.signedUrl, path: storagePath, token: data.token })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/deallink/deals/:dealId/documents
+router.post('/deals/:dealId/documents', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  const { filename, path: storagePath, size, mime_type } = req.body
+  if (!filename || !storagePath) return res.status(400).json({ error: 'filename and path are required.' })
+
+  try {
+    const owned = await assertDealOwner(db, req.params.dealId, accountId)
+    if (!owned) return res.status(404).json({ error: 'Deal not found.' })
+
+    const validPrefixes = [`${accountId}/${req.params.dealId}/`, `deals/${req.params.dealId}/`]
+    if (!validPrefixes.some(p => storagePath.startsWith(p))) {
+      return res.status(400).json({ error: 'storage_path does not match this deal.' })
+    }
+
+    const { data, error } = await db
+      .from('deallink_documents')
+      .insert({
+        deal_id:   req.params.dealId,
+        account_id: accountId,
+        filename,
+        path:      storagePath,
+        size:      size      || null,
+        mime_type: mime_type || null,
+      })
+      .select()
+      .single()
+    if (error) return res.status(500).json({ error: error.message })
+    res.status(201).json({ document: data })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/deallink/deals/:dealId/documents/:docId/download
+router.get('/deals/:dealId/documents/:docId/download', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data: doc, error: docErr } = await db
+      .from('deallink_documents')
+      .select('path')
+      .eq('id', req.params.docId)
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (docErr) return res.status(500).json({ error: docErr.message })
+    if (!doc)   return res.status(404).json({ error: 'Document not found.' })
+
+    const { data, error } = await db.storage
+      .from(DOC_BUCKET)
+      .createSignedUrl(doc.path, 300)   // 5-minute signed URL
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ url: data.signedUrl })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// DELETE /api/deallink/deals/:dealId/documents/:docId
+router.delete('/deals/:dealId/documents/:docId', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  const accountId = accountIdFor(req)
+  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
+
+  try {
+    const { data: doc, error: docErr } = await db
+      .from('deallink_documents')
+      .select('path')
+      .eq('id', req.params.docId)
+      .eq('deal_id', req.params.dealId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (docErr) return res.status(500).json({ error: docErr.message })
+    if (!doc)   return res.status(404).json({ error: 'Document not found.' })
+
+    // Remove storage object first (non-fatal if missing).
+    await db.storage.from(DOC_BUCKET).remove([doc.path])
+
+    const { error: delErr } = await db
+      .from('deallink_documents')
+      .delete()
+      .eq('id', req.params.docId)
+      .eq('account_id', accountId)
+    if (delErr) return res.status(500).json({ error: delErr.message })
+
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
 })
 
 // ─── LEADS ────────────────────────────────────────────────────────────────
@@ -331,161 +544,56 @@ router.get('/leads', async (req, res) => {
 
 // ─── BUYERS ───────────────────────────────────────────────────────────────
 
-const BUYER_FIELDS = ['name', 'email', 'phone', 'buyer_type', 'status', 'markets',
-  'property_types', 'min_price', 'max_price', 'notes', 'source']
-
-function pickBuyer(body) {
-  const out = {}
-  for (const k of BUYER_FIELDS) if (k in body) out[k] = body[k]
-  return out
-}
-
 router.get('/buyers', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const { data, error } = await db.from('deallink_buyers').select('*')
-    .eq('account_id', accountId).order('created_at', { ascending: false })
+
+  const { data, error } = await db
+    .from('deallink_buyers')
+    .select('*')
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: false })
+
   if (error) return res.status(500).json({ error: error.message })
   res.json({ buyers: data || [] })
 })
 
-router.post('/buyers', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const row = { ...pickBuyer(req.body), account_id: accountId }
-  if (!row.name) return res.status(400).json({ error: 'name is required.' })
-  const { data, error } = await db.from('deallink_buyers').insert(row).select().single()
-  if (error) return res.status(500).json({ error: error.message })
-  res.status(201).json({ buyer: data })
-})
-
-router.patch('/buyers/:id', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const { data, error } = await db.from('deallink_buyers').update(pickBuyer(req.body))
-    .eq('id', req.params.id).eq('account_id', accountId).select().single()
-  if (error) return res.status(500).json({ error: error.message })
-  if (!data) return res.status(404).json({ error: 'Buyer not found.' })
-  res.json({ buyer: data })
-})
-
-router.delete('/buyers/:id', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-
-  // Null any offers' buyer_id first — see /deals/:id DELETE for rationale
-  // (composite FK is NO ACTION; offers preserve buyer_name denormalized).
-  const { error: nErr } = await db
-    .from('deallink_offers')
-    .update({ buyer_id: null })
-    .eq('buyer_id', req.params.id)
-    .eq('account_id', accountId)
-  if (nErr) return res.status(500).json({ error: nErr.message })
-
-  const { error } = await db.from('deallink_buyers').delete()
-    .eq('id', req.params.id).eq('account_id', accountId)
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
-
 // ─── OFFERS ───────────────────────────────────────────────────────────────
-
-const OFFER_FIELDS = ['deal_id', 'buyer_id', 'buyer_name', 'amount', 'status', 'notes']
-const VALID_OFFER_STATUSES = new Set(['Pending', 'Accepted', 'Rejected', 'Countered'])
-
-function pickOffer(body) {
-  const out = {}
-  for (const k of OFFER_FIELDS) if (k in body) out[k] = body[k]
-  if ('status' in out && !VALID_OFFER_STATUSES.has(out.status)) out.status = 'Pending'
-  return out
-}
 
 router.get('/offers', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
   const accountId = accountIdFor(req)
   if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const { data, error } = await db.from('deallink_offers').select('*')
-    .eq('account_id', accountId).order('created_at', { ascending: false })
+
+  const { data, error } = await db
+    .from('deallink_offers')
+    .select('*')
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: false })
+
   if (error) return res.status(500).json({ error: error.message })
   res.json({ offers: data || [] })
 })
 
-router.post('/offers', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const row = { ...pickOffer(req.body), account_id: accountId }
-  if (row.deal_id) {
-    const { data: deal } = await db.from('deallink_deals').select('id, account_id')
-      .eq('id', row.deal_id).maybeSingle()
-    if (!deal || deal.account_id !== accountId) return res.status(400).json({ error: 'Invalid deal_id.' })
-  }
-  if (row.buyer_id) {
-    const { data: buyer } = await db.from('deallink_buyers').select('id, account_id, name')
-      .eq('id', row.buyer_id).maybeSingle()
-    if (!buyer || buyer.account_id !== accountId) return res.status(400).json({ error: 'Invalid buyer_id.' })
-    if (!row.buyer_name) row.buyer_name = buyer.name
-  }
-  const { data, error } = await db.from('deallink_offers').insert(row).select().single()
-  if (error) return res.status(500).json({ error: error.message })
-  res.status(201).json({ offer: data })
-})
+// ─── IM SHARE LINK ────────────────────────────────────────────────────────
 
-router.patch('/offers/:id', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const patch = pickOffer(req.body)
-  if (patch.deal_id) {
-    const { data: deal } = await db.from('deallink_deals').select('id, account_id')
-      .eq('id', patch.deal_id).maybeSingle()
-    if (!deal || deal.account_id !== accountId) return res.status(400).json({ error: 'Invalid deal_id.' })
-  }
-  if (patch.buyer_id) {
-    const { data: buyer } = await db.from('deallink_buyers').select('id, account_id, name')
-      .eq('id', patch.buyer_id).maybeSingle()
-    if (!buyer || buyer.account_id !== accountId) return res.status(400).json({ error: 'Invalid buyer_id.' })
-    if (!patch.buyer_name) patch.buyer_name = buyer.name
-  }
-  const { data, error } = await db.from('deallink_offers').update(patch)
-    .eq('id', req.params.id).eq('account_id', accountId).select().single()
-  if (error) return res.status(500).json({ error: error.message })
-  if (!data) return res.status(404).json({ error: 'Offer not found.' })
-  res.json({ offer: data })
-})
-
-router.delete('/offers/:id', async (req, res) => {
-  const db = dbOrFail(res); if (!db) return
-  const accountId = accountIdFor(req)
-  if (!accountId) return res.status(400).json({ error: 'No account_id available.' })
-  const { error } = await db.from('deallink_offers').delete()
-    .eq('id', req.params.id).eq('account_id', accountId)
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
+router.post('/deals/:id/im/share', (req, res) => {
+  res.json({ slug: `https://doorine.com/im/${req.params.id}` })
 })
 
 // ─── MARKETPLACE ─────────────────────────────────────────────────────────
-// Cross-wholesaler deal feed. Auth required + product entitlement.
-// Marketplace visibility is controlled per-deal via marketplace_visible,
-// not via a profile-level opt-in flag.
+// Cross-wholesaler deal feed. Auth required + product entitlement, but
+// returns deals from ANY account whose profile has marketplace_opt_in=true.
 // We never expose account_id; profile handle/name only.
-
-function maskAddr(addr) {
-  return String(addr || '').replace(/^\d+\s+/, '— ')
-}
 
 router.get('/marketplace', async (req, res) => {
   const db = dbOrFail(res); if (!db) return
 
-  // Fetch all profiles — marketplace visibility is controlled per-deal via
-  // marketplace_visible, not via a profile-level opt-in flag.
   const { data: profiles, error: pErr } = await db
     .from('deallink_profiles')
     .select('account_id, handle, name, initials, city')
+    .eq('marketplace_opt_in', true)
   if (pErr) return res.status(500).json({ error: pErr.message })
 
   const byAccount = new Map((profiles || []).map((p) => [p.account_id, p]))
@@ -505,20 +613,46 @@ router.get('/marketplace', async (req, res) => {
     deals: (deals || []).map((d) => {
       const seller = byAccount.get(d.account_id) || {}
       return {
-        id: d.id,
+        ...d,
         addr: d.hide_street ? maskAddr(d.addr) : d.addr,
-        city: d.city, state: d.state, zip: d.zip, type: d.type,
-        units: d.units, beds: d.beds, baths: d.baths, sqft: d.sqft,
-        ask: d.ask, arv: d.arv, status: d.status, tags: d.tags || [],
-        photo_url: d.photo_url || '', description: d.description || '',
-        created_at: d.created_at,
-        seller: {
-          handle: seller.handle, name: seller.name,
-          initials: seller.initials, city: seller.city,
-        },
+        seller: { handle: seller.handle, name: seller.name, initials: seller.initials, city: seller.city },
       }
     }),
   })
+})
+
+// ─── CONTENT SHARES ───────────────────────────────────────────────────────
+
+router.post('/content-shares', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized.' })
+
+  const { content_type, deal_id = null, platform } = req.body || {}
+
+  const { error } = await db.from('deallink_content_shares').insert({
+    user_id: req.user.id,
+    content_type,
+    deal_id: deal_id || null,
+    platform,
+  })
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+router.get('/content-shares', async (req, res) => {
+  const db = dbOrFail(res); if (!db) return
+  if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized.' })
+
+  const { data, error } = await db
+    .from('deallink_content_shares')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .order('shared_at', { ascending: false })
+    .limit(50)
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data || [])
 })
 
 module.exports = router

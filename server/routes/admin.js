@@ -14,7 +14,7 @@ router.use(requireSuperAdmin)
 // table as a JSON column when Phase 5 brings real Deal Link tiers.
 const PLANS_BY_PRODUCT = {
   chg: ['starter', 'professional', 'enterprise'],
-  deallink: ['free', 'pro'],
+  deallink: ['free', 'personal', 'team'],
   'investor-portal': ['standard'],
   'contractor-portal': ['free', 'pro'],
 }
@@ -442,6 +442,11 @@ router.put('/accounts/:id', async (req, res) => {
 
 router.delete('/accounts/:id', async (req, res) => {
   try {
+    const { data: users } = await supabaseAdmin
+      .from('user_profiles').select('id').eq('account_id', req.params.id)
+    if (users && users.length > 0) {
+      return res.status(400).json({ error: `Cannot delete account — ${users.length} user(s) still exist. Remove all users first.` })
+    }
     const { error } = await supabaseAdmin.from('accounts').delete().eq('id', req.params.id)
     if (error) throw error
     res.json({ ok: true })
@@ -536,6 +541,11 @@ router.put('/users/:id', async (req, res) => {
 
 router.delete('/users/:id', async (req, res) => {
   try {
+    const { data: target } = await supabaseAdmin
+      .from('user_profiles').select('is_super_admin').eq('id', req.params.id).single()
+    if (target?.is_super_admin) {
+      return res.status(403).json({ error: 'Cannot delete a Super Admin account.' })
+    }
     await supabaseAdmin.from('user_profiles').delete().eq('id', req.params.id)
     await supabaseAdmin.auth.admin.deleteUser(req.params.id)
     res.json({ ok: true })
