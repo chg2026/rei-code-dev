@@ -356,6 +356,11 @@ footer{padding:32px 60px;border-top:1px solid rgba(160,140,100,0.2);background:v
 
 // ─── Routes (static) ───────────────────────────────────────────────────────────
 
+app.get('/join', (req, res) => {
+  const ref = req.query.ref ? `?ref=${encodeURIComponent(req.query.ref)}` : ''
+  res.redirect(302, `https://reiflywheel.doorine.com/signup${ref}`)
+})
+
 app.get('/im/:dealId', (req, res) => {
   res.redirect(301, `https://reiflywheel.doorine.com/im/${req.params.dealId}`)
 })
