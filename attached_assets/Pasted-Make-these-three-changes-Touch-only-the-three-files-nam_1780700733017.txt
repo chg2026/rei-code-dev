@@ -1,0 +1,107 @@
+Make these three changes. Touch only the three files named. Do not modify any other file.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CHANGE 1 — apps/deallink/src/pages/AdminProfile.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Remove the Market Alerts section entirely from this file:
+- Delete the line <MarketAlerts show={show} /> and the wrapping <div style={{ marginTop: 28 }}> around it
+- Delete the entire MarketAlerts function component and all its helpers: PROPERTY_TYPES constant, alertTypeLabel function, alertGeography function, alertDetails function, and the MarketAlerts function itself (everything from the "market alerts" comment block to the end of the MarketAlerts function)
+Do not touch any other part of AdminProfile.jsx.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CHANGE 2 — apps/deallink/src/pages/AdminDashboard.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Remove the DashboardInsights component and its usage:
+- Delete the entire DashboardInsights function (the one that renders ActivityCounter, ReferralTracker, ActionInbox, MarketFeed, ProfileScore)
+- Delete the <DashboardInsights /> usage in the AdminDashboard return JSX
+- Also delete these functions that are no longer needed on this page: useCountUp, ActivityCounter, ActionInbox, MarketFeed, ProfileScore, ReferralTracker
+- Keep everything else: the inventory table, filters, search, deal CRUD menu, PageHeader, EmptyState, OnboardingCard
+Do not touch any other part of AdminDashboard.jsx.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CHANGE 3 — apps/deallink/src/pages/Dashboard.jsx
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add two new sections at the bottom of the Dashboard return JSX, after the "Recent deals + Market feed" grid and before the closing </div></Layout>:
+
+Section A — Market Stats card. Add this component above the Dashboard export:
+
+function MarketStatsCard() {
+  const { state } = useStore();
+  const [stats, setStats] = React.useState(null);
+  const [copied, setCopied] = React.useState(false);
+
+  React.useEffect(() => {
+    api.get('/deallink/dashboard/stats')
+      .then(({ data }) => setStats(data || {}))
+      .catch(() => {});
+  }, []);
+
+  const totalArv = state.deals.reduce((s, d) => s + (Number(d.arv) || 0), 0);
+  const views = Number(stats?.profile_views_this_week) || 0;
+
+  function handleShare() {
+    const text = [
+      '📊 My REI Flywheel stats this week:',
+      `🏠 ${state.deals.length} active deal${state.deals.length === 1 ? '' : 's'}`,
+      `👥 ${state.buyers.length} buyer${state.buyers.length === 1 ? '' : 's'} in my network`,
+      `👁 ${views} profile view${views === 1 ? '' : 's'} this week`,
+      `💰 $${totalArv.toLocaleString()} ARV pipeline`,
+      '',
+      `See my deals → doorine.com/r/${state.profile?.handle || ''}`,
+    ].join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-xs font-medium text-[#6e6e73] uppercase tracking-wider">Market stats</p>
+          <p className="text-[#1d1d1f] text-sm mt-1">Share your activity snapshot</p>
+        </div>
+        <button
+          onClick={handleShare}
+          style={{ background: copied ? '#22a06b' : '#b8860b', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
+        >
+          {copied ? '✓ Copied!' : '📋 Copy & share'}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Deals', value: state.deals.length },
+          { label: 'Buyers', value: state.buyers.length },
+          { label: 'Views this week', value: views },
+          { label: 'ARV pipeline', value: `$${(totalArv / 1000).toFixed(0)}k` },
+        ].map(({ label, value }) => (
+          <div key={label} className="text-center p-3 rounded-lg bg-[rgba(184,134,11,0.06)] border border-[rgba(184,134,11,0.15)]">
+            <p className="text-[#1d1d1f] text-xl font-bold text-[#b8860b]">{value}</p>
+            <p className="text-[#6e6e73] text-xs mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+Section B — Market Alerts. Copy the entire MarketAlerts component and all its helpers (PROPERTY_TYPES, alertTypeLabel, alertGeography, alertDetails, MarketAlerts function) from AdminProfile.jsx into Dashboard.jsx, placing them above the Dashboard export. Then add this JSX at the bottom of the Dashboard return, after MarketStatsCard:
+
+<Card>
+  <CardHeader>
+    <CardTitle>Market Alerts</CardTitle>
+    <p className="text-[#6e6e73] text-xs">Get notified when new deals match your criteria</p>
+  </CardHeader>
+  <div className="px-5 pb-5">
+    <MarketAlerts />
+  </div>
+</Card>
+
+Note: when copying MarketAlerts from AdminProfile.jsx, change the function signature from MarketAlerts({ show }) to MarketAlerts() and replace all show(...) calls with window.alert(...) or just remove them — the Dashboard already has no toast system on this page.
+
+Add these to the Dashboard JSX in this order at the bottom:
+1. <MarketStatsCard />
+2. The Market Alerts card
+
+Confirm build passes and list any errors.
