@@ -233,6 +233,7 @@ function relTime(ts) {
 }
 
 function NotificationBell({ userId }) {
+  const nav = useNavigate();
   const [open, setOpen] = React.useState(false);
   const [count, setCount] = React.useState(0);
   const [items, setItems] = React.useState([]);
@@ -390,8 +391,25 @@ function NotificationBell({ userId }) {
                 const isRead = n.read ?? n.is_read ?? false;
                 const isPriority = ['offer_received', 'contract_deadline'].includes(n.type);
                 const cnt = n.count || 1;
+                const baseBg = isRead ? 'transparent' : isPriority ? 'rgba(52,120,246,0.10)' : 'rgba(184,134,11,0.08)';
+                const handleClick = () => {
+                  setOpen(false);
+                  switch (n.type) {
+                    case 'profile_viewed': nav('/admin/leads'); break;
+                    case 'buyer_joined': nav('/buyers'); break;
+                    case 'buyer_viewed': nav(n.metadata?.deal_id ? `/admin/deal/${n.metadata.deal_id}` : '/admin'); break;
+                    case 'offer_received': nav('/offers'); break;
+                    default: nav('/admin');
+                  }
+                };
                 return (
-                  <div key={n.id ?? i} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: isRead ? 'transparent' : isPriority ? 'rgba(52,120,246,0.10)' : 'rgba(184,134,11,0.08)' }}>
+                  <div
+                    key={n.id ?? i}
+                    onClick={handleClick}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = baseBg; }}
+                    style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: baseBg, cursor: 'pointer' }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
