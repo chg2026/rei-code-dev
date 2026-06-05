@@ -4,6 +4,7 @@ import AdminShell from '../components/AdminShell.jsx';
 import { useStore, useToast } from '../store.jsx';
 import { Kicker, Status, Tag } from '../components/UI.jsx';
 import api from '../lib/api.js';
+import NotificationBell from '../components/NotificationBell.jsx';
 
 function ReferralTracker() {
   const [referralUrl, setReferralUrl] = React.useState(null);
@@ -127,6 +128,112 @@ function ReferralTracker() {
   );
 }
 
+function NotificationsSection() {
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    api.get('/deallink/notifications')
+      .then(r => setItems(Array.isArray(r.data) ? r.data.slice(0, 5) : []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || items.length === 0) return null;
+
+  const unreadCount = items.filter(n => !n.read).length;
+  const priority = items.filter(n => ['offer_received', 'contract_deadline'].includes(n.type));
+  const activity = items.filter(n => !['offer_received', 'contract_deadline'].includes(n.type));
+
+  function relTime(ts) {
+    if (!ts) return '';
+    const diff = Math.max(0, Date.now() - new Date(ts).getTime());
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  const renderRow = (n, i) => {
+    const isPriority = ['offer_received', 'contract_deadline'].includes(n.type);
+    const cnt = n.count || 1;
+    const isRead = n.read ?? false;
+    return (
+      <div key={n.id ?? i} style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10,
+        padding: '9px 0',
+        borderBottom: '1px solid var(--line)',
+        opacity: isRead ? 0.6 : 1,
+      }}>
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4,
+          background: isRead ? 'transparent' : isPriority ? '#3478f6' : '#b8860b',
+          border: isRead ? '1.5px solid var(--line)' : 'none',
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: isRead ? 400 : 600, color: 'var(--ink)', flex: 1 }}>
+              {n.title || 'Notification'}
+            </span>
+            {cnt > 1 && (
+              <span style={{
+                background: isPriority ? 'rgba(52,120,246,0.12)' : 'rgba(184,134,11,0.12)',
+                color: isPriority ? '#3478f6' : '#b8860b',
+                fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '1px 6px',
+              }}>{cnt}</span>
+            )}
+            <span style={{ fontSize: 11, color: 'var(--mute)', flexShrink: 0 }}>{relTime(n.created_at)}</span>
+          </div>
+          {n.body && <p style={{ fontSize: 12, color: 'var(--mute)', margin: '2px 0 0' }}>{n.body}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ margin: '0 24px 20px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--card)', overflow: 'hidden' }}>
+      <div
+        onClick={() => setCollapsed(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', borderBottom: collapsed ? 'none' : '1px solid var(--line)' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Notifications</span>
+          {unreadCount > 0 && (
+            <span style={{ background: '#b8860b', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '1px 7px' }}>
+              {unreadCount} new
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 12, color: 'var(--mute)' }}>{collapsed ? 'Show ▾' : 'Hide ▴'}</span>
+      </div>
+
+      {!collapsed && (
+        <div style={{ padding: '0 16px' }}>
+          {priority.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#3478f6', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 0 2px' }}>
+                Offers & Alerts
+              </div>
+              {priority.map(renderRow)}
+            </>
+          )}
+          {activity.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 0 2px', marginTop: priority.length > 0 ? 4 : 0 }}>
+                Activity
+              </div>
+              {activity.map(renderRow)}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { state, dispatch } = useStore();
   const nav = useNavigate();
@@ -159,6 +266,7 @@ export default function AdminDashboard() {
       </div>
 
       <ReferralTracker />
+      <NotificationsSection />
 
       <div style={{ padding: '0 24px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {[['all', `All ${state.deals.length}`], ['active', `Active ${counts.active || 0}`], ['pending', `Pending ${counts.pending || 0}`], ['sold', `Sold ${counts.sold || 0}`]].map(([k, l]) => (
