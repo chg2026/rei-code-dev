@@ -1,0 +1,46 @@
+Create a new file at apps/deallink/src/pages/Demo.jsx — a fully self-contained interactive demo page. It must NOT import from store.jsx and must NOT touch localStorage. All data is hardcoded inside the file.
+
+The demo has two panels that slide horizontally:
+
+PANEL 1 — Buyer view (default):
+- Shows a hardcoded profile: handle "jrodriguez.deals", initials "JR", bio "Cash buyer specialist · Cleveland, OH · Closing 3–5 deals/month."
+- 4 hardcoded deals:
+  1. 2841 W 58th St, Cleveland 44102 — SFR, 3/2, 1240sf, Ask $89k, ARV $145k, Vacant, featured
+  2. 11204 Parkhill Dr, Garfield Heights 44125 — SFR, 4/2, 1580sf, Ask $72k, ARV $128k, Tenant MTM, new
+  3. 3312 E 131st St, Cleveland 44120 — MF 2-unit, 4/2, 2100sf, Ask $118k, ARV $195k, Vacant
+  4. 6614 Lansing Ave, Cleveland 44105 — SFR, 3/1, 980sf, Ask $54k, ARV $99k, Vacant, status pending
+- Profile page shows avatar, bio, deal count, "Join buyer list" button, featured card, filter tags (All/SFR/MF/<$100k/Vacant), cards/table toggle, deal list
+- Clicking a deal shows the deal detail view with all specs and a sticky "I'm interested →" button at the bottom
+- Clicking "I'm interested →" opens a modal form: First name, Last name, Email (required), Phone (required), Buyer type (Cash/Hard money/Agent/JV partner/Other)
+- Submitting the form triggers a smooth CSS slide transition (transform translateX, 0.55s cubic-bezier) to Panel 2
+
+PANEL 2 — Wholesaler view:
+- Shows a leads inbox table with columns: Name, Email, Phone, Type, Deal, When
+- 3 pre-seeded existing leads (Marcus Webb/Cash/demo-1, Tanya Liu/Hard money/demo-3, Devon Holt/Agent/buyer list)
+- The newly submitted lead appears at the top, highlighted with a left border and a "NEW" badge
+- A callout box says: "That buyer just landed here. Every 'I'm interested' submission shows up in this inbox — tied to the deal, with contact info ready to go."
+- A CTA card at the bottom: "Ready to start capturing your own leads? Claim your handle →" linking to /onboarding
+- A "← Buyer view" button that slides back to Panel 1
+
+SLIDING CONTAINER:
+- Outer wrapper: overflow hidden
+- Inner track: display flex, width 200vw, transition transform 0.55s cubic-bezier(0.4,0,0.2,1)
+- Each panel: width 100vw, flex-shrink 0
+- phase state: 'buyer' → translateX(0), 'leads' → translateX(-100vw)
+
+DEMO BANNER (sticky top, 44px tall, dark background #1c1c1c):
+- Left: "INTERACTIVE DEMO" label in mono font + toggle buttons "Buyer view" / "Wholesaler view" that manually switch phase
+- Right: "Claim your handle →" link to /onboarding in white button
+
+Import only from: react, react-router-dom, and ../components/UI.jsx
+Use existing CSS classes: public-page, public-frame, deal-row, featured-card, spec-row, table, row, btn, tag, kicker, modal-backdrop, modal, toast, hairline, stripe, status, avatar
+
+Then in apps/deallink/src/App.jsx:
+- Add: import Demo from './pages/Demo.jsx';
+- Add route: <Route path="/demo" element={<Demo />} />
+
+Then in apps/deallink/src/pages/Landing.jsx:
+- Change the "View example profile" Link from: to={`/p/${state.profile.handle}`}  to: to="/demo"
+- Change the "Open profile →" Link in the sample wholesaler section from: to={`/p/${state.profile.handle}`}  to: to="/demo"
+
+Only edit files inside apps/deallink/. Do not touch any other folder.

@@ -1,0 +1,106 @@
+Create a new file apps/deallink/src/components/FlipBrrrrCalc.jsx that is a fully self-contained Flip + BRRRR calculator component. It receives props: { deal, dispatch }. It saves its state to deal.imConfig.calcState via dispatch({ type: 'update_deal', id: deal.id, patch: { imConfig: { ...deal.imConfig, calcState: updated } } }).
+
+The component layout:
+- A shared ASSUMPTION PANEL on the left (or top on mobile) with inputs grouped into sections: PURCHASE, REHAB, FINANCING
+- A RESULTS PANEL on the right with a toggle between FLIP and BRRRR
+- Tabs styled the same as the rest of the Deal Analyzer (monospace kicker labels, serif numbers, var(--line) borders, var(--surface) backgrounds)
+
+═══ SHARED INPUTS (saved to calcState.shared) ═══
+PURCHASE section:
+  - purchasePrice (number, default 0) — label "Purchase price"
+  - closingCosts (number, default 0) — label "Closing costs  title, escrow, inspection"
+  - monthlyHolding (number, default 0) — label "Monthly holding costs  taxes, insurance, utilities"
+
+REHAB section:
+  - rehabCost (number, default 0) — label "Estimated rehab cost"
+  - rehabMonths (select: 0,1,2,3,4,5,6,9,12, default 3) — label "Rehab period"
+
+FINANCING section:
+  - financingType (select: 'cash'|'hard_money'|'conventional', default 'cash') — label "Financing type"
+    Options: "All cash", "Hard money", "Conventional"
+  - When financingType !== 'cash', show:
+    - loanAmount (number) — label "Loan amount"
+    - interestRate (number, %) — label "Interest rate (%/yr)"
+    - loanTermMonths (select: 6,12,18,24,36,60,120,180,360, default 12) — label "Loan term (months)"
+
+═══ FLIP INPUTS (saved to calcState.flip) ═══
+Shown in results panel when FLIP tab active, under section "A · SALE ASSUMPTIONS":
+  - arv (number, default 0) — label "After-repair value (ARV)"
+  - monthsToSell (select: 1,2,3,4,5,6,9,12, default 2) — label "Months to sell after rehab"
+  - costOfSalePct (number, %, default 7) — label "Projected cost of sale (%)"
+  - costOfSaleDollars: auto-calculated = arv * costOfSalePct/100, read-only display
+
+═══ FLIP CALCULATIONS ═══
+totalHoldMonths = rehabMonths + monthsToSell
+totalHoldingCost = monthlyHolding * totalHoldMonths
+costOfSale = arv * (costOfSalePct / 100)
+allInCostExclSale = purchasePrice + closingCosts + totalHoldingCost + rehabCost
+cashRequired = financingType === 'cash' ? allInCostExclSale : allInCostExclSale - loanAmount
+profit = arv - allInCostExclSale - costOfSale
+roi = cashRequired > 0 ? (profit / cashRequired) * 100 : 0
+roiAnnualized = totalHoldMonths > 0 ? (Math.pow(1 + roi/100, 12/totalHoldMonths) - 1) * 100 : 0
+equityMultiple = cashRequired > 0 ? (cashRequired + profit) / cashRequired : 0
+
+═══ FLIP RESULTS DISPLAY ═══
+Section "B · DEAL COSTS" — line items:
+  Purchase price | closingCosts | Holding costs (totalHoldingCost) | Rehab budget (rehabCost) | Cost of sale (costOfSale in red)
+  Bold total row: "All-in cost (excl. sale)" = allInCostExclSale | "Cash required" = cashRequired
+
+Section "C · RETURN METRICS":
+  - "Projected profit" with badge: if profit > 0 show "Strong deal ✓" in green, if profit < 0 show "Negative" in red — value in green/red
+  - "ROI on cash invested" — value as %
+  - "ROI annualized (hold-adjusted)" — value as %
+  - "Equity multiple" — value as "1.43×"
+
+═══ BRRRR INPUTS (saved to calcState.brrrr) ═══
+Shown in results panel when BRRRR tab active, under section "A · RENTAL ASSUMPTIONS":
+  - monthlyRent (number, default 0) — label "Monthly gross rent"
+  - vacancyPct (number, %, default 8) — label "Vacancy rate (%)"
+  - monthlyExpenses (number, default 0) — label "Monthly operating expenses  taxes, insurance, mgmt, repairs"
+  - refinanceLTV (number, %, default 75) — label "Refinance LTV (%)"
+  - refinanceRate (number, %, default 7) — label "Refi interest rate (%/yr)"
+  - refinanceTerm (select: 180,240,300,360, default 360) — label "Refi loan term"
+    Options: "15 years", "20 years", "25 years", "30 years"
+
+═══ BRRRR CALCULATIONS ═══
+After-repair value for refi uses shared arv input — add arv field to BRRRR section "A" (same field as FLIP arv, stored in calcState.shared.arv):
+refiLoanAmount = arv * (refinanceLTV / 100)
+monthlyRefiPayment = refiLoanAmount * (refinanceRate/100/12) / (1 - Math.pow(1 + refinanceRate/100/12, -refinanceTerm))
+effectiveRent = monthlyRent * (1 - vacancyPct/100)
+monthlyCashFlow = effectiveRent - monthlyExpenses - monthlyRefiPayment
+annualCashFlow = monthlyCashFlow * 12
+totalInitialInvestment = purchasePrice + closingCosts + rehabCost + (monthlyHolding * rehabMonths)
+cashLeftInDeal = totalInitialInvestment - refiLoanAmount
+cashOnCash = cashLeftInDeal > 0 ? (annualCashFlow / cashLeftInDeal) * 100 : 0
+equityAtPurchase = arv - refiLoanAmount
+
+═══ BRRRR RESULTS DISPLAY ═══
+Section "B · REFINANCE SUMMARY":
+  - Total invested | Refi loan amount | Cash back from refi | Cash left in deal (= cashLeftInDeal)
+
+Section "C · RENTAL RETURNS":
+  - "Monthly cash flow" — value in green if positive, red if negative
+  - "Annual cash flow" — value
+  - "Cash-on-cash return" — value as %
+  - "Equity at acquisition" — value
+
+═══ PERSISTENCE ═══
+On every input change, immediately dispatch update_deal to save calcState. Initialize from deal?.imConfig?.calcState || {}.
+
+Use helper: function fmt$(n) { return '$' + Math.round(n).toLocaleString(); }
+Use helper: function fmt%(n) { return n.toFixed(2) + '%'; }
+
+═══ STYLING ═══
+- Use the same CSS classes and CSS variables already used in DealAnalyzer.jsx (var(--line), var(--surface), var(--mute), var(--dim), .serif, .btn, .input, var(--mono))
+- Left panel: white/surface background, right panel: white background
+- Section headers in monospace uppercase, small, var(--dim) color, letter-spacing
+- Big numbers in .serif class
+- Positive numbers in green (#27ae60 or var(--ok) if defined), negative in red (#c0392b or var(--danger) if defined)
+
+═══ INTEGRATION ═══
+After creating FlipBrrrrCalc.jsx, open apps/deallink/src/pages/DealAnalyzer.jsx and:
+1. Import FlipBrrrrCalc at the top
+2. Find the tab/section system (look for how "Comps" is shown as a section)
+3. Add a "Calculator" section alongside Comps that renders <FlipBrrrrCalc deal={deal} dispatch={dispatch} />
+
+Only edit files inside apps/deallink/. Do not touch any other folder.

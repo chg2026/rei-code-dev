@@ -1,7 +1,85 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { MapPin, Home, Bed, Bath, Ruler, Users, KeyRound, ArrowLeft, ChevronRight } from 'lucide-react';
 import { PublicAPI } from '../lib/deallink-api.js';
-import { Kicker, Hairline, Stripe, Status, Modal, Field } from '../components/UI.jsx';
+import { Modal, Field } from '../components/LegacyPublicUI.jsx';
+import PhoneInput, { normalizePhone } from '../components/PhoneInput.jsx';
+
+const GOLD = '#b8860b';
+const GOLD_SOFT = 'rgba(184,134,11,0.10)';
+const GOLD_BORDER = 'rgba(184,134,11,0.25)';
+const INK = '#1d1d1f';
+const MUTE = '#6e6e73';
+const DIM = '#86868b';
+const LINE = 'rgba(0,0,0,0.08)';
+const CARD = '#ffffff';
+const BG = '#f5f5f7';
+
+function fmtUsd(n) {
+  const v = Number(n);
+  if (!v || !Number.isFinite(v)) return null;
+  return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+function typeLabel(t) {
+  return ({ SFR: 'Single Family', MF: 'Multi-Family', DUP: 'Duplex' })[t] || t || '—';
+}
+
+function StatusChip({ status }) {
+  const map = {
+    Available:  { bg: 'rgba(52,199,89,0.12)',  color: '#1a7a34', dot: '#34c759' },
+    Marketed:   { bg: 'rgba(184,134,11,0.12)', color: '#7a5500', dot: GOLD },
+    'Under Contract': { bg: 'rgba(255,149,0,0.12)', color: '#9a5500', dot: '#ff9500' },
+    Closed:     { bg: 'rgba(120,120,128,0.12)', color: '#48484a', dot: '#8e8e93' },
+  };
+  const s = map[status] || map['Available'];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px', borderRadius: 20,
+      background: s.bg, color: s.color,
+      fontSize: 11, fontWeight: 600, letterSpacing: 0.2,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+      {status || 'Available'}
+    </span>
+  );
+}
+
+function SpecCard({ icon: Icon, label, value }) {
+  if (!value || value === '—' || value === 'undefined' || value === 'null') return null;
+  return (
+    <div style={{
+      background: CARD, border: `1px solid ${LINE}`,
+      borderRadius: 12, padding: '10px 12px',
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: GOLD_SOFT, border: `1px solid ${GOLD_BORDER}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Icon size={15} color={GOLD} />
+      </div>
+      <div>
+        <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: DIM, fontFamily: 'var(--mono, monospace)' }}>{label}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginTop: 1 }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function PriceChip({ label, value, accent }) {
+  return (
+    <div style={{
+      flex: 1, background: CARD, border: `1px solid ${accent ? GOLD_BORDER : LINE}`,
+      borderRadius: 14, padding: '12px 14px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 1, color: DIM, fontFamily: 'var(--mono, monospace)' }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: accent ? GOLD : INK, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    </div>
+  );
+}
 
 export default function DealDetail() {
   const { handle, dealId } = useParams();
@@ -24,92 +102,170 @@ export default function DealDetail() {
 
   if (state.loading) {
     return (
-      <div className="public-page">
-        <div className="public-frame" style={{ textAlign: 'center', padding: 40, color: 'var(--mute)', fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: 1 }}>
-          Loading…
-        </div>
+      <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: MUTE, fontSize: 13, fontFamily: 'var(--mono, monospace)', letterSpacing: 1 }}>Loading…</div>
       </div>
     );
   }
 
   if (state.error || !state.deal) {
     return (
-      <div className="public-page"><div className="public-frame" style={{ textAlign: 'center', padding: 40 }}>
-        <Kicker>Deal not found</Kicker>
-        <Link to={`/p/${handle}`} className="btn sm" style={{ marginTop: 20 }}>Back to profile</Link>
-      </div></div>
+      <div style={{ minHeight: '100vh', background: BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div style={{ fontSize: 15, color: MUTE }}>This deal is no longer available.</div>
+        <Link to={`/p/${handle}`} style={{ fontSize: 13, color: GOLD, fontWeight: 600 }}>← Back to profile</Link>
+      </div>
     );
   }
 
   const d = state.deal;
-  const rows = [
-    ['Address', d.addr],
-    ['City / ZIP', `${d.city} ${d.zip}`],
-    ['Type', typeLabel(d.type)],
-    ['Units', `${d.units}`],
-    ['Beds / Baths', `${d.beds} / ${d.baths}`],
-    ['Sqft', Number(d.sqft).toLocaleString()],
-    ['Occupancy', d.occ],
-    ['Access', d.access],
-    ['Asking', `$${Number(d.ask).toLocaleString()},000`],
-    ['ARV', `$${Number(d.arv).toLocaleString()},000`],
-    ['Spread', `$${Number(d.arv - d.ask).toLocaleString()},000`],
-  ];
+  const allPhotos = Array.isArray(d.photos) && d.photos.length ? d.photos : (d.photoUrl ? [d.photoUrl] : []);
+  const heroPhoto = allPhotos[0] || null;
+  const galleryPhotos = allPhotos.slice(1);
+  const spread = Number(d.arv || 0) - Number(d.ask || 0);
+  const showArv = Number(d.arv) > 0;
+  const showSpread = showArv && Number(d.ask) > 0;
 
   return (
-    <div className="public-page" style={{ paddingBottom: 96 }}>
-      <div className="public-frame">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Link to={`/p/${handle}`} style={{ fontSize: 12, color: 'var(--mute)' }}>← {state.profile?.handle || handle}</Link>
-          <Status kind={d.status} />
-        </div>
+    <div style={{ minHeight: '100vh', background: BG, paddingBottom: 100 }}>
 
-        <Kicker>Deal · #{String(d.id || '').slice(0, 8).toUpperCase()}</Kicker>
-        <div className="serif" style={{ fontSize: 22, marginTop: 6, lineHeight: 1.2 }}>{d.addr}</div>
-
-        <Hairline style={{ margin: '18px 0 0' }} />
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderTop: 'none' }}>
-          {rows.map(([l, v]) => (
-            <div key={l} className="spec-row">
-              <span className="l">{l}</span>
-              <span className="v">{v}</span>
-            </div>
-          ))}
-        </div>
-
-        {d.notes && (
-          <div style={{ marginTop: 18 }}>
-            <Kicker>Notes</Kicker>
-            <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, color: 'var(--mute)' }}>{d.notes}</div>
-          </div>
+      {/* Hero */}
+      <div style={{
+        position: 'relative', width: '100%',
+        aspectRatio: heroPhoto ? '16/7' : '16/5',
+        background: heroPhoto ? '#1d1d1f' : `linear-gradient(135deg, ${GOLD_SOFT}, ${BG})`,
+        overflow: 'hidden',
+      }}>
+        {heroPhoto && (
+          <img src={heroPhoto} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.75 }} />
         )}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)' }} />
 
-        <div style={{ marginTop: 18 }}>
-          <Kicker>Photos · placeholder</Kicker>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 8 }}>
-            {[0, 1, 2, 3].map((i) => <Stripe key={i} height={70} />)}
+        {/* Back link */}
+        <Link to={`/p/${handle}`} style={{
+          position: 'absolute', top: 16, left: 16,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          color: heroPhoto ? 'rgba(255,255,255,0.85)' : MUTE,
+          fontSize: 13, fontWeight: 500, textDecoration: 'none',
+          background: heroPhoto ? 'rgba(0,0,0,0.25)' : 'transparent',
+          backdropFilter: heroPhoto ? 'blur(8px)' : 'none',
+          padding: '6px 10px', borderRadius: 20,
+        }}>
+          <ArrowLeft size={13} /> {state.profile?.handle || handle}
+        </Link>
+
+        {/* Address overlay */}
+        <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <StatusChip status={d.status} />
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--mono, monospace)' }}>
+              #{String(d.id || '').slice(0, 8).toUpperCase()}
+            </span>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', lineHeight: 1.2, letterSpacing: -0.5 }}>{d.addr || 'Untitled deal'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 5, color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+            <MapPin size={12} />
+            <span>{[d.city, d.state, d.zip].filter(Boolean).join(', ') || '—'}</span>
           </div>
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '14px 20px 18px', borderTop: '1px solid var(--line)', background: 'var(--bg)', display: 'flex', justifyContent: 'center' }}>
+      {/* Content */}
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 16px' }}>
+
+        {/* Price strip */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <PriceChip label="Asking" value={fmtUsd(d.ask) || '—'} accent />
+          {showArv && <PriceChip label="ARV" value={fmtUsd(d.arv)} />}
+          {showSpread && <PriceChip label="Spread" value={fmtUsd(spread)} />}
+        </div>
+
+        {/* Specs */}
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: DIM, fontFamily: 'var(--mono, monospace)', fontWeight: 600, marginBottom: 10 }}>Property details</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <SpecCard icon={Home}      label="Type"       value={typeLabel(d.type)} />
+            <SpecCard icon={Users}     label="Units"      value={d.units ? `${d.units}` : null} />
+            <SpecCard icon={Bed}       label="Beds"       value={d.beds ? `${d.beds}` : null} />
+            <SpecCard icon={Bath}      label="Baths"      value={d.baths ? `${d.baths}` : null} />
+            <SpecCard icon={Ruler}     label="Sqft"       value={d.sqft ? Number(d.sqft).toLocaleString() : null} />
+            <SpecCard icon={KeyRound}  label="Access"     value={d.access} />
+          </div>
+        </div>
+
+        {/* Notes */}
+        {d.notes && (
+          <div style={{ marginTop: 20, background: CARD, border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: DIM, fontFamily: 'var(--mono, monospace)', fontWeight: 600, marginBottom: 8 }}>Notes</div>
+            <div style={{ fontSize: 13, color: MUTE, lineHeight: 1.65 }}>{d.notes}</div>
+          </div>
+        )}
+
+        {/* Gallery (additional photos) */}
+        {galleryPhotos.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: DIM, fontFamily: 'var(--mono, monospace)', fontWeight: 600, marginBottom: 10 }}>Photos</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {galleryPhotos.slice(0, 6).map((url, i) => (
+                <div key={i} style={{ aspectRatio: '1/1', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Wholesaler card */}
+        {state.profile && (
+          <div style={{ marginTop: 20, background: CARD, border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            {state.profile.avatarUrl
+              ? <img src={state.profile.avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${LINE}`, flexShrink: 0 }} />
+              : <div style={{ width: 40, height: 40, borderRadius: '50%', background: GOLD_SOFT, border: `1px solid ${GOLD_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, color: GOLD, fontSize: 14 }}>
+                  {(state.profile.handle || '?').slice(0, 2).toUpperCase()}
+                </div>
+            }
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{state.profile.handle}</div>
+              {state.profile.bio && <div style={{ fontSize: 12, color: MUTE, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{state.profile.bio}</div>}
+            </div>
+            <ChevronRight size={16} color={DIM} />
+          </div>
+        )}
+      </div>
+
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        padding: '12px 16px 24px',
+        background: 'rgba(245,245,247,0.85)', backdropFilter: 'blur(12px)',
+        borderTop: `1px solid ${LINE}`,
+      }}>
         <button
           onClick={() => setOpen(true)}
-          disabled={d.status === 'sold'}
-          style={{ width: '100%', maxWidth: 420, background: 'var(--ink)', color: 'var(--bg)', border: 'none', borderRadius: 14, padding: '16px 20px', fontFamily: 'var(--sans)', fontSize: 15, fontWeight: 600, letterSpacing: -0.1, cursor: d.status === 'sold' ? 'not-allowed' : 'pointer', opacity: d.status === 'sold' ? 0.5 : 1 }}
+          disabled={d.status === 'Closed'}
+          style={{
+            width: '100%', maxWidth: 480, display: 'block', margin: '0 auto',
+            background: d.status === 'Closed' ? DIM : INK,
+            color: '#fff', border: 'none', borderRadius: 14,
+            padding: '15px 20px', fontSize: 15, fontWeight: 600,
+            letterSpacing: -0.1, cursor: d.status === 'Closed' ? 'not-allowed' : 'pointer',
+            opacity: d.status === 'Closed' ? 0.6 : 1,
+            fontFamily: 'var(--sans, sans-serif)',
+          }}
         >
-          {d.status === 'sold' ? 'This deal has been sold' : "I'm interested"}
+          {d.status === 'Closed' ? 'This deal has been sold' : "I'm interested"}
         </button>
       </div>
 
       {open && <LeadModal handle={handle} deal={d} onClose={() => setOpen(false)} onSubmitted={() => { setOpen(false); showToast("Request sent — they'll be in touch."); }} />}
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+          background: INK, color: '#fff', padding: '10px 18px', borderRadius: 20,
+          fontSize: 13, fontWeight: 500, pointerEvents: 'none', zIndex: 999,
+        }}>{toast}</div>
+      )}
     </div>
   );
-}
-
-function typeLabel(t) {
-  return ({ SFR: 'Single Family', MF: 'Multi-Family', DUP: 'Duplex' })[t] || t;
 }
 
 function LeadModal({ handle, deal, onClose, onSubmitted }) {
@@ -127,7 +283,7 @@ function LeadModal({ handle, deal, onClose, onSubmitted }) {
     setSubmitting(true);
     setError(null);
     try {
-      await PublicAPI.submitLead(handle, { first, last, email, phone, buyerType, dealId: deal.id, kind: 'deal-interest' });
+      await PublicAPI.submitLead(handle, { first, last, email, phone: normalizePhone(phone), buyerType, dealId: deal.id, kind: 'deal-interest' });
       onSubmitted();
     } catch (err) {
       setError(err?.message || 'Failed to submit.');
@@ -138,16 +294,18 @@ function LeadModal({ handle, deal, onClose, onSubmitted }) {
 
   return (
     <Modal onClose={onClose}>
-      <Kicker>Interested in</Kicker>
-      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{deal.addr}</div>
-      <div style={{ fontSize: 11, color: 'var(--mute)', marginTop: 2, fontFamily: 'var(--mono)' }}>${deal.ask}k / ${deal.arv}k ARV</div>
+      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>Interested in</div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 4, color: 'var(--ink)' }}>{deal.addr}</div>
+      <div style={{ fontSize: 12, color: 'var(--mute)', marginTop: 2, fontFamily: 'var(--mono)' }}>
+        ${Number(deal.ask || 0).toLocaleString()}{Number(deal.arv) > 0 ? ` · $${Number(deal.arv).toLocaleString()} ARV` : ''}
+      </div>
       <form onSubmit={submit} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Field label="First name"><input value={first} onChange={(e) => setFirst(e.target.value)} required autoFocus /></Field>
           <Field label="Last name"><input value={last} onChange={(e) => setLast(e.target.value)} /></Field>
         </div>
         <Field label="Email"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
-        <Field label="Phone"><input value={phone} onChange={(e) => setPhone(e.target.value)} required /></Field>
+        <Field label="Phone"><PhoneInput value={phone} onChange={setPhone} required /></Field>
         <Field label="Buyer type">
           <select value={buyerType} onChange={(e) => setBuyerType(e.target.value)}>
             <option>Cash</option>
@@ -158,7 +316,9 @@ function LeadModal({ handle, deal, onClose, onSubmitted }) {
           </select>
         </Field>
         {error && <div style={{ fontSize: 12, color: 'var(--err)' }}>{error}</div>}
-        <button className="btn solid full" type="submit" disabled={submitting} style={{ marginTop: 8, padding: '14px', borderRadius: 14, fontSize: 14 }}>{submitting ? 'Sending…' : 'Send request'}</button>
+        <button className="btn solid full" type="submit" disabled={submitting} style={{ marginTop: 8, padding: '14px', borderRadius: 14, fontSize: 14 }}>
+          {submitting ? 'Sending…' : 'Send request'}
+        </button>
         <div style={{ fontSize: 10, color: 'var(--dim)', textAlign: 'center', marginTop: 4 }}>You'll also join the weekly buyer list.</div>
       </form>
     </Modal>

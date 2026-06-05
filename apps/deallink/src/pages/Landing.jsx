@@ -1,73 +1,213 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Kicker, Hairline, Avatar } from '../components/UI.jsx';
+import './landing.css';
 
-// Public marketing page. No store/auth dependency — Landing is one of the
-// few routes a logged-out visitor can hit, so it must render with zero
-// API calls. The "View example profile" CTA is a hard-coded link; the
-// public read API will return a 404 page if no such handle exists in the
-// connected database.
-const EXAMPLE_HANDLE = 'jrodriguez.deals';
+function Arrow() {
+  return (
+    <svg className="btn__arrow" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 12h14M13 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 16V4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </svg>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5" />
+      <circle cx="17" cy="9" r="2.75" />
+      <path d="M21.5 19a4.5 4.5 0 0 0-6.2-4.16" />
+    </svg>
+  );
+}
+
+function BarChartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 21h18" />
+      <rect x="5" y="12" width="3" height="7" />
+      <rect x="10.5" y="7" width="3" height="12" />
+      <rect x="16" y="3" width="3" height="16" />
+    </svg>
+  );
+}
+
+const FEATURES = [
+  { num: '01', Icon: GlobeIcon, title: 'A public profile', body: 'Avatar, handle, bio. Buyers bookmark it. You only post once.' },
+  { num: '02', Icon: UploadIcon, title: 'Bulk import deals', body: 'Drop a CSV. We auto-map columns and flag duplicates.' },
+  { num: '03', Icon: UsersIcon, title: 'Capture lead intent', body: "Buyers tap 'I'm interested.' Name, email, phone — straight to your inbox." },
+  { num: '04', Icon: BarChartIcon, title: 'Pipeline & analytics', body: "See offers, track stages, measure what's actually moving." },
+];
+
+const STEPS = [
+  { num: 'Step 01', title: 'Claim your handle', body: <>Pick a slug like <span className="mono">doorine.com/r/yourname</span>. Your profile is live in under a minute.</> },
+  { num: 'Step 02', title: 'Post inventory', body: 'Add deals one-by-one or import a CSV. Every property gets its own clean public page.' },
+  { num: 'Step 03', title: 'Send the link', body: 'SMS, email, signature, social. Buyers self-serve. Hot leads land in your pipeline.' },
+];
 
 export default function Landing() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ padding: '20px 32px', display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--line)' }}>
-        <Link to="/" style={{ fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: 1.6, textTransform: 'uppercase', fontWeight: 600 }}>DealLink</Link>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-          <Link to="/login" className="btn sm">Sign in</Link>
-          <Link to="/onboarding" className="btn sm solid">Claim your handle →</Link>
+    <div className="lp">
+      {/* NAV */}
+      <header className="nav">
+        <div className="nav__inner">
+          <Link to="/" className="wordmark">REI<span className="wordmark__accent">flywheel</span></Link>
+          <nav className="nav__links">
+            <a href="#features" className="nav__link">Features</a>
+            <a href="#how" className="nav__link">How it works</a>
+            <a href="#" className="nav__link">Pricing</a>
+            <Link to="/login" className="nav__link">Sign in</Link>
+            <Link to="/signup" className="btn btn--primary">Claim your handle <Arrow /></Link>
+          </nav>
         </div>
       </header>
 
-      <section style={{ padding: '80px 32px 60px', maxWidth: 980, margin: '0 auto', textAlign: 'center' }}>
-        <Kicker style={{ justifyContent: 'center', display: 'inline-block' }}>For real estate wholesalers</Kicker>
-        <h1 className="serif" style={{ fontSize: 'clamp(40px, 7vw, 72px)', fontWeight: 500, lineHeight: 1.05, margin: '24px 0 18px' }}>
-          One link for every deal<br />you wholesale.
-        </h1>
-        <p style={{ fontSize: 16, color: 'var(--mute)', maxWidth: 540, margin: '0 auto 32px', lineHeight: 1.6 }}>
-          Share a public profile. Post inventory once. Capture buyers — without the spreadsheet shuffle.
-        </p>
-        <div style={{ display: 'inline-flex', gap: 10 }}>
-          <Link to="/onboarding" className="btn solid">Claim your handle →</Link>
-          <Link to={`/p/${EXAMPLE_HANDLE}`} className="btn">View example profile</Link>
-        </div>
-        <div style={{ marginTop: 14, fontSize: 12, color: 'var(--dim)', fontFamily: 'var(--mono)' }}>
-          deallink.io/<u>yourname</u>
-        </div>
-      </section>
-
-      <Hairline />
-
-      <section style={{ padding: '60px 32px', maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 32 }}>
-        {[
-          ['01', 'A public profile', 'Avatar, handle, bio. Buyers bookmark it. You only post once.'],
-          ['02', 'Bulk import deals', 'Drop a CSV. We auto-map columns, flag duplicates, and validate.'],
-          ['03', 'Capture lead intent', 'Buyers tap “I’m interested.” Name, email, phone, buyer type.'],
-          ['04', 'See who’s knocking', 'A clean leads inbox tied to each deal — no Slack DMs lost.'],
-        ].map(([n, t, d]) => (
-          <div key={n}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)', letterSpacing: 1.4 }}>{n}</div>
-            <div className="serif" style={{ fontSize: 20, marginTop: 6 }}>{t}</div>
-            <div style={{ fontSize: 13, color: 'var(--mute)', marginTop: 6, lineHeight: 1.55 }}>{d}</div>
+      {/* HERO */}
+      <section className="hero">
+        <div className="container">
+          <span className="hero__eyebrow">For real estate wholesalers</span>
+          <h1 className="hero__title">One link for every<br />deal you <span className="serif">wholesale</span>.</h1>
+          <p className="hero__sub">Share a public profile. Post inventory once. Capture buyers — without the spreadsheet shuffle.</p>
+          <div className="hero__ctas">
+            <Link to="/signup" className="btn btn--primary btn--lg">Claim your handle <Arrow /></Link>
+            <Link to="/demo" className="btn btn--ghost btn--lg">View example profile</Link>
           </div>
-        ))}
-      </section>
-
-      <Hairline />
-
-      <section style={{ padding: '60px 32px', maxWidth: 980, margin: '0 auto', textAlign: 'center' }}>
-        <Kicker>Sample wholesaler</Kicker>
-        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Avatar size={64} initials="JR" />
-          <div className="serif" style={{ fontSize: 22 }}>@{EXAMPLE_HANDLE}</div>
-          <Link to={`/p/${EXAMPLE_HANDLE}`} className="btn solid sm">Open profile →</Link>
+          <div className="hero__url">doorine.com/r/<span className="slug">yourname</span></div>
         </div>
       </section>
 
-      <footer style={{ marginTop: 'auto', padding: '24px 32px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--mute)', fontFamily: 'var(--mono)' }}>
-        <span>© 2026 · BuildFlow</span>
-        <Link to="/login">Sign in</Link>
+      {/* PRODUCT PREVIEW */}
+      <section className="preview">
+        <div className="container">
+          <div className="preview__frame">
+            <div className="preview__chrome">
+              <div className="preview__dots">
+                <span className="preview__dot" />
+                <span className="preview__dot" />
+                <span className="preview__dot" />
+              </div>
+              <div className="preview__url-bar">doorine.com/r/testing25.deals</div>
+            </div>
+            <div className="preview__placeholder">Dashboard preview — screenshot coming soon</div>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="features" id="features">
+        <div className="container">
+          <div className="features__header">
+            <span className="features__eyebrow">What you get</span>
+            <h2 className="features__title">Everything a wholesaler needs to <span className="serif">close</span>, in one place.</h2>
+          </div>
+          <div className="features__grid">
+            {FEATURES.map((f) => (
+              <article className="feature" key={f.num}>
+                <div className="feature__num">{f.num}</div>
+                <div className="feature__icon"><f.Icon /></div>
+                <h3 className="feature__title">{f.title}</h3>
+                <p className="feature__body">{f.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="steps" id="how">
+        <div className="container">
+          <div className="steps__header">
+            <h2 className="steps__title">Set up <span className="serif">once</span>. Run every deal through it.</h2>
+            <p className="steps__lede">Built for solo wholesalers and small teams. No setup calls, no migrations — just a link that does the work.</p>
+          </div>
+          <div className="steps__grid">
+            {STEPS.map((s) => (
+              <article className="step" key={s.num}>
+                <div className="step__num">{s.num}</div>
+                <h3 className="step__title">{s.title}</h3>
+                <p className="step__body">{s.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA BANNER */}
+      <section className="cta">
+        <div className="container">
+          <div className="cta__inner">
+            <span className="cta__eyebrow">Get your link</span>
+            <h2 className="cta__title">Start sending <span className="serif">today</span>.</h2>
+            <p className="cta__sub">Free while you build your list. No credit card. Upgrade when you're closing.</p>
+            <div className="hero__ctas">
+              <Link to="/signup" className="btn btn--primary btn--lg">Claim your handle <Arrow /></Link>
+              <Link to="/demo" className="btn btn--ghost btn--lg">View a demo</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="container">
+          <div className="footer__top">
+            <div className="footer__col">
+              <Link to="/" className="wordmark">REI<span className="wordmark__accent">flywheel</span></Link>
+              <p className="footer__tagline">One link for every door.</p>
+            </div>
+            <div className="footer__col">
+              <h5>Product</h5>
+              <ul>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#how">How it works</a></li>
+                <li><a href="#">Pricing</a></li>
+                <li><Link to="/demo">Example profile</Link></li>
+              </ul>
+            </div>
+            <div className="footer__col">
+              <h5>Resources</h5>
+              <ul>
+                <li><a href="#">Help center</a></li>
+                <li><a href="#">Buyer guide</a></li>
+                <li><a href="#">Changelog</a></li>
+                <li><a href="#">Status</a></li>
+              </ul>
+            </div>
+            <div className="footer__col">
+              <h5>Company</h5>
+              <ul>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Contact</a></li>
+                <li><a href="#">Privacy</a></li>
+                <li><a href="#">Terms</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="footer__bottom">
+            <span>© 2026 REI Flywheel · All rights reserved.</span>
+            <Link to="/login" className="footer__signin">Sign in →</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

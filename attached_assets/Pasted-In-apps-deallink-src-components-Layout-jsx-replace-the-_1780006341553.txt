@@ -1,0 +1,13 @@
+In apps/deallink/src/components/Layout.jsx, replace the current top-right area (the avatar circle + name + sign out button) with a single clickable avatar that opens a dropdown menu. Here's exactly what I want:
+Avatar trigger: Keep the existing gold circle with initials (same size, 32px). Make it clickable — onClick toggles a menuOpen boolean state. Add cursor: pointer and a subtle gold ring on hover: box-shadow: 0 0 0 2px rgba(184,134,11,0.4). Remove the separate name text and sign out button that are currently next to it.
+Dropdown menu: When menuOpen is true, render a floating card positioned absolute top: 44px right: 0 relative to a position: relative wrapper around the avatar. Style: white background, border-radius 12px, box-shadow 0 8px 32px rgba(0,0,0,0.14), border 1px solid rgba(0,0,0,0.08), width 200px, padding 6px, z-index 1001.
+Three items in the menu:
+
+Edit profile — icon: User from lucide-react. Clicking it navigates to /settings using useNavigate.
+Onboarding guide — icon: BookOpen from lucide-react. Label: 'Onboarding guide'. Clicking it imports resetTour from ./OnboardingProgressBar.jsx — wait, resetTour is exported from OnboardingCard.jsx. Import resetTour from ./OnboardingCard.jsx. When clicked: if localStorage.getItem('rei_flywheel_tour_hidden') is set, remove it and call resetTour() so the guide restarts; otherwise set localStorage.setItem('rei_flywheel_tour_hidden', '1') and fire window.dispatchEvent(new Event('rei_tour_update')). The label should say 'Hide onboarding' if the guide is currently visible, 'Show onboarding' if hidden. Read this from a local state that checks localStorage.getItem('rei_flywheel_tour_hidden') on mount.
+Sign out — icon: LogOut from lucide-react, color red #c81e1e. Clicking it calls the existing sign-out logic: dispatch({ type: 'sign_out' }) then navigate to /.
+
+Each menu item: flex row, align-items center, gap 10px, padding 8px 12px, border-radius 8px, font-size 13px, font-weight 500, color #1d1d1f. Hover background: rgba(0,0,0,0.04). The sign out item color is #c81e1e.
+Close the menu when clicking outside: add a useEffect that listens to mousedown on document, closes the menu if the click is outside the wrapper ref. Clean up the listener on unmount.
+In OnboardingProgressBar.jsx, add a check at the top of the render: if localStorage.getItem('rei_flywheel_tour_hidden') === '1', return null. Also subscribe to rei_tour_update already handles this — just add the hidden check inside the existing refresh function so it re-reads on each update.
+Do not change any other files
