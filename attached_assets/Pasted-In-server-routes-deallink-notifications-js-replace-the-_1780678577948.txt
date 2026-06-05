@@ -1,22 +1,7 @@
-const { Router } = require('express')
-const { requireAuth } = require('../middleware/auth')
-const { supabaseAdmin } = require('../middleware/auth')
-const { getUnreadCount } = require('../services/notifications')
+In server/routes/deallink-notifications.js, replace the GET / route (the one that fetches notifications with .limit(10)) with this new version that groups notifications by type before returning them.
 
-const router = Router()
+Replace the entire GET '/' handler with:
 
-// GET /api/deallink/notifications/unread-count
-router.get('/unread-count', requireAuth, async (req, res) => {
-  try {
-    const count = await getUnreadCount(req.user.id)
-    res.json({ count })
-  } catch (err) {
-    console.error('[deallink-notifications/unread-count] Error:', err.message)
-    res.status(500).json({ error: 'Failed to fetch unread count.' })
-  }
-})
-
-// GET /api/deallink/notifications
 router.get('/', requireAuth, async (req, res) => {
   try {
     // Fetch last 200 raw notifications (enough to group meaningfully)
@@ -110,21 +95,6 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
-// POST /api/deallink/notifications/mark-all-read
-router.post('/mark-all-read', requireAuth, async (req, res) => {
-  try {
-    const { error } = await supabaseAdmin
-      .from('deallink_notifications')
-      .update({ read: true })
-      .eq('user_id', req.user.id)
-      .eq('read', false)
+Do not change any other routes in this file. Do not touch any other file. Only edit server/routes/deallink-notifications.js.
 
-    if (error) throw error
-    res.json({ ok: true })
-  } catch (err) {
-    console.error('[deallink-notifications/mark-all-read] Error:', err.message)
-    res.status(500).json({ error: 'Failed to mark notifications as read.' })
-  }
-})
-
-module.exports = router
+After making the change, show me the complete updated file so I can verify it.
