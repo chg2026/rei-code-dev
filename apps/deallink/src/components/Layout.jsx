@@ -382,33 +382,49 @@ function NotificationBell({ userId }) {
               <p style={{ color: '#86868b', fontSize: 13, padding: '18px 14px', textAlign: 'center' }}>Loading…</p>
             ) : items.length === 0 ? (
               <p style={{ color: '#86868b', fontSize: 13, padding: '18px 14px', textAlign: 'center' }}>No notifications</p>
-            ) : (
-              items.map((n, i) => {
+            ) : (() => {
+              const priority = items.filter(n => ['offer_received', 'contract_deadline'].includes(n.type));
+              const activity = items.filter(n => !['offer_received', 'contract_deadline'].includes(n.type));
+              const hasBoth = priority.length > 0 && activity.length > 0;
+              const renderItem = (n, i) => {
                 const isRead = n.read ?? n.is_read ?? false;
+                const isPriority = ['offer_received', 'contract_deadline'].includes(n.type);
+                const cnt = n.count || 1;
                 return (
-                  <div
-                    key={n.id ?? i}
-                    style={{
-                      padding: '10px 14px',
-                      borderBottom: '1px solid rgba(255,255,255,0.06)',
-                      background: isRead ? 'transparent' : 'rgba(184,134,11,0.08)',
-                    }}
-                  >
-                    <p style={{ color: '#ffffff', fontSize: 13, fontWeight: 700, margin: 0 }}>
-                      {n.title || 'Notification'}
-                    </p>
-                    {(n.body || n.message) && (
-                      <p style={{ color: '#c7c7cc', fontSize: 12, margin: '2px 0 0' }}>
-                        {n.body || n.message}
-                      </p>
-                    )}
-                    <p style={{ color: '#86868b', fontSize: 11, margin: '4px 0 0' }}>
-                      {relTime(n.created_at || n.createdAt || n.timestamp)}
-                    </p>
+                  <div key={n.id ?? i} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: isRead ? 'transparent' : isPriority ? 'rgba(52,120,246,0.10)' : 'rgba(184,134,11,0.08)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <p style={{ color: '#ffffff', fontSize: 13, fontWeight: 700, margin: 0, flex: 1 }}>{n.title || 'Notification'}</p>
+                          {cnt > 1 && (
+                            <span style={{ background: isPriority ? '#3478f6' : '#b8860b', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '1px 6px', flexShrink: 0 }}>{cnt}</span>
+                          )}
+                          {!isRead && <span style={{ width: 6, height: 6, borderRadius: '50%', background: isPriority ? '#3478f6' : '#b8860b', flexShrink: 0 }} />}
+                        </div>
+                        {(n.body || n.message) && <p style={{ color: '#c7c7cc', fontSize: 12, margin: '2px 0 0' }}>{n.body || n.message}</p>}
+                        <p style={{ color: '#86868b', fontSize: 11, margin: '4px 0 0' }}>{relTime(n.created_at || n.createdAt || n.timestamp)}</p>
+                      </div>
+                    </div>
                   </div>
                 );
-              })
-            )}
+              };
+              return (
+                <>
+                  {priority.length > 0 && (
+                    <>
+                      {hasBoth && <div style={{ padding: '5px 14px 3px', fontSize: 10, fontWeight: 700, color: '#3478f6', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(52,120,246,0.06)' }}>Offers & Alerts</div>}
+                      {priority.map(renderItem)}
+                    </>
+                  )}
+                  {activity.length > 0 && (
+                    <>
+                      {hasBoth && <div style={{ padding: '5px 14px 3px', fontSize: 10, fontWeight: 700, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.08em', borderTop: priority.length > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>Activity</div>}
+                      {activity.map(renderItem)}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
