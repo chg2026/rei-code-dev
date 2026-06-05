@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store.jsx';
 import { Avatar, Hairline } from './UI.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 export default function AdminShell({ children, tab }) {
   const { state, dispatch } = useStore();
@@ -53,6 +54,7 @@ export default function AdminShell({ children, tab }) {
             style={{ padding: '6px 10px' }}
             onClick={() => { dispatch({ type: 'sign_out' }); nav('/'); }}
           >Sign out</button>
+          <NotificationBell userId={state.profile?.id} />
           <Avatar size={28} initials={state.profile.initials} />
         </div>
       </div>
