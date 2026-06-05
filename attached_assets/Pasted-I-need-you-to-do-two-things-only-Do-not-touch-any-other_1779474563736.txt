@@ -1,0 +1,111 @@
+I need you to do two things only. Do not touch any other files or reference any plan documents.
+
+STEP 1: Create apps/deallink/src/components/FlipBrrrrCalc.jsx
+
+This is a self-contained Flip + BRRRR calculator component. Props: { deal, dispatch }.
+
+It saves state to deal.imConfig.calcState via:
+dispatch({ type: 'update_deal', id: deal.id, patch: { imConfig: { ...deal.imConfig, calcState: updated } } })
+
+Initialize state from: deal?.imConfig?.calcState || {}
+
+Use ONLY the CSS variables and classes already in use in DealAnalyzer.jsx — var(--line), var(--surface), var(--mute), var(--dim), var(--mono), .serif, .btn, .btn.solid, .btn.sm, .input. Do NOT introduce Tailwind classes, new CSS, or any external libraries. Match the existing REI Flywheel visual style exactly.
+
+Layout:
+- Left column: "Assumptions" panel with all shared + mode-specific inputs
+- Right column: results panel with a FLIP / BRRRR toggle at the top
+- On small screens stack vertically
+
+━━━ SHARED INPUTS (calcState.shared) ━━━
+All numbers start at 0. Inputs use className="input".
+
+PURCHASE (monospace section header):
+- purchasePrice — "Purchase price"
+- closingCosts — "Closing costs"
+- monthlyHolding — "Monthly holding costs"
+
+REHAB:
+- rehabCost — "Estimated rehab cost"
+- rehabMonths — select: 0,1,2,3,4,5,6,9,12 — "Rehab period (months)"
+
+FINANCING:
+- financingType — select: cash="All cash", hard_money="Hard money", conventional="Conventional"
+- If financingType !== 'cash', show: loanAmount, interestRatePct (%), loanTermMonths (select 6,12,18,24,36,60,120,180,360)
+
+ARV (used by both modes):
+- arv — "After-repair value (ARV)"
+
+━━━ FLIP MODE INPUTS (calcState.flip) ━━━
+Shown in results panel under "A · SALE ASSUMPTIONS":
+- monthsToSell — select: 1,2,3,4,5,6,9,12 — "Months to sell after rehab"
+- costOfSalePct — number, default 7 — "Cost of sale (%)"
+- costOfSaleDollars — read-only, auto = arv * costOfSalePct/100
+
+━━━ FLIP MATH ━━━
+totalHoldMonths = Number(rehabMonths) + Number(monthsToSell)
+totalHoldingCost = monthlyHolding * totalHoldMonths
+costOfSale = arv * (costOfSalePct / 100)
+allInExclSale = purchasePrice + closingCosts + totalHoldingCost + rehabCost
+cashRequired = financingType === 'cash' ? allInExclSale : allInExclSale - loanAmount
+profit = arv - allInExclSale - costOfSale
+roi = cashRequired > 0 ? (profit / cashRequired) * 100 : 0
+roiAnnualized = totalHoldMonths > 0 ? (Math.pow(1 + roi/100, 12/totalHoldMonths) - 1) * 100 : 0
+equityMultiple = cashRequired > 0 ? (cashRequired + profit) / cashRequired : 0
+
+━━━ FLIP RESULTS ━━━
+Section "B · DEAL COSTS":
+Line items: Purchase price | Closing costs | Holding costs | Rehab budget | Cost of sale (in red/var(--danger,#c0392b))
+Bold totals row: "All-in cost (excl. sale)" and "Cash required"
+
+Section "C · RETURN METRICS":
+- Projected profit — green badge "Strong deal ✓" if profit > 0, red "Negative" if < 0
+- ROI on cash invested — as XX.XX%
+- ROI annualized — as XX.XX%
+- Equity multiple — as X.XXx
+
+━━━ BRRRR MODE INPUTS (calcState.brrrr) ━━━
+Shown in results panel under "A · RENTAL ASSUMPTIONS":
+- monthlyRent — "Monthly gross rent"
+- vacancyPct — number %, default 8 — "Vacancy rate (%)"
+- monthlyExpenses — "Monthly operating expenses"
+- refinanceLTV — number %, default 75 — "Refinance LTV (%)"
+- refinanceRate — number %, default 7 — "Refi interest rate (%/yr)"
+- refinanceTerm — select: 180="15 yr", 240="20 yr", 300="25 yr", 360="30 yr"
+
+━━━ BRRRR MATH ━━━
+refiLoan = arv * (refinanceLTV / 100)
+r = refinanceRate / 100 / 12
+n = Number(refinanceTerm)
+monthlyRefiPayment = r > 0 ? refiLoan * r / (1 - Math.pow(1+r, -n)) : refiLoan / n
+effectiveRent = monthlyRent * (1 - vacancyPct / 100)
+monthlyCF = effectiveRent - monthlyExpenses - monthlyRefiPayment
+annualCF = monthlyCF * 12
+totalInvested = purchasePrice + closingCosts + rehabCost + (monthlyHolding * Number(rehabMonths))
+cashLeft = totalInvested - refiLoan
+cashOnCash = cashLeft > 0 ? (annualCF / cashLeft) * 100 : 0
+equityAtAcq = arv - refiLoan
+
+━━━ BRRRR RESULTS ━━━
+Section "B · REFINANCE SUMMARY":
+Total invested | Refi loan amount | Cash back from refi (= refiLoan) | Cash left in deal (= cashLeft)
+
+Section "C · RENTAL RETURNS":
+- Monthly cash flow — green if > 0, red if < 0
+- Annual cash flow
+- Cash-on-cash return — as XX.XX%
+- Equity at acquisition
+
+━━━ NUMBER HELPERS ━━━
+const fmt$ = n => '$' + Math.round(n).toLocaleString()
+const fmtPct = n => n.toFixed(2) + '%'
+
+━━━ PERSISTENCE ━━━
+Every time any input changes, call a saveCalc(updated) helper that dispatches update_deal with the merged imConfig. Use a single calcState object: { shared: {...}, flip: {...}, brrrr: {...} }.
+
+STEP 2: Open apps/deallink/src/pages/DealAnalyzer.jsx
+
+Find where <Comps ... /> is rendered as a section/tab. Add a second tab called "Calculator" that renders <FlipBrrrrCalc deal={deal} dispatch={dispatch} />.
+
+Import FlipBrrrrCalc at the top of DealAnalyzer.jsx.
+
+That is all. Do not touch any other file. Only edit inside apps/deallink/.

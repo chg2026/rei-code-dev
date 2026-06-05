@@ -1,0 +1,59 @@
+Two things to fix. Read each file before editing. Only touch apps/deallink/.
+
+━━━ FIX 1: Remove the "Calculator" tab from DealAnalyzer.jsx ━━━
+
+Open apps/deallink/src/pages/DealAnalyzer.jsx.
+
+1. Find the ResearchTabs component (or wherever "Comps" and "Calculator" tabs are rendered together). Remove the "Calculator" tab entirely — both the tab button and the tabpanel that renders <FlipBrrrrCalc />.
+
+2. Find the "Fix & Flip" tab/section in the Deal Analyzer. When this tab is active, replace its content area entirely with:
+   <FlipBrrrrCalc deal={deal} dispatch={dispatch} mode="flip" />
+   This should fill 100% of the available content area — no other content alongside it.
+
+3. Find the "BRRRR" tab/section in the Deal Analyzer. When this tab is active, replace its content area entirely with:
+   <FlipBrrrrCalc deal={deal} dispatch={dispatch} mode="brrrr" />
+   Same — full width, full height.
+
+━━━ FIX 2: Update FlipBrrrrCalc.jsx to pass the mode ━━━
+
+Open apps/deallink/src/components/FlipBrrrrCalc.jsx.
+
+1. Add `mode` to the props: function FlipBrrrrCalc({ deal, dispatch, mode = 'flip' })
+
+2. Pass the mode in the iframe src: src={`/deal-calc.html?mode=${mode}`}
+
+3. Also include the mode in the REI_PREFILL message:
+   frame.contentWindow.postMessage({
+     type: 'REI_PREFILL',
+     mode: mode,
+     deal: { ... }
+   }, '*');
+
+━━━ FIX 3: Strip the CHG deal header from deal-calc.html ━━━
+
+Open apps/deallink/public/deal-calc.html.
+
+1. Find and DELETE any HTML element that shows a deal address bar or deal info header (the bar showing "1847 Oak Ridge Dr — Tampa · SFR · Nicole L. · Identified" or similar). This is a CHG nav element that should not exist in the REI version.
+
+2. Find the JavaScript init block at the bottom. Add this at the very start of the init block (before any recalc calls):
+   // Read mode from URL
+   var urlMode = new URLSearchParams(window.location.search).get('mode') || 'flip';
+
+3. After reading urlMode, add logic to switch to the correct view:
+   if (urlMode === 'brrrr') {
+     // click the BRRRR tab / call switchRV('brrrr') or equivalent
+     var brrrrBtn = document.querySelector('[data-rv="brrrr"]') || document.getElementById('btn-brrrr');
+     if (brrrrBtn) brrrrBtn.click();
+   }
+
+4. In the REI_PREFILL message listener, also handle the mode switch:
+   if (e.data.mode === 'brrrr') {
+     var brrrrBtn = document.querySelector('[data-rv="brrrr"]') || document.getElementById('btn-brrrr');
+     if (brrrrBtn) brrrrBtn.click();
+   }
+
+   Look at the existing switchRV() or tab-switching function in deal-calc.html to find the exact function/button name to call — use whatever is already there.
+
+Parse-check both .jsx files after editing. Report what you find for the deal address header (exact element/line) before removing it.
+
+Only edit files inside apps/deallink/. Do not touch apps/chg-rehab/.

@@ -1,0 +1,169 @@
+I need you to do the following. Read each file before editing. Do not touch anything outside apps/deallink/.
+
+━━━ STEP 1: Copy the calculator HTML ━━━
+
+Read the full file apps/chg-rehab/public/underwriting-calc.html and create a copy at apps/deallink/public/deal-calc.html.
+
+━━━ STEP 2: Strip non-calculator sections ━━━
+
+In apps/deallink/public/deal-calc.html, remove the following entirely (markup + any JS that exclusively drives them):
+- The Pipeline screen (board/list views with deal cards)
+- The Rehab Manager screen (budget/scope/schedule tabs)
+- The Contacts screen
+- The Admin screen
+- The Scenarios tab and its screen (scenario comparison engine)
+- The Reports tab and its screen (PDF/Investor/Lender/Excel cards)
+- The top nav links for Pipeline, Rehab, Contacts, Admin, Scenarios, Reports
+- The "YOUR CALCULATORS · + Pin a calculator" row
+- The "Flip calculator 🔒 Fixed" label bar at the top of the results panel
+
+Keep ONLY:
+- The Assumption Panel (left sidebar)
+- The FLIP / BRRRR toggle
+- The full Flip results view (#rv-flip): sections A, B, C, deal structure chart, deal allocation chart, ARV sensitivity cards, Doomsday stress test chart, Live deal stress tester
+- The full BRRRR results view (#rv-brrrr): sections A, B, C, D, 5-year projection chart, DSCR snapshot, Live BRRRR stress tester
+- All math: recalcFlip(), recalcB(), calcBal(), updateStressTester(), updateBrrrStressTester()
+- The REI Flywheel pre-fill + save script at the bottom (lines 3228–3270)
+
+━━━ STEP 3: Reskin the CSS palette ━━━
+
+In the :root block, replace the CHG dark-teal color palette with REI Flywheel colors:
+
+Replace these CHG values:
+  --color-primary: (whatever the dark teal is)
+  --color-primary-dark: (darker teal)
+  --assumption-bg: (the dark panel background)
+  --assumption-text: (light text on dark panel)
+
+With REI values:
+  --color-primary: #C9973B          /* REI amber/gold */
+  --color-primary-dark: #A67C2E     /* darker amber */
+  --assumption-bg: #1C2333          /* dark slate — keeps the two-tone look but neutral not teal */
+  --assumption-text: #F5F0E8        /* warm off-white */
+  --color-positive: #22863a         /* green for profit/positive */
+  --color-negative: #c0392b         /* red for costs/negative */
+  --color-accent: #C9973B           /* amber for badges, active tabs, highlights */
+
+Also update:
+  - Any .nav-tab.active or .tab-btn.active underline/border color → #C9973B
+  - The "Strong deal ✓" badge background → light amber tint (#FFF8E7), text → #92650A
+  - The "LIVE" badge on stress testers → amber
+  - The FLIP/BRRRR toggle: active pill background → #C9973B, text → white
+  - Chart.js dataset colors for the Flip waterfall bars: keep the existing red/green/gray logic, just ensure the "Projected profit" bar uses #22863a
+
+━━━ STEP 4: Update the iframe in DealAnalyzer ━━━
+
+Open apps/deallink/src/components/FlipBrrrrCalc.jsx.
+
+Replace the entire component with this:
+
+```jsx
+import React, { useEffect, useRef } from 'react';
+
+export default function FlipBrrrrCalc({ deal, dispatch }) {
+  const iframeRef = useRef(null);
+
+  // Pre-fill the calculator when the iframe loads
+  function handleLoad() {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    try {
+      frame.contentWindow.postMessage({
+        type: 'REI_PREFILL',
+        deal: {
+          purchasePrice: deal?.purchase_price || 0,
+          rehabCost: deal?.rehab_budget || 0,
+          arv: deal?.arv || 0,
+          address: deal?.address || '',
+          calcState: deal?.imConfig?.calcState || null,
+        }
+      }, '*');
+    } catch (e) {}
+  }
+
+  // Listen for save messages from the iframe
+  useEffect(() => {
+    function handleMessage(e) {
+      if (e.data?.type === 'REI_SAVE' && e.data?.calcState) {
+        dispatch({
+          type: 'update_deal',
+          id: deal.id,
+          patch: { imConfig: { ...deal.imConfig, calcState: e.data.calcState } }
+        });
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [deal, dispatch]);
+
+  return (
+    <div style={{ width: '100%', height: '100vh', minHeight: 700 }}>
+      <iframe
+        ref={iframeRef}
+        src="/deal-calc.html"
+        onLoad={handleLoad}
+        style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+        title="Deal Calculator"
+      />
+    </div>
+  );
+}
+```
+
+━━━ STEP 5: Update the pre-fill script in deal-calc.html ━━━
+
+Find the REI pre-fill script at the bottom of apps/deallink/public/deal-calc.html (the block added at lines ~3228–3270). Replace it entirely with:
+
+```html
+<script>
+// REI Flywheel ↔ Calculator bridge
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'REI_PREFILL') {
+    var d = e.data.deal || {};
+    // Restore saved state if present
+    if (d.calcState) {
+      try { restoreCalcState(d.calcState); } catch(err) {}
+    }
+    // Pre-fill assumption panel inputs
+    if (d.purchasePrice) {
+      var pp = document.getElementById('inp-purchase');
+      if (pp) { pp.value = d.purchasePrice; pp.dispatchEvent(new Event('input')); }
+    }
+    if (d.rehabCost) {
+      var rc = document.getElementById('inp-rehab');
+      if (rc) { rc.value = d.rehabCost; rc.dispatchEvent(new Event('input')); }
+    }
+    if (d.arv) {
+      var arvEl = document.getElementById('inp-arv');
+      if (arvEl) { arvEl.value = d.arv; arvEl.dispatchEvent(new Event('input')); }
+    }
+  }
+});
+
+function getCalcState() {
+  // Collect all input values from the assumption panel
+  var inputs = {};
+  document.querySelectorAll('[id^="inp-"]').forEach(function(el) {
+    inputs[el.id] = el.value;
+  });
+  return inputs;
+}
+
+function restoreCalcState(state) {
+  Object.keys(state).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.value = state[id]; el.dispatchEvent(new Event('input')); }
+  });
+}
+
+// Auto-save every 5 seconds
+setInterval(function() {
+  try {
+    window.parent.postMessage({ type: 'REI_SAVE', calcState: getCalcState() }, '*');
+  } catch(e) {}
+}, 5000);
+</script>
+```
+
+Only edit files inside apps/deallink/. Do not touch apps/chg-rehab/ after reading it.
+Parse-check both edited files when done. Report any issues.
