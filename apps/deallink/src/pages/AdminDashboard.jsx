@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminShell from '../components/AdminShell.jsx';
 import { useStore, useToast } from '../store.jsx';
-import { Kicker, Status, Tag } from '../components/UI.jsx';
+import { Kicker, Status, Tag } from '../components/ui.jsx';
 import api from '../lib/api.js';
 import NotificationBell from '../components/NotificationBell.jsx';
 
