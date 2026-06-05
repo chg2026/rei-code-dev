@@ -1,18 +1,16 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store.jsx';
+import Layout from './Layout.jsx';
 
-import NotificationBell from './NotificationBell.jsx';
-
-export default function AdminShell({ children, tab }) {
-  const { state, dispatch } = useStore();
+// Backwards-compat shim. The original AdminShell rendered its own nav; we
+// now route everything through the shared sidebar Layout. Pages that still
+// use <AdminShell> just inherit Layout's chrome.
+export default function AdminShell({ children }) {
+  const { state } = useStore();
   const loc = useLocation();
   const nav = useNavigate();
-  const current = tab || loc.pathname.split('/')[2] || 'deals';
 
-  // ProtectedRoute (one level up in App.jsx) handles auth + entitlement.
-  // If the user landed on /admin without claiming a handle yet, send them
-  // to onboarding so they don't see an empty inventory state.
   React.useEffect(() => {
     if (state.loaded && !state.profile?.handle && loc.pathname !== '/onboarding') {
       nav('/onboarding', { replace: true });
@@ -21,44 +19,12 @@ export default function AdminShell({ children, tab }) {
 
   if (!state.loaded) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--mute)', fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: 1 }}>
-        Loading…
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center py-32 text-[#6e6e73] font-mono text-xs tracking-wide">Loading…</div>
+      </Layout>
     );
   }
   if (!state.profile?.handle) return null;
 
-  const tabs = [
-    { id: 'deals', label: 'Deals', to: '/admin' },
-    { id: 'leads', label: 'Leads', to: '/admin/leads' },
-    { id: 'profile', label: 'Profile', to: '/admin/profile' },
-    { id: 'leaderboard', label: 'Leaderboard', to: '/leaderboard' },
-  ];
-
-  const profileUrl = `/p/${state.profile.handle}`;
-
-  return (
-    <div className="admin-shell">
-      <div className="admin-nav">
-        <Link to="/admin" className="brand">DealLink</Link>
-        <span style={{ display:"inline-block", width:1, height:16, background:"var(--line)", margin:"0 4px" }} />
-        <div className="tabs">
-          {tabs.map(t => (
-            <Link key={t.id} to={t.to} className={`tab${current === t.id ? ' active' : ''}`}>{t.label}</Link>
-          ))}
-        </div>
-        <div className="right">
-          <Link to={profileUrl} className="url" target="_blank" rel="noreferrer">deallink.io/{state.profile.handle} ↗</Link>
-          <button
-            className="btn sm"
-            style={{ padding: '6px 10px' }}
-            onClick={() => { dispatch({ type: 'sign_out' }); nav('/'); }}
-          >Sign out</button>
-          <NotificationBell userId={state.profile?.id} />
-          <span style={{ width:28, height:28, borderRadius:'50%', background:'#b8860b', color:'#fff', fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{state.profile.initials}</span>
-        </div>
-      </div>
-      {children}
-    </div>
-  );
+  return <Layout>{children}</Layout>;
 }
