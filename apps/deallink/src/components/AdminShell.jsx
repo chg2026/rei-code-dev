@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store.jsx';
-import { Avatar, Hairline } from './UI.jsx';
+import { Avatar, Hairline } from './ui.jsx';
 import NotificationBell from './NotificationBell.jsx';
 
 export default function AdminShell({ children, tab }) {
