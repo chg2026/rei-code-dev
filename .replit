@@ -140,3 +140,4 @@ timeoutMs = 300000
 [[deployment.rewrites]]
 from = "/*"
 to = "/index.html"
+run = ["node", "apps/doorine-landing/index.js"]
