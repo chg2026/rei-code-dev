@@ -47,7 +47,8 @@ router.get('/', requireAuth, async (req, res) => {
 
       // For groupable types, key is type + deal_id (if present)
       const dealId = row.metadata?.deal_id || null
-      const groupKey = dealId ? `${type}::${dealId}` : type
+      // buyer_joined groups by type only (not per-deal) — all joiners merge into one
+      const groupKey = (type === 'buyer_joined') ? type : (dealId ? `${type}::${dealId}` : type)
 
       if (seenGroupKeys.has(groupKey)) {
         const existing = seenGroupKeys.get(groupKey)
@@ -83,14 +84,14 @@ router.get('/', requireAuth, async (req, res) => {
       const names = item._names || []
       delete item._names
 
-      if (item.type === 'deal_viewed') {
+      if (item.type === 'buyer_viewed') {
         item.title = n === 1
           ? `Someone viewed your deal`
           : `${n} people viewed your deal`
         item.body = addr
           ? (n === 1 ? `${names[0] || 'A buyer'} viewed ${addr}` : `${addr} — ${n} views`)
           : `${n} view${n > 1 ? 's' : ''} on your listing`
-      } else if (item.type === 'new_lead') {
+      } else if (item.type === 'buyer_joined') {
         item.title = n === 1 ? `New buyer joined your list` : `${n} new buyers joined your list`
         item.body = n === 1
           ? `${names[0] || 'A buyer'} joined your buyer list`
