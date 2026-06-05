@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../store.jsx';
-import { Avatar, Hairline } from './ui.jsx';
+import { Avatar } from './ui.jsx';
 import NotificationBell from './NotificationBell.jsx';
 
 export default function AdminShell({ children, tab }) {
@@ -41,7 +41,7 @@ export default function AdminShell({ children, tab }) {
     <div className="admin-shell">
       <div className="admin-nav">
         <Link to="/admin" className="brand">DealLink</Link>
-        <Hairline vertical style={{ height: 16 }} />
+        <span style={{ display:"inline-block", width:1, height:16, background:"var(--line)", margin:"0 4px" }} />
         <div className="tabs">
           {tabs.map(t => (
             <Link key={t.id} to={t.to} className={`tab${current === t.id ? ' active' : ''}`}>{t.label}</Link>
