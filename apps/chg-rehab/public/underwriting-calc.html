@@ -3274,15 +3274,39 @@ updateSliderTrack($('slider-hold'),true);
       if (brrrrBtn && brrrrBtn.classList.contains('active')) strategy = 'brrrr';
       function raw(id) { var el = document.getElementById(id); return el ? Number((el.value||'0').replace(/,/g,'')) : 0; }
       var payload = {
-        type: 'chg-calc-save',
         strategy: strategy,
         savedAt: new Date().toISOString(),
-        inputs: { purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'), closing: raw('ap-closing'), holding: raw('ap-holding') }
+        inputs: { purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'), closing: raw('ap-closing'), holding: raw('ap-holding') },
+        results: {
+          profit: raw('f-profit') || raw('b-profit-refi'),
+          roi: document.getElementById('f-roi') ? document.getElementById('f-roi').textContent : null,
+        },
+        label: (document.querySelector('.db-name') ? document.querySelector('.db-name').textContent : 'Analysis') + ' — ' + strategy.toUpperCase() + ' — ' + new Date().toLocaleDateString()
       };
-      window.parent.postMessage(payload, '*');
-      saveBtn.textContent = '✓ Saved!';
-      saveBtn.style.background = '#1F7A4D';
-      setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2000);
+      if (window._propertyId) {
+        saveBtn.textContent = 'Saving…';
+        fetch('/api/properties/' + window._propertyId + '/underwriting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function(res) {
+          if (res.ok) {
+            saveBtn.textContent = '✓ Saved to property!';
+            saveBtn.style.background = '#1F7A4D';
+          } else {
+            saveBtn.textContent = '✗ Save failed';
+            saveBtn.style.background = '#c81e1e';
+          }
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        }).catch(function() {
+          saveBtn.textContent = '✗ Save failed';
+          saveBtn.style.background = '#c81e1e';
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        });
+      } else {
+        saveBtn.textContent = '⚠ No property selected';
+        setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2000);
+      }
     };
     document.body.appendChild(saveBtn);
   });

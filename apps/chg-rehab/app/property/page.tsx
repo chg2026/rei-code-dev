@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
 type Filter = "all" | "rehab" | "rental" | "acq" | "sold";
-type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants";
+type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants" | "analysis";
 
 type SP = { id?: string; q?: string; filter?: Filter; tab?: Tab };
 
@@ -218,6 +218,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
                 ["assets", "Asset register"],
                 ["documents", "Documents"],
                 ["tenants", "Tenants"],
+                ["analysis", "Analysis"],
               ] as [Tab, string][]
             ).map(([t, label]) => (
               <Link
@@ -245,6 +246,8 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
               <AssetsTab propertyId={selected.id} />
             ) : tab === "documents" ? (
               <DocumentsTab propertyId={selected.id} companyId={user.companyId} />
+            ) : tab === "analysis" ? (
+              <AnalysisPanel propertyId={selected.id} />
             ) : (
               <TenantsTab property={selected} companyId={user.companyId} />
             )}
@@ -891,5 +894,40 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
         );
       })}
     </>
+  );
+}
+
+async function AnalysisPanel({ propertyId }: { propertyId: string }) {
+  if (!propertyId) return <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 12 }}>Select a property to view analyses.</div>;
+  const sections = await prisma.propertyFinancialSection.findMany({
+    where: { propertyId, section: { startsWith: "underwriting_" } },
+    orderBy: { id: "desc" },
+  });
+  if (sections.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
+        No saved analyses yet. Run an analysis in Underwriting and click "Save analysis to deal."
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = d.inputs as Record<string, number> | undefined;
+        return (
+          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, padding: 16, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{String(d.label ?? s.section)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+              {inputs?.purchase ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Purchase</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.purchase).toLocaleString()}</div></div> : null}
+              {inputs?.rehab ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Rehab</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.rehab).toLocaleString()}</div></div> : null}
+              {inputs?.arv ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ARV</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.arv).toLocaleString()}</div></div> : null}
+              {d.results && (d.results as Record<string, unknown>).roi ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ROI</div><div style={{ fontSize: 13, fontWeight: 500, color: "var(--green)" }}>{String((d.results as Record<string, unknown>).roi)}</div></div> : null}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 8 }}>{String(d.savedAt ?? "").replace("T", " ").slice(0, 16)}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
