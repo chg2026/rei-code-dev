@@ -404,8 +404,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
   <span class="db-back">&#8592; Pipeline</span>
   <span class="db-sep">/</span>
   <div class="db-info">
-    <div class="db-name">1847 Oak Ridge Dr &mdash; Tampa</div>
-    <div class="db-sub">Tampa, FL 33602 &nbsp;&middot;&nbsp; SFR &nbsp;&middot;&nbsp; Nicole L. &nbsp;&middot;&nbsp; Identified</div>
+    <div class="db-name">New Analysis</div>
+    <div class="db-sub">Enter property details to begin</div>
   </div>
 </div>
 
@@ -785,7 +785,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
           </div>
 
           <div class="card rf">
-            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to 1847 Oak Ridge Dr as you work</div>
+            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to New Analysis as you work</div>
             <div class="rf-btns">
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
@@ -1193,7 +1193,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
             </div>
 
           <div class="card rf">
-            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to 1847 Oak Ridge Dr as you work</div>
+            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to New Analysis as you work</div>
             <div class="rf-btns">
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
@@ -1490,7 +1490,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
         <option value="">All stages</option><option>Identified</option><option>Offer Submitted</option><option>Under Contract</option><option>Due Diligence</option><option>Closed/Acquired</option>
       </select>
       <select id="pl-team-filter" onchange="applyPipelineFilters()" style="font-size:11px;padding:5px 10px;border-radius:20px;border:0.5px solid var(--b2);background:var(--s3);font-family:var(--font);color:var(--t2);">
-        <option value="">All team</option><option>Nicole L.</option><option>Roey G.</option>
+        <option value="">All team</option><option>—</option><option>—</option>
       </select>
     </div>
     <!-- BOARD VIEW -->
@@ -1499,7 +1499,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
         <div class="pl-col">
           <div class="pl-col-hd"><span class="pl-col-lbl">Identified</span><span class="pl-col-count">3</span></div>
           <div class="pl-col-body">
-            <div class="pl-card" onclick="openDeal('underwriting')" data-type="sfr" data-team="NL"><div class="pl-card-addr">1847 Oak Ridge Dr — Tampa</div><div class="pl-card-meta"><span class="pl-badge pl-badge-sfr">SFR</span><span class="pl-badge pl-badge-flip">Flip</span></div><div class="pl-card-price">$195,000</div><div class="pl-card-metric">Est. profit $95k</div><div class="pl-card-footer"><div class="pl-avatar">NL</div><span class="pl-days">Day 3</span></div></div>
+            <div style="padding:32px;text-align:center;color:#AEAEB2;font-size:12px;">No deals yet — add a deal from the Pipeline to begin analysis.</div>
             <div class="pl-card" onclick="openDeal('underwriting')" data-type="sfr" data-team="RG"><div class="pl-card-addr">4210 Sunview Blvd — Orlando</div><div class="pl-card-meta"><span class="pl-badge pl-badge-sfr">SFR</span><span class="pl-badge pl-badge-brrrr">BRRRR</span></div><div class="pl-card-price">$125,000</div><div class="pl-card-metric">Proj. CF +$101/mo</div><div class="pl-card-footer"><div class="pl-avatar">RG</div><span class="pl-days">Day 1</span></div></div>
             <div class="pl-card" onclick="openDeal('underwriting')" data-type="mf" data-team="NL"><div class="pl-card-addr">882 Maple St — Cleveland</div><div class="pl-card-meta"><span class="pl-badge pl-badge-mf">MF</span><span class="pl-badge pl-badge-brrrr">BRRRR</span></div><div class="pl-card-price">$220,000</div><div class="pl-card-metric">6-unit · $3,600 GSI</div><div class="pl-card-footer"><div class="pl-avatar">NL</div><span class="pl-days">Day 5</span></div></div>
           </div>
@@ -1546,7 +1546,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
           <th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);border-bottom:0.5px solid var(--b1);">Days</th>
         </tr></thead>
         <tbody>
-          <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="sfr" data-team="NL"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">1847 Oak Ridge Dr — Tampa</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-flip">Flip</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$195,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--grn-dk);">Est. profit $95k</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar">NL</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">3</td></tr>
+          <div style="padding:32px;text-align:center;color:#AEAEB2;font-size:12px;">No deals yet — add a deal from the Pipeline to begin analysis.</div>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="sfr" data-team="RG"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">4210 Sunview Blvd — Orlando</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-brrrr">BRRRR</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$125,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--grn-dk);">CF +$101/mo</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">1</td></tr>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="mf" data-team="NL"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">882 Maple St — Cleveland</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-mf">MF</span> <span class="pl-badge pl-badge-brrrr">BRRRR</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$220,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">6-unit · $3,600 GSI</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar">NL</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">5</td></tr>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;background:rgba(255,59,48,0.03);" class="pl-list-row" data-type="sfr" data-team="RG"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;color:var(--red-dk);">⚠ 312 Birch Ave — Akron</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-flip">Flip</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Offer Submitted</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$87,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--red-dk);">Counter pending</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--red-dk);">14</td></tr>
@@ -1565,7 +1565,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 <!-- ══════════════════════════════════════════ -->
 <div class="mod-screen" id="screen-rehab">
   <div class="mod-hd">
-    <div><div class="mod-hd-title">Rehab manager</div><div class="mod-hd-sub">1847 Oak Ridge Dr — Tampa &nbsp;·&nbsp; Budget vs. actual tracking · Scope · Schedule</div></div>
+    <div><div class="mod-hd-title">Rehab manager</div><div class="mod-hd-sub">New Analysis — Tampa &nbsp;·&nbsp; Budget vs. actual tracking · Scope · Schedule</div></div>
     <div style="display:flex;gap:8px;">
       <button class="mod-btn mod-btn-secondary">Export</button>
       <button class="mod-btn mod-btn-primary">+ Add line item</button>
@@ -1629,7 +1629,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div id="rm-schedule" style="display:none;">
       <div class="adm-section">
-        <div class="adm-section-hd">Project timeline — 1847 Oak Ridge Dr</div>
+        <div class="adm-section-hd">Project timeline — New Analysis</div>
         <div style="padding:14px 16px;">
           <div style="display:grid;grid-template-columns:140px 1fr;gap:0;">
             <div style="font-size:10px;font-weight:600;color:var(--t3);padding:7px 0;border-bottom:0.5px solid var(--b1);">Phase</div>
@@ -1656,7 +1656,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 <!-- ══════════════════════════════════════════ -->
 <div class="mod-screen" id="screen-property-record" style="overflow-y:auto;">
   <div class="mod-hd" style="flex-shrink:0;">
-    <div><div class="mod-hd-title">Property record</div><div class="mod-hd-sub">1847 Oak Ridge Dr — Tampa, FL 33602</div></div>
+    <div><div class="mod-hd-title">Property record</div><div class="mod-hd-sub">New Analysis — Tampa, FL 33602</div></div>
     <div style="display:flex;gap:8px;">
       <button class="mod-btn mod-btn-secondary">Edit</button>
       <button class="mod-btn mod-btn-primary">Link to deal</button>
@@ -1666,7 +1666,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="adm-section">
         <div class="adm-section-hd">Property details</div>
-        <div class="adm-row"><div><div class="adm-row-lbl">Address</div><div class="adm-row-sub">1847 Oak Ridge Dr, Tampa FL 33602</div></div></div>
+        <div class="adm-row"><div><div class="adm-row-lbl">Address</div><div class="adm-row-sub">New Analysis, Tampa FL 33602</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Property type</div><div class="adm-row-sub">Single family residential</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Beds / Baths</div><div class="adm-row-sub">3 bed / 2 bath</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Square footage</div><div class="adm-row-sub">1,420 sqft</div></div></div>
@@ -1676,7 +1676,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       <div class="adm-section">
         <div class="adm-section-hd">Linked deals</div>
         <div class="adm-row" style="cursor:pointer;" onclick="setModule('underwriting',document.getElementById('nl-underwriting'))">
-          <div><div class="adm-row-lbl">1847 Oak Ridge Dr — Flip analysis</div><div class="adm-row-sub">Underwriting · Identified · Apr 26, 2026</div></div>
+          <div><div class="adm-row-lbl">New Analysis — Flip analysis</div><div class="adm-row-sub">Underwriting · Identified · Apr 26, 2026</div></div>
           <span style="color:var(--blue);font-size:12px;">→</span>
         </div>
         <div class="adm-row" style="color:var(--t3);font-size:12px;">No other linked deals</div>
@@ -1708,8 +1708,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       <button class="pl-filter-tab" onclick="setContactFilter('contractor',this)" data-role="contractor">Contractors</button>
     </div>
     <div id="ct-list">
-      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#A8C4D0,#5B8FA8);">NL</div><div class="ct-info"><div class="ct-name">Nicole L.</div><div class="ct-role">Acquisitions Manager · CHG</div></div><div class="ct-contact">office@goldbridgerei.com</div></div>
-      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div><div class="ct-info"><div class="ct-name">Roey G.</div><div class="ct-role">CEO · CHG Software</div></div><div class="ct-contact">(216) 555-0142</div></div>
+      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#A8C4D0,#5B8FA8);">NL</div><div class="ct-info"><div class="ct-name">—</div><div class="ct-role">Acquisitions Manager · CHG</div></div><div class="ct-contact">office@goldbridgerei.com</div></div>
+      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div><div class="ct-info"><div class="ct-name">—</div><div class="ct-role">CEO · CHG Software</div></div><div class="ct-contact">(216) 555-0142</div></div>
       <div class="ct-card" data-role="lender" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#34C759,#1A6B35);">JM</div><div class="ct-info"><div class="ct-name">James Martinez</div><div class="ct-role">Hard money lender · First Capital</div></div><div class="ct-contact">james@firstcap.com</div></div>
       <div class="ct-card" data-role="agent" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF3B30,#8C1515);">SR</div><div class="ct-info"><div class="ct-name">Sarah Reynolds</div><div class="ct-role">Real estate agent · ReMax</div></div><div class="ct-contact">(813) 555-0198</div></div>
       <div class="ct-card" data-role="contractor" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#5856D6,#3634A3);">TC</div><div class="ct-info"><div class="ct-name">Tom's Construction LLC</div><div class="ct-role">General contractor</div></div><div class="ct-contact">(216) 555-0277</div></div>
@@ -1766,9 +1766,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div class="adm-section" style="margin-top:16px;">
       <div class="adm-section-hd">Pending orders</div>
-      <div class="adm-row"><div><div class="adm-row-lbl">LVP Flooring — 1,400 sqft · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Home Depot · Ordered May 1 · Est. delivery May 8</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$4,800</div><span class="rm-status rm-status-prog">In transit</span></div></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Kitchen cabinet set · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Home Depot · Ordered Apr 28 · Est. delivery May 12</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$6,200</div><span class="rm-status rm-status-pend">Pending</span></div></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Bathroom fixtures (2) · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Ferguson · Ordered Apr 30 · Est. delivery May 10</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$3,200</div><span class="rm-status rm-status-prog">In transit</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">LVP Flooring — 1,400 sqft · New Analysis</div><div class="adm-row-sub">Home Depot · Ordered May 1 · Est. delivery May 8</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$4,800</div><span class="rm-status rm-status-prog">In transit</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">Kitchen cabinet set · New Analysis</div><div class="adm-row-sub">Home Depot · Ordered Apr 28 · Est. delivery May 12</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$6,200</div><span class="rm-status rm-status-pend">Pending</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">Bathroom fixtures (2) · New Analysis</div><div class="adm-row-sub">Ferguson · Ordered Apr 30 · Est. delivery May 10</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$3,200</div><span class="rm-status rm-status-prog">In transit</span></div></div>
     </div>
   </div>
 </div>
@@ -1799,8 +1799,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div class="adm-section">
       <div class="adm-section-hd">Team management</div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Nicole L. — office@goldbridgerei.com</div><div class="adm-row-sub">Acquisitions Manager · Admin</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Roey G.</div><div class="adm-row-sub">CEO · Owner</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">— — office@goldbridgerei.com</div><div class="adm-row-sub">Acquisitions Manager · Admin</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">—</div><div class="adm-row-sub">CEO · Owner</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
       <div class="adm-row" style="cursor:pointer;"><div style="color:var(--blue);font-size:12px;font-weight:600;">+ Invite team member</div></div>
     </div>
     <div class="adm-section">
@@ -1855,7 +1855,7 @@ function applyPipelineFilters(){
     const t=card.dataset.type||'';
     const tm=card.dataset.team||'';
     const typeOk=_plFilter==='all'||((_plFilter==='sfr'&&t==='sfr')||(_plFilter==='mf'&&t==='mf')||_plFilter==='mine');
-    const teamOk=!team||(team==='Nicole L.'&&tm==='NL')||(team==='Roey G.'&&tm==='RG');
+    const teamOk=!team||(team==='—'&&tm==='NL')||(team==='—'&&tm==='RG');
     card.style.display=typeOk&&teamOk?'':'none';
   });
   // Filter list rows
@@ -1863,7 +1863,7 @@ function applyPipelineFilters(){
     const t=row.dataset.type||'';
     const tm=row.dataset.team||'';
     const typeOk=_plFilter==='all'||((_plFilter==='sfr'&&t==='sfr')||(_plFilter==='mf'&&t==='mf')||_plFilter==='mine');
-    const teamOk=!team||(team==='Nicole L.'&&tm==='NL')||(team==='Roey G.'&&tm==='RG');
+    const teamOk=!team||(team==='—'&&tm==='NL')||(team==='—'&&tm==='RG');
     row.style.display=typeOk&&teamOk?'':'none';
   });
 }
