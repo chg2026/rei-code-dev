@@ -61,19 +61,21 @@ type ProfileRow = {
 async function loadProfileInitial(
   userId: string,
   fallbackEmail: string | null,
-  role: string
+  role: string,
+  firstName?: string | null,
+  lastName?: string | null,
 ): Promise<ProfileTabInitial> {
   const admin = getSupabaseAdminClient();
   const { data } = await admin
     .from("user_profiles")
     .select("full_name, phone, email, profile_score, accounts ( name, plan_tier )")
-    .eq("email", fallbackEmail ?? "")
+    .eq("id", userId)
     .maybeSingle<ProfileRow>();
   const account = Array.isArray(data?.accounts)
     ? data?.accounts?.[0] ?? null
     : data?.accounts ?? null;
   return {
-    fullName: data?.full_name ?? "",
+    fullName: data?.full_name || [firstName, lastName].filter(Boolean).join(" ") || "",
     phone: data?.phone ?? "",
     email: data?.email ?? fallbackEmail,
     accountName: account?.name ?? null,
@@ -115,7 +117,7 @@ export default async function AccountPage({
         notifyQuietEnd: true,
       },
     }),
-    loadProfileInitial(user.id, user.email ?? null, user.role),
+    loadProfileInitial(user.id, user.email ?? null, user.role, user.firstName, user.lastName),
   ]);
 
   const companyChannels = readCompanyChannels(settings.meta);
