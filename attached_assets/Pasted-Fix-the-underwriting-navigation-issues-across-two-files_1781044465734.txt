@@ -1,0 +1,46 @@
+Fix the underwriting navigation issues across two files.
+
+─────────────────────────────────────────
+FILE 1: apps/chg-rehab/app/underwriting/UnderwritingClient.tsx
+─────────────────────────────────────────
+
+Update the iframeSrc to also pass the propertyId:
+
+FROM:
+  const iframeSrc = selected
+    ? `/underwriting-calc.html?address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}`
+    : "/underwriting-calc.html";
+
+TO:
+  const iframeSrc = selected
+    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}`
+    : "/underwriting-calc.html";
+
+─────────────────────────────────────────
+FILE 2: apps/chg-rehab/public/underwriting-calc.html
+─────────────────────────────────────────
+
+Inside the existing IIFE at the bottom of the file (the one that already reads URL params), find this line:
+
+  const params = new URLSearchParams(window.location.search);
+
+Right after reading the params, add this line to capture propertyId:
+
+  var propertyId = params.get("propertyId");
+
+Then find the two "Return to deal" buttons in the file:
+  <button class="btn-ret">Return to deal &rarr;</button>
+
+Both occurrences — add an onclick that navigates to the property page:
+  <button class="btn-ret" onclick="if(window._propertyId){window.top.location.href='/property?id='+window._propertyId;}">Return to deal &rarr;</button>
+
+Then in the IIFE, after the line `var propertyId = params.get("propertyId");`, add:
+  if (propertyId) window._propertyId = propertyId;
+
+Also fix the Scenarios tab so it highlights when active. Find this button:
+  <button class="to" onclick="showPH('scenarios')">&#8776; Scenarios</button>
+
+Replace with:
+  <button class="to" id="tab-scenarios" onclick="showPH('scenarios');document.querySelectorAll('.to').forEach(function(b){b.classList.remove('active')});this.classList.add('active');">&#8776; Scenarios</button>
+
+Do not change anything else.

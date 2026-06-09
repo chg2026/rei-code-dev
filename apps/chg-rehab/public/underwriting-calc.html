@@ -425,7 +425,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     <div class="mm-item" onclick="showPH('commercial')"><div><div>Commercial CRE</div><div class="mm-sub">Office, retail, industrial</div></div><span class="mm-tag mt-go">Open &rarr;</span></div>
   </div>
   <div class="t-sep"></div>
-  <button class="to" onclick="showPH('scenarios')">&#8776; Scenarios</button>
+  <button class="to" id="tab-scenarios" onclick="showPH('scenarios');document.querySelectorAll('.to').forEach(function(b){b.classList.remove('active')});this.classList.add('active');">&#8776; Scenarios</button>
   <button class="to" onclick="showPH('reports')">Reports</button>
 </div>
 
@@ -790,7 +790,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
               <button class="btn-save">Save</button>
-              <button class="btn-ret">Return to deal &rarr;</button>
+              <button class="btn-ret" onclick="if(window._propertyId){window.top.location.href='/property?id='+window._propertyId;}">Return to deal &rarr;</button>
               <button class="btn-ret" style="background:var(--amb);box-shadow:0 2px 8px rgba(255,159,10,0.3);" onclick="pushDealToScenarios()">Continue to scenarios &rarr;</button>
             </div>
           </div>
@@ -1198,7 +1198,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
               <button class="btn-save">Save</button>
-              <button class="btn-ret">Return to deal &rarr;</button>
+              <button class="btn-ret" onclick="if(window._propertyId){window.top.location.href='/property?id='+window._propertyId;}">Return to deal &rarr;</button>
               <button class="btn-ret" style="background:var(--amb);box-shadow:0 2px 8px rgba(255,159,10,0.3);" onclick="pushDealToScenarios()">Continue to scenarios &rarr;</button>
             </div>
           </div>
@@ -1814,6 +1814,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 <script>
 (function() {
   const params = new URLSearchParams(window.location.search);
+  var propertyId = params.get("propertyId");
+  if (propertyId) window._propertyId = propertyId;
   const address = params.get("address");
   const city = params.get("city");
   const state = params.get("state");

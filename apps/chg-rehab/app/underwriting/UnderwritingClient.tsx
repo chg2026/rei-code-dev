@@ -16,7 +16,7 @@ export default function UnderwritingClient({ properties }: { properties: Propert
   const selected = properties.find(p => p.id === selectedId);
 
   const iframeSrc = selected
-    ? `/underwriting-calc.html?address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}`
+    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}`
     : "/underwriting-calc.html";
 
   return (
