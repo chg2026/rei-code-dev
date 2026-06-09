@@ -1812,6 +1812,24 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 </div>
 
 <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const address = params.get("address");
+  const city = params.get("city");
+  const state = params.get("state");
+  const status = params.get("status");
+  if (address) {
+    window.addEventListener("DOMContentLoaded", function() {
+      const nameEl = document.querySelector(".db-name");
+      const subEl = document.querySelector(".db-sub");
+      if (nameEl) nameEl.textContent = address;
+      if (subEl) {
+        const parts = [city, state].filter(Boolean).join(", ");
+        subEl.textContent = parts ? parts + (status ? " · " + status : "") : (status || "Enter property details to begin");
+      }
+    });
+  }
+})();
 // ─── HELPERS ───
 const $=id=>document.getElementById(id);
 const pD=s=>parseFloat((s||'0').toString().replace(/[^0-9.]/g,''))||0;
