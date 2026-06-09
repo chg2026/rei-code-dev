@@ -248,7 +248,7 @@ body {
 
 /* ── MAIN CONTENT ── */
 .main-wrap { display: block; overflow: hidden; position: relative; width: 100%; flex: 1; min-height: 0; }
-.module { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; flex-direction: column; background: var(--paper); }
+.module { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: auto; flex-direction: column; background: var(--paper); }
 .module.active { display: flex; flex-direction: column; }
 
 /* ── PROJECT HEADER BAR ── */
