@@ -1831,6 +1831,27 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       }
     });
   }
+
+  var analysisId = params.get("analysisId");
+  if (analysisId && window._propertyId) {
+    fetch('/api/properties/' + window._propertyId + '/underwriting/' + analysisId)
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data || !data.inputs) return;
+        var inp = data.inputs;
+        window.addEventListener("DOMContentLoaded", function() {
+          function setVal(id, v) { var el = document.getElementById(id); if (el && v) { el.value = v; el.dispatchEvent(new Event('input',{bubbles:true})); } }
+          setVal('ap-price', inp.purchase);
+          setVal('ap-rehab', inp.rehab);
+          setVal('f-arv', inp.arv);
+          setVal('ap-closing', inp.closing);
+          setVal('ap-holding', inp.holding);
+          if (inp.downPayment) setVal('ap-down', inp.downPayment);
+          if (inp.interestRate) setVal('ap-rate', inp.interestRate);
+          setTimeout(function(){ try { recalcFlip(); recalcB(); recalc(); } catch(e){} }, 300);
+        });
+      }).catch(function(){});
+  }
 })();
 // ─── HELPERS ───
 const $=id=>document.getElementById(id);

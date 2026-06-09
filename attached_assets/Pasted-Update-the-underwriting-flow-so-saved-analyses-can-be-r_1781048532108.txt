@@ -1,0 +1,227 @@
+Update the underwriting flow so saved analyses can be reopened in the calculator.
+
+─────────────────────────────────────────
+FILE 1: apps/chg-rehab/app/underwriting/UnderwritingClient.tsx
+─────────────────────────────────────────
+
+Add support for loading a saved analysis via URL param `analysisId`.
+
+1. Update the props type to accept an optional analysisId:
+
+FROM:
+export default function UnderwritingClient({ properties }: { properties: Property[] }) {
+
+TO:
+export default function UnderwritingClient({ properties, initialAnalysisId }: { properties: Property[]; initialAnalysisId?: string | null }) {
+
+2. Update iframeSrc to include analysisId when present:
+
+FROM:
+  const iframeSrc = selected
+    ? `/underwriting-calc.html?propertyId=...`
+    : "/underwriting-calc.html";
+
+TO:
+  const iframeSrc = selected
+    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}${initialAnalysisId ? `&analysisId=${encodeURIComponent(initialAnalysisId)}` : ""}`
+    : "/underwriting-calc.html";
+
+─────────────────────────────────────────
+FILE 2: apps/chg-rehab/app/underwriting/page.tsx
+─────────────────────────────────────────
+
+Pass analysisId from search params to UnderwritingClient:
+
+FROM:
+export default async function UnderwritingPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const properties = await prisma.property.findMany({
+    where: { companyId: user.companyId },
+    select: { id: true, address: true, city: true, state: true, status: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return <UnderwritingClient properties={properties} />;
+}
+
+TO:
+export default async function UnderwritingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ analysisId?: string; propertyId?: string }>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const sp = (await searchParams) || {};
+
+  const properties = await prisma.property.findMany({
+    where: { companyId: user.companyId },
+    select: { id: true, address: true, city: true, state: true, status: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return <UnderwritingClient properties={properties} initialAnalysisId={sp.analysisId ?? null} />;
+}
+
+─────────────────────────────────────────
+FILE 3: apps/chg-rehab/public/underwriting-calc.html
+─────────────────────────────────────────
+
+In the existing IIFE that reads URL params, after the existing DOMContentLoaded block that populates .db-name and .db-sub, add code to pre-fill inputs when analysisId is present:
+
+Add after the address-populating block:
+
+  var analysisId = params.get("analysisId");
+  if (analysisId && window._propertyId) {
+    fetch('/api/properties/' + window._propertyId + '/underwriting/' + analysisId)
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (!data || !data.inputs) return;
+        var inp = data.inputs;
+        window.addEventListener("DOMContentLoaded", function() {
+          function setVal(id, v) { var el = document.getElementById(id); if (el && v) { el.value = v; el.dispatchEvent(new Event('input',{bubbles:true})); } }
+          setVal('ap-price', inp.purchase);
+          setVal('ap-rehab', inp.rehab);
+          setVal('f-arv', inp.arv);
+          setVal('ap-closing', inp.closing);
+          setVal('ap-holding', inp.holding);
+          if (inp.downPayment) setVal('ap-down', inp.downPayment);
+          if (inp.interestRate) setVal('ap-rate', inp.interestRate);
+          setTimeout(function(){ try { recalcFlip(); recalcB(); recalc(); } catch(e){} }, 300);
+        });
+      }).catch(function(){});
+  }
+
+─────────────────────────────────────────
+FILE 4: apps/chg-rehab/app/api/properties/[id]/underwriting/route.ts
+─────────────────────────────────────────
+
+Add a GET by section ID endpoint. Find the existing GET function and add a new route handler for getting a single analysis by its section ID.
+
+Add this export after the existing GET function:
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const url = new URL(req.url);
+  const sectionId = url.searchParams.get("sectionId");
+  if (!sectionId) return NextResponse.json({ error: "sectionId required" }, { status: 400 });
+
+  const section = await prisma.propertyFinancialSection.findFirst({
+    where: { id: sectionId, propertyId: id },
+  });
+  if (!section) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Verify ownership
+  const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
+  if (!property) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  await prisma.propertyFinancialSection.delete({ where: { id: sectionId } });
+  return NextResponse.json({ ok: true });
+}
+
+Also create a new route file apps/chg-rehab/app/api/properties/[id]/underwriting/[sectionId]/route.ts:
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
+  const { id, sectionId } = await params;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
+  if (!property) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const section = await prisma.propertyFinancialSection.findFirst({
+    where: { id: sectionId, propertyId: id },
+  });
+  if (!section) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  return NextResponse.json(section.data);
+}
+
+─────────────────────────────────────────
+FILE 5: apps/chg-rehab/app/property/page.tsx
+─────────────────────────────────────────
+
+In the AnalysisList component, update each analysis card to show a "View full report" link instead of trying to expand detailed metrics.
+
+Replace the AnalysisList function with:
+
+function AnalysisList({ sections, propertyId }: { sections: { id: string; section: string; data: unknown }[]; propertyId: string }) {
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = (d.inputs ?? {}) as Record<string, unknown>;
+        const results = (d.results ?? {}) as Record<string, string | null>;
+        const label = String(d.label ?? s.section);
+        const savedAt = String(d.savedAt ?? "").replace("T", " ").slice(0, 16);
+        const strategy = String(d.strategy ?? "flip").toUpperCase();
+        const fmtNum = (v: unknown) => v && Number(v) ? `$${Number(v).toLocaleString()}` : null;
+
+        return (
+          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "0.5px solid var(--border-lo)" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{label}</div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>Saved {savedAt}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E8EFF1", color: "#1F4D5C", fontWeight: 700 }}>{strategy}</span>
+                {results.dealStrength && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E4F1EA", color: "#0D4A28", fontWeight: 600 }}>{results.dealStrength}</span>}
+              </div>
+            </div>
+
+            {/* Key metrics row */}
+            <div style={{ padding: "14px 20px", display: "flex", gap: 24, flexWrap: "wrap", borderBottom: "0.5px solid var(--border-lo)" }}>
+              {[
+                { label: "Purchase", value: fmtNum(inputs.purchase) },
+                { label: "Rehab", value: fmtNum(inputs.rehab) },
+                { label: "ARV", value: fmtNum(inputs.arv) },
+                { label: "Projected profit", value: results.profit },
+                { label: "ROI on cash", value: results.roiOnCash },
+                { label: "CoC return", value: results.cocReturn },
+                { label: "Monthly cash flow", value: results.monthlyFlow },
+              ].filter(r => r.value).map(r => (
+                <div key={r.label}>
+                  <div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{r.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: r.label.includes("profit") || r.label.includes("ROI") || r.label.includes("cash flow") || r.label.includes("CoC") ? "#1F7A4D" : "var(--text-primary)" }}>{r.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div style={{ padding: "10px 20px", display: "flex", gap: 10, alignItems: "center" }}>
+              <Link
+                href={`/underwriting?propertyId=${encodeURIComponent(propertyId)}&analysisId=${encodeURIComponent(s.id)}`}
+                style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
+              >
+                Open full report →
+              </Link>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Opens in calculator — use Print for a full printable report</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+Also update AnalysisPanel to pass propertyId to AnalysisList:
+
+Find:
+  return <AnalysisList sections={sections} />;
+
+Replace with:
+  return <AnalysisList sections={sections} propertyId={propertyId} />;
+
+Do not change anything else.

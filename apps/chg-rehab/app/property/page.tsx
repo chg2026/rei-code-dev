@@ -897,118 +897,61 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
   );
 }
 
-function AnalysisList({ sections }: { sections: { id: string; section: string; data: unknown }[] }) {
+function AnalysisList({ sections, propertyId }: { sections: { id: string; section: string; data: unknown }[]; propertyId: string }) {
   return (
     <div style={{ padding: 16 }}>
       {sections.map((s) => {
         const d = s.data as Record<string, unknown>;
         const inputs = (d.inputs ?? {}) as Record<string, unknown>;
-        const costs = (d.costs ?? {}) as Record<string, string | null>;
         const results = (d.results ?? {}) as Record<string, string | null>;
-        const sensitivity = (d.sensitivity ?? {}) as Record<string, string | null>;
-        const property = (d.property ?? {}) as Record<string, string>;
         const label = String(d.label ?? s.section);
         const savedAt = String(d.savedAt ?? "").replace("T", " ").slice(0, 16);
         const strategy = String(d.strategy ?? "flip").toUpperCase();
-
-        const fmt = (v: unknown) => v ? String(v) : null;
         const fmtNum = (v: unknown) => v && Number(v) ? `$${Number(v).toLocaleString()}` : null;
 
         return (
-          <details key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
-            <summary style={{ padding: "14px 20px", cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid var(--border-lo)" }}>
+          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "0.5px solid var(--border-lo)" }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{label}</div>
                 <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>Saved {savedAt}</div>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {results.dealStrength && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E4F1EA", color: "#0D4A28", fontWeight: 600 }}>{results.dealStrength}</span>}
-                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--bg-secondary)", color: "var(--text-secondary)" }}>View report ▾</span>
-              </div>
-            </summary>
-
-            <div style={{ padding: "20px 20px 24px" }}>
-
-              {/* Strategy badge */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
                 <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E8EFF1", color: "#1F4D5C", fontWeight: 700 }}>{strategy}</span>
-                {property.sub && <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{property.sub}</span>}
+                {results.dealStrength && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E4F1EA", color: "#0D4A28", fontWeight: 600 }}>{results.dealStrength}</span>}
               </div>
-
-              {/* Inputs section */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-tertiary)", marginBottom: 10 }}>Deal Inputs</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-                  {[
-                    { label: "Purchase price", value: fmtNum(inputs.purchase) },
-                    { label: "Rehab budget", value: fmtNum(inputs.rehab) },
-                    { label: "ARV", value: fmtNum(inputs.arv) },
-                    { label: "Closing costs", value: fmtNum(inputs.closing) },
-                    { label: "Monthly holding", value: fmtNum(inputs.holding) },
-                    { label: "Down payment", value: fmtNum(inputs.downPayment) },
-                  ].filter(r => r.value).map(r => (
-                    <div key={r.label} style={{ padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: 6 }}>
-                      <div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{r.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700 }}>{r.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Cost summary */}
-              {(costs.allIn || costs.cashRequired) && (
-                <div style={{ marginBottom: 20, padding: "12px 16px", background: "#F5F4F0", borderRadius: 6, display: "flex", gap: 24, flexWrap: "wrap" }}>
-                  {costs.allIn && <div><div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>All-in cost</div><div style={{ fontSize: 14, fontWeight: 700 }}>{costs.allIn}</div></div>}
-                  {costs.cashRequired && <div><div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Cash required</div><div style={{ fontSize: 14, fontWeight: 700 }}>{costs.cashRequired}</div></div>}
-                  {costs.totalCapital && <div><div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Total capital</div><div style={{ fontSize: 14, fontWeight: 700 }}>{costs.totalCapital}</div></div>}
-                </div>
-              )}
-
-              {/* Return metrics */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-tertiary)", marginBottom: 10 }}>Return Metrics</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-                  {[
-                    { label: "Projected profit", value: fmt(results.profit), highlight: true },
-                    { label: "ROI on cash", value: fmt(results.roiOnCash), highlight: true },
-                    { label: "ROI annualized", value: fmt(results.roiAnnualized) },
-                    { label: "IRR", value: fmt(results.irr) },
-                    { label: "Monthly cash flow", value: fmt(results.monthlyFlow) },
-                    { label: "CoC return", value: fmt(results.cocReturn) },
-                    { label: "Equity multiple", value: fmt(results.equityMultiple) },
-                    { label: "NPV (8%)", value: fmt(results.npv) },
-                    { label: "Tied capital", value: fmt(results.tiedCapital) },
-                    { label: "Cash-out refi", value: fmt(results.cashOut) },
-                  ].filter(r => r.value).map(r => (
-                    <div key={r.label} style={{ padding: "10px 12px", background: r.highlight ? "#E4F1EA" : "var(--bg-secondary)", borderRadius: 6, border: r.highlight ? "0.5px solid rgba(29,158,117,0.25)" : "none" }}>
-                      <div style={{ fontSize: 9, color: r.highlight ? "#0D4A28" : "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{r.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: r.highlight ? "#1F7A4D" : "var(--text-primary)" }}>{r.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sensitivity */}
-              {(sensitivity.bear || sensitivity.base || sensitivity.bull) && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-tertiary)", marginBottom: 10 }}>ARV Sensitivity</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                    {[
-                      { label: "Bear −10%", value: sensitivity.bear, color: "#FFF1F0", border: "rgba(162,45,45,0.2)", text: "#8C1515" },
-                      { label: "Base (expected)", value: sensitivity.base, color: "#E8EFF1", border: "rgba(31,77,92,0.2)", text: "#143641" },
-                      { label: "Bull +10%", value: sensitivity.bull, color: "#E4F1EA", border: "rgba(29,158,117,0.2)", text: "#0D4A28" },
-                    ].filter(r => r.value).map(r => (
-                      <div key={r.label} style={{ padding: "12px", background: r.color, borderRadius: 6, border: `0.5px solid ${r.border}`, textAlign: "center" }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: r.text, marginBottom: 6 }}>{r.label}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: r.text }}>{r.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
             </div>
-          </details>
+
+            {/* Key metrics row */}
+            <div style={{ padding: "14px 20px", display: "flex", gap: 24, flexWrap: "wrap", borderBottom: "0.5px solid var(--border-lo)" }}>
+              {[
+                { label: "Purchase", value: fmtNum(inputs.purchase) },
+                { label: "Rehab", value: fmtNum(inputs.rehab) },
+                { label: "ARV", value: fmtNum(inputs.arv) },
+                { label: "Projected profit", value: results.profit },
+                { label: "ROI on cash", value: results.roiOnCash },
+                { label: "CoC return", value: results.cocReturn },
+                { label: "Monthly cash flow", value: results.monthlyFlow },
+              ].filter(r => r.value).map(r => (
+                <div key={r.label}>
+                  <div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{r.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: r.label.includes("profit") || r.label.includes("ROI") || r.label.includes("cash flow") || r.label.includes("CoC") ? "#1F7A4D" : "var(--text-primary)" }}>{r.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div style={{ padding: "10px 20px", display: "flex", gap: 10, alignItems: "center" }}>
+              <Link
+                href={`/underwriting?propertyId=${encodeURIComponent(propertyId)}&analysisId=${encodeURIComponent(s.id)}`}
+                style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
+              >
+                Open full report →
+              </Link>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Opens in calculator — use Print for a full printable report</span>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -1028,5 +971,5 @@ async function AnalysisPanel({ propertyId }: { propertyId: string }) {
       </div>
     );
   }
-  return <AnalysisList sections={sections} />;
+  return <AnalysisList sections={sections} propertyId={propertyId} />;
 }

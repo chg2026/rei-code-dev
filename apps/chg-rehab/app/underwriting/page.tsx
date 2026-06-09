@@ -5,9 +5,15 @@ import UnderwritingClient from "./UnderwritingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function UnderwritingPage() {
+export default async function UnderwritingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ analysisId?: string; propertyId?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+
+  const sp = (await searchParams) || {};
 
   const properties = await prisma.property.findMany({
     where: { companyId: user.companyId },
@@ -21,5 +27,5 @@ export default async function UnderwritingPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  return <UnderwritingClient properties={properties} />;
+  return <UnderwritingClient properties={properties} initialAnalysisId={sp.analysisId ?? null} initialPropertyId={sp.propertyId ?? null} />;
 }

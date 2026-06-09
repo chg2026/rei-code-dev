@@ -10,13 +10,17 @@ type Property = {
   status: string | null;
 };
 
-export default function UnderwritingClient({ properties }: { properties: Property[] }) {
-  const [selectedId, setSelectedId] = useState<string>(properties[0]?.id ?? "");
+export default function UnderwritingClient({ properties, initialAnalysisId, initialPropertyId }: { properties: Property[]; initialAnalysisId?: string | null; initialPropertyId?: string | null }) {
+  const [selectedId, setSelectedId] = useState<string>(
+    initialPropertyId && properties.some(p => p.id === initialPropertyId)
+      ? initialPropertyId
+      : (properties[0]?.id ?? "")
+  );
 
   const selected = properties.find(p => p.id === selectedId);
 
   const iframeSrc = selected
-    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}`
+    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}${initialAnalysisId ? `&analysisId=${encodeURIComponent(initialAnalysisId)}` : ""}`
     : "/underwriting-calc.html";
 
   return (
