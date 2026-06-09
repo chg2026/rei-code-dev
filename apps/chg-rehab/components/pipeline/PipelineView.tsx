@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/pipeline";
+import AddDealButton from "@/app/pipeline/AddDealButton";
 
 export type PipelineDealRow = {
   id: string;
@@ -245,10 +246,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
             onClick={() => setView("list")}
             style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", ...(view === "list" ? btnActive : btnInactive) }}
           >List</button>
-          <button
-            style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, background: "#1F4D5C", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-            onClick={() => alert("New deal setup coming in next sprint")}
-          >+ New deal</button>
+          <AddDealButton />
         </div>
       </div>
 
