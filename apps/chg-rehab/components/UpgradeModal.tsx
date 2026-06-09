@@ -93,8 +93,10 @@ export default function UpgradeModal({
         },
       );
       if (res?.upgraded) {
-        // Direct subscription upgrade succeeded (existing sub was swapped in Stripe)
-        window.location.href = successUrl;
+        // Direct subscription upgrade — don't use successUrl here.
+        // {CHECKOUT_SESSION_ID} is only replaced by Stripe during the checkout redirect flow,
+        // not during a direct subscription swap. Redirect to billing with a success flag instead.
+        window.location.href = "/billing?upgraded=true";
         return;
       }
       if (!res?.url) {
