@@ -7,40 +7,40 @@ import WorkspaceNewPill from "@/components/WorkspaceNewPill";
 type NavItem = { href: string; label: string };
 type NavSection = { label?: string; items: NavItem[] };
 
-const DASHBOARD: NavItem = { href: "/pipeline", label: "Dashboard" };
+const DASHBOARD: NavItem = { href: "/dashboard", label: "Dashboard" };
 
 const BASE_SECTIONS: NavSection[] = [
   { items: [DASHBOARD] },
+  {
+    label: "My Workspace",
+    items: [
+      { href: "/command-center", label: "Tasks & Calendar" },
+      { href: "/messages", label: "Messages" },
+    ],
+  },
   {
     label: "Deals",
     items: [
       { href: "/pipeline", label: "Pipeline" },
       { href: "/underwriting", label: "Underwriting" },
-      { href: "/property", label: "Property Record" },
-      { href: "/docs", label: "Documents Hub" },
     ],
   },
   {
-    label: "Rehab",
+    label: "Portfolio",
     items: [
+      { href: "/property", label: "Property Record" },
       { href: "/rehab", label: "Rehab Manager" },
       { href: "/warehouse", label: "Warehouse" },
-      { href: "/contractor-portal", label: "Contractor Portal" },
+      { href: "/docs", label: "Documents Hub" },
     ],
   },
   {
     label: "People",
     items: [
       { href: "/contacts", label: "Contacts" },
+      { href: "/contractor-portal", label: "Contractor Portal" },
       { href: "/investor-portal", label: "Investor Portal" },
       { href: "/settings/team", label: "Team" },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [
-      { href: "/command-center", label: "Command center" },
-      { href: "/messages", label: "Messages" },
     ],
   },
 ];
@@ -99,7 +99,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
             {section.label ? (
               <div className="nav-label">
                 {section.label}
-                {section.label === "Workspace" ? <WorkspaceNewPill /> : null}
+                {section.label === "My Workspace" ? <WorkspaceNewPill /> : null}
               </div>
             ) : null}
             {section.items.map((item) => {
