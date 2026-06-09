@@ -11,6 +11,7 @@ import NotificationBell from "@/components/NotificationBell";
 import AppSwitcher from "@/components/AppSwitcher";
 import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "CHG Platform",
@@ -19,6 +20,14 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
+  let companyName: string | null = null;
+  if (user?.companyId) {
+    const company = await prisma.company.findUnique({
+      where: { id: user.companyId },
+      select: { name: true },
+    });
+    companyName = company?.name ?? null;
+  }
 
   if (!user) {
     // Login screen owns the full viewport (no top bar).
@@ -57,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <div className="app-shell">
-          <TopNav user={user} />
+          <TopNav user={user} companyName={companyName} />
           <div className="main-col">
             <div className="topbar">
               <div className="spacer" />

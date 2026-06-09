@@ -63,7 +63,7 @@ const DashboardIcon = () => (
   </svg>
 );
 
-export default function TopNav({ user }: { user: SessionUser }) {
+export default function TopNav({ user, companyName }: { user: SessionUser; companyName?: string | null }) {
   const pathname = usePathname();
 
   // Admin section is built per-render so the Super Admin tab can be
@@ -88,8 +88,10 @@ export default function TopNav({ user }: { user: SessionUser }) {
     <>
       <aside className="sidebar">
         <Link href="/" className="brand">
-          <span className="brand-mark">CHG</span>
-          <span className="brand-sub">Rehab</span>
+          <span className="brand-mark" style={{ fontSize: companyName && companyName.length > 12 ? 16 : 26 }}>
+            {companyName || "CHG"}
+          </span>
+          <span className="brand-sub">Rehab Platform</span>
         </Link>
 
         {sections.map((section, idx) => (
