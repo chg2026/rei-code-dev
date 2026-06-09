@@ -906,7 +906,7 @@ async function AnalysisPanel({ propertyId }: { propertyId: string }) {
   if (sections.length === 0) {
     return (
       <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
-        No saved analyses yet. Run an analysis in Underwriting and click "Save analysis to deal."
+        No saved analyses yet. Run an analysis in Underwriting and click &quot;Save analysis to deal.&quot;
       </div>
     );
   }
