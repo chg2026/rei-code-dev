@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanySettings } from "@/lib/companySettings";
 import { can } from "@/lib/permissions";
+import { seedWarehouseForCompany } from "@/lib/warehouseSeed";
 import WarehouseClient from "./Client";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export default async function WarehousePage() {
   if (!user) redirect("/login");
   if (!(await can(user, "warehouse", "view"))) redirect("/");
 
-  const [departments, templates, settings, canEdit, canManage, allDeptsForManager] = await Promise.all([
+  const fetchVisibleDepts = () =>
     prisma.warehouseDepartment.findMany({
       where: { companyId: user.companyId, hidden: false },
       include: {
@@ -28,24 +29,49 @@ export default async function WarehousePage() {
         },
       },
       orderBy: [{ pinned: "desc" }, { order: "asc" }],
-    }),
+    });
+  const fetchTemplates = () =>
     prisma.warehouseTemplate.findMany({
       where: { companyId: user.companyId },
       orderBy: [{ isDefault: "desc" }, { isLocked: "desc" }, { name: "asc" }],
-    }),
-    getCompanySettings(user.companyId),
-    can(user, "warehouse", "edit"),
-    can(user, "warehouse", "admin"),
-    // All (incl. hidden) departments/subs for the Category Manager — folded
-    // into the same Promise.all to eliminate a sequential round-trip.
+    });
+  // All (incl. hidden) departments/subs for the Category Manager.
+  const fetchAllDepts = () =>
     prisma.warehouseDepartment.findMany({
       where: { companyId: user.companyId },
       include: {
         subcategories: { orderBy: [{ pinned: "desc" }, { order: "asc" }] },
       },
       orderBy: [{ pinned: "desc" }, { order: "asc" }],
-    }),
+    });
+
+  const [settings, canEdit, canManage] = await Promise.all([
+    getCompanySettings(user.companyId),
+    can(user, "warehouse", "edit"),
+    can(user, "warehouse", "admin"),
   ]);
+
+  let [departments, templates, allDeptsForManager] = await Promise.all([
+    fetchVisibleDepts(),
+    fetchTemplates(),
+    fetchAllDepts(),
+  ]);
+
+  // Self-heal: the standard warehouse catalog is the default view for every
+  // company. If a company has no departments at all (brand-new company, or
+  // data lost), seed the standard catalog once, then re-read.
+  if (allDeptsForManager.length === 0) {
+    try {
+      await seedWarehouseForCompany(prisma, user.companyId);
+      [departments, templates, allDeptsForManager] = await Promise.all([
+        fetchVisibleDepts(),
+        fetchTemplates(),
+        fetchAllDepts(),
+      ]);
+    } catch (err) {
+      console.error("[warehouse] auto-seed failed for company", user.companyId, err);
+    }
+  }
 
   const dataDepts = departments.map((d) => ({
     id: d.id,
