@@ -897,6 +897,52 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
   );
 }
 
+function AnalysisList({ sections }: { sections: { id: string; section: string; data: unknown }[] }) {
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = (d.inputs ?? {}) as Record<string, number>;
+        const results = (d.results ?? {}) as Record<string, string | null>;
+        const label = String(d.label ?? s.section);
+        const savedAt = String(d.savedAt ?? "").replace("T", " ").slice(0, 16);
+        return (
+          <details key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
+            <summary style={{ padding: "14px 16px", cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{savedAt}</div>
+              </div>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--bg-secondary)", color: "var(--text-secondary)", fontWeight: 500 }}>
+                View report ▾
+              </span>
+            </summary>
+            <div style={{ borderTop: "0.5px solid var(--border-lo)", padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Inputs</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+                {inputs.purchase ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Purchase price</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.purchase).toLocaleString()}</div></div> : null}
+                {inputs.rehab ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Rehab budget</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.rehab).toLocaleString()}</div></div> : null}
+                {inputs.arv ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ARV</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.arv).toLocaleString()}</div></div> : null}
+                {inputs.closing ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Closing costs</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.closing).toLocaleString()}</div></div> : null}
+                {inputs.holding ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Holding costs</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.holding).toLocaleString()}</div></div> : null}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Results</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+                {results.profit ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Profit</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.profit}</div></div> : null}
+                {results.roi ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ROI</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.roi}</div></div> : null}
+                {results.mao ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>MAO</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.mao}</div></div> : null}
+                {results.cashFlow ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Monthly cash flow</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.cashFlow}</div></div> : null}
+                {results.cocReturn ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>CoC return</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.cocReturn}</div></div> : null}
+                {results.dealStrength ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Deal strength</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.dealStrength}</div></div> : null}
+              </div>
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 async function AnalysisPanel({ propertyId }: { propertyId: string }) {
   if (!propertyId) return <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 12 }}>Select a property to view analyses.</div>;
   const sections = await prisma.propertyFinancialSection.findMany({
@@ -910,24 +956,5 @@ async function AnalysisPanel({ propertyId }: { propertyId: string }) {
       </div>
     );
   }
-  return (
-    <div style={{ padding: 16 }}>
-      {sections.map((s) => {
-        const d = s.data as Record<string, unknown>;
-        const inputs = d.inputs as Record<string, number> | undefined;
-        return (
-          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, padding: 16, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{String(d.label ?? s.section)}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
-              {inputs?.purchase ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Purchase</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.purchase).toLocaleString()}</div></div> : null}
-              {inputs?.rehab ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Rehab</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.rehab).toLocaleString()}</div></div> : null}
-              {inputs?.arv ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ARV</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.arv).toLocaleString()}</div></div> : null}
-              {d.results && (d.results as Record<string, unknown>).roi ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ROI</div><div style={{ fontSize: 13, fontWeight: 500, color: "var(--green)" }}>{String((d.results as Record<string, unknown>).roi)}</div></div> : null}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 8 }}>{String(d.savedAt ?? "").replace("T", " ").slice(0, 16)}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <AnalysisList sections={sections} />;
 }
