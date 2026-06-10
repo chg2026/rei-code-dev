@@ -40,7 +40,7 @@ export default function NotificationBell() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/notifications", { cache: "no-store" });
+      const r = await fetch("/api/workspace/notifications", { cache: "no-store" });
       if (!r.ok) return;
       const data = (await r.json()) as FeedResponse;
       setUnread(data.unreadCount);
@@ -74,7 +74,11 @@ export default function NotificationBell() {
 
   const markRead = async (id: string) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+      await fetch("/api/workspace/notifications", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)));
       setUnread((u) => Math.max(0, u - 1));
     } catch {
@@ -85,7 +89,11 @@ export default function NotificationBell() {
   const markAll = async () => {
     setLoading(true);
     try {
-      await fetch("/api/notifications/read-all", { method: "POST" });
+      await fetch("/api/workspace/notifications", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
       const now = new Date().toISOString();
       setItems((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: now })));
       setUnread(0);

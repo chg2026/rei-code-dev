@@ -6,8 +6,10 @@ import NotificationBell from "./NotificationBell";
 import BillingNavIndicator from "./BillingNavIndicator";
 import BillingNavBadge from "./BillingNavBadge";
 import AppSwitcher from "./AppSwitcher";
+import WorkspaceNavLinks from "./WorkspaceNavLinks";
 
-const BASE_MODULES: { href: string; label: string }[] = [
+// Modules rendered before the WORKSPACE group.
+const CORE_MODULES: { href: string; label: string }[] = [
   { href: "/pipeline", label: "Pipeline" },
   { href: "/underwriting", label: "Underwriting" },
   { href: "/rehab", label: "Rehab Manager" },
@@ -18,7 +20,6 @@ const BASE_MODULES: { href: string; label: string }[] = [
   { href: "/docs", label: "Documents Hub" },
   { href: "/contractor-portal", label: "Contractor Portal" },
   { href: "/investor-portal", label: "Investor Portal" },
-  { href: "/admin", label: "Admin Settings" },
 ];
 
 export default function TopNav({
@@ -29,12 +30,14 @@ export default function TopNav({
   companyName?: string | null;
 }) {
   const pathname = usePathname();
-  // Super Admin tab is only rendered for users with the platform-wide flag.
-  // Append after Admin Settings so the company-admin tab stays in its
-  // canonical position for non-super-admins.
-  const modules = user.isSuperAdmin
-    ? [...BASE_MODULES, { href: "/super-admin", label: "Super Admin" }]
-    : BASE_MODULES;
+  // Admin tab(s) render after the WORKSPACE group. Super Admin is only shown
+  // to users with the platform-wide flag, appended after Admin Settings.
+  const adminModules = user.isSuperAdmin
+    ? [
+        { href: "/admin", label: "Admin Settings" },
+        { href: "/super-admin", label: "Super Admin" },
+      ]
+    : [{ href: "/admin", label: "Admin Settings" }];
 
   const initials =
     [(user.firstName || "")[0], (user.lastName || "")[0]]
@@ -51,7 +54,20 @@ export default function TopNav({
         CHG <span>Rehab</span>
       </div>
       <nav className="module-nav">
-        {modules.map((m) => {
+        {CORE_MODULES.map((m) => {
+          const active = pathname === m.href || pathname.startsWith(m.href + "/");
+          return (
+            <Link
+              key={m.href}
+              href={m.href}
+              className={active ? "mnav-btn active" : "mnav-btn"}
+            >
+              {m.label}
+            </Link>
+          );
+        })}
+        <WorkspaceNavLinks />
+        {adminModules.map((m) => {
           const active = pathname === m.href || pathname.startsWith(m.href + "/");
           return (
             <Link

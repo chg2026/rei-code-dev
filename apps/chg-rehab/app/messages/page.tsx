@@ -40,6 +40,20 @@ export default function MessagesPage() {
   const [newChanName, setNewChanName] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // @ mention picker state.
+  const [mentionUsers, setMentionUsers] = useState<{ id: string; name: string; initials: string }[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/workspace/mentions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.users) setMentionUsers(d.users); })
+      .catch(() => undefined);
+  }, []);
 
   // Dismiss NEW pill.
   useEffect(() => {
@@ -122,6 +136,42 @@ export default function MessagesPage() {
     });
     await loadMessages(activeId, { incremental: true });
     loadChannels();
+  };
+
+  const mentionMatches = useMemo(() => {
+    if (!mentionOpen) return [];
+    const q = mentionQuery.toLowerCase();
+    return mentionUsers.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [mentionOpen, mentionQuery, mentionUsers]);
+
+  const onComposerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setComposer(val);
+    const caret = e.target.selectionStart ?? val.length;
+    const m = val.slice(0, caret).match(/(?:^|\s)@(\w*)$/);
+    if (m) {
+      setMentionQuery(m[1]);
+      setMentionOpen(true);
+      setMentionIndex(0);
+    } else {
+      setMentionOpen(false);
+    }
+  };
+
+  const applyMention = (u: { name: string }) => {
+    const el = composerRef.current;
+    const caret = el?.selectionStart ?? composer.length;
+    const before = composer.slice(0, caret);
+    const after = composer.slice(caret);
+    const replaced = before.replace(/(^|\s)@(\w*)$/, (_m, p1) => `${p1}@${u.name} `);
+    setComposer(replaced + after);
+    setMentionOpen(false);
+    requestAnimationFrame(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(replaced.length, replaced.length);
+      }
+    });
   };
 
   const createChannel = async () => {
@@ -229,16 +279,61 @@ export default function MessagesPage() {
                 ))}
               </div>
               <div className={s.composer}>
-                <textarea
-                  className={s.composerInput}
-                  value={composer}
-                  onChange={(e) => setComposer(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-                  }}
-                  placeholder="Type a message — Shift+Enter for newline"
-                  rows={1}
-                />
+                <div style={{ position: "relative", flex: 1, display: "flex" }}>
+                  {mentionOpen && mentionMatches.length ? (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: "100%",
+                        left: 0,
+                        marginBottom: 6,
+                        width: 240,
+                        background: "#fff",
+                        border: "1px solid var(--border-mid, #d0d4d9)",
+                        borderRadius: 6,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        zIndex: 30,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {mentionMatches.map((u, i) => (
+                        <div
+                          key={u.id}
+                          onMouseDown={(e) => { e.preventDefault(); applyMention(u); }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 10px",
+                            cursor: "pointer",
+                            background: i === mentionIndex ? "#f0f7ff" : "#fff",
+                          }}
+                        >
+                          <span className={s.avatar} style={{ width: 20, height: 20, fontSize: 9 }}>{u.initials}</span>
+                          <span style={{ fontSize: 12 }}>{u.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <textarea
+                    ref={composerRef}
+                    className={s.composerInput}
+                    style={{ width: "100%" }}
+                    value={composer}
+                    onChange={onComposerChange}
+                    onKeyDown={(e) => {
+                      if (mentionOpen && mentionMatches.length) {
+                        if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((idx) => (idx + 1) % mentionMatches.length); return; }
+                        if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((idx) => (idx - 1 + mentionMatches.length) % mentionMatches.length); return; }
+                        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); applyMention(mentionMatches[mentionIndex]); return; }
+                        if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+                    }}
+                    placeholder="Type a message — @ to mention, Shift+Enter for newline"
+                    rows={1}
+                  />
+                </div>
                 <button
                   type="button"
                   className={`${s.btn} ${s.ghost}`}

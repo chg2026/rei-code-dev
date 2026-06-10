@@ -14,8 +14,13 @@ export async function GET() {
 
   const now = new Date();
   const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  // A pipeline deal is "stuck" when it is still open (not closed) and has not
+  // been touched in 14+ days; 30+ days idle is treated as urgent.
+  const STUCK_MS = 14 * 24 * 60 * 60 * 1000;
+  const URGENT_STUCK_MS = 30 * 24 * 60 * 60 * 1000;
+  const stuckBefore = new Date(now.getTime() - STUCK_MS);
 
-  const [expDocs, overdueTasks, manual] = await Promise.all([
+  const [expDocs, overdueTasks, manual, stuckDeals] = await Promise.all([
     prisma.document.findMany({
       where: {
         companyId: user.companyId,
@@ -35,6 +40,11 @@ export async function GET() {
       orderBy: { remindAt: "asc" },
       take: 50,
     }),
+    prisma.pipelineDeal.findMany({
+      where: { companyId: user.companyId, closedAt: null, updatedAt: { lt: stuckBefore } },
+      orderBy: { updatedAt: "asc" },
+      take: 50,
+    }),
   ]);
 
   type Item = {
@@ -44,7 +54,7 @@ export async function GET() {
     link: string | null;
     when: string | null;
     urgent: boolean;
-    kind: "doc" | "task" | "manual";
+    kind: "doc" | "task" | "manual" | "deal";
   };
   const items: Item[] = [];
   for (const d of expDocs) {
@@ -79,6 +89,18 @@ export async function GET() {
       when: r.remindAt?.toISOString() ?? null,
       urgent: r.urgent,
       kind: "manual",
+    });
+  }
+  for (const d of stuckDeals) {
+    const days = Math.floor((now.getTime() - d.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
+    items.push({
+      id: `deal:${d.id}`,
+      title: `Stuck deal: ${d.address} — no movement in ${days} days`,
+      source: `Pipeline · ${d.stage}`,
+      link: "/pipeline",
+      when: d.updatedAt.toISOString(),
+      urgent: now.getTime() - d.updatedAt.getTime() >= URGENT_STUCK_MS,
+      kind: "deal",
     });
   }
   items.sort((a, b) => (a.when ?? "9999").localeCompare(b.when ?? "9999"));
