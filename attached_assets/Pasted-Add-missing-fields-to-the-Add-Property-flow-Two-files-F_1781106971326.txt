@@ -1,0 +1,84 @@
+Add missing fields to the Add Property flow. Two files.
+
+FILE 1: apps/chg-rehab/app/api/properties/route.ts
+In the POST handler, after reading purchasePrice, add:
+
+  const propertyType = String(body.propertyType || "").trim() || null;
+  const beds = body.beds != null && body.beds !== "" ? Number(body.beds) : null;
+  const baths = body.baths != null && body.baths !== "" ? Number(body.baths) : null;
+  const sqft = body.sqft != null && body.sqft !== "" ? Number(body.sqft) : null;
+  const yearBuilt = body.yearBuilt != null && body.yearBuilt !== "" ? Number(body.yearBuilt) : null;
+  const parcelApn = String(body.parcelApn || "").trim() || null;
+  const currentOwner = String(body.currentOwner || "").trim() || null;
+
+Then find where meta is built:
+  const meta: Prisma.InputJsonValue = {
+    purchasePrice: purchasePrice ?? undefined,
+    createdManually: true,
+  };
+
+Replace with:
+  const meta: Prisma.InputJsonValue = {
+    purchasePrice: purchasePrice ?? undefined,
+    propertyType: propertyType ?? undefined,
+    beds: beds ?? undefined,
+    baths: baths ?? undefined,
+    sqft: sqft ?? undefined,
+    yearBuilt: yearBuilt ?? undefined,
+    parcelApn: parcelApn ?? undefined,
+    currentOwner: currentOwner ?? undefined,
+    createdManually: true,
+  };
+
+FILE 2: apps/chg-rehab/app/property/PropertyActions.tsx
+In the AddPropertyModal form, the submit handler sends:
+  body: JSON.stringify({ address, city, state, zip, status, purchasePrice })
+
+Update it to also send the new fields. First, the form needs input fields and the submit needs to read them from FormData.
+
+After the existing purchasePrice field, add these fields to the form (before the submit button):
+
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+    <Field label="Property type">
+      <select name="propertyType" style={inputStyle()}>
+        <option value="">Select type</option>
+        <option value="SFR">Single Family (SFR)</option>
+        <option value="Multi-family">Multi-family</option>
+        <option value="Condo">Condo</option>
+        <option value="Townhome">Townhome</option>
+        <option value="Commercial">Commercial</option>
+        <option value="Land">Land</option>
+      </select>
+    </Field>
+    <Field label="Year built">
+      <input name="yearBuilt" type="number" min={1800} max={2030} style={inputStyle()} placeholder="e.g. 1998" />
+    </Field>
+  </div>
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+    <Field label="Beds">
+      <input name="beds" type="number" min={0} style={inputStyle()} placeholder="3" />
+    </Field>
+    <Field label="Baths">
+      <input name="baths" type="number" min={0} step={0.5} style={inputStyle()} placeholder="2" />
+    </Field>
+    <Field label="Sq ft">
+      <input name="sqft" type="number" min={0} style={inputStyle()} placeholder="1200" />
+    </Field>
+  </div>
+  <Field label="Parcel / APN">
+    <input name="parcelApn" style={inputStyle()} placeholder="e.g. 123-456-789" />
+  </Field>
+  <Field label="Current owner">
+    <input name="currentOwner" style={inputStyle()} placeholder="Owner name" />
+  </Field>
+
+Then update the body in the fetch call to include:
+    propertyType: fd.get("propertyType"),
+    yearBuilt: fd.get("yearBuilt") || null,
+    beds: fd.get("beds") || null,
+    baths: fd.get("baths") || null,
+    sqft: fd.get("sqft") || null,
+    parcelApn: fd.get("parcelApn"),
+    currentOwner: fd.get("currentOwner"),
+
+Read the file carefully first to find the exact location of the form fields and the fetch call body. Do not break any existing fields.

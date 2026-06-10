@@ -283,6 +283,13 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
             zip: fd.get("zip"),
             status: fd.get("status"),
             purchasePrice: Number(fd.get("purchasePrice") || 0) || null,
+            propertyType: fd.get("propertyType"),
+            yearBuilt: fd.get("yearBuilt") || null,
+            beds: fd.get("beds") || null,
+            baths: fd.get("baths") || null,
+            sqft: fd.get("sqft") || null,
+            parcelApn: fd.get("parcelApn"),
+            currentOwner: fd.get("currentOwner"),
           }),
         });
         if (!res.ok) {
@@ -312,6 +319,39 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
           </select>
         </Field>
         <Field label="Purchase price (optional)"><input name="purchasePrice" type="number" min={0} style={inputStyle()} placeholder="0" /></Field>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label="Property type">
+            <select name="propertyType" style={inputStyle()}>
+              <option value="">Select type</option>
+              <option value="SFR">Single Family (SFR)</option>
+              <option value="Multi-family">Multi-family</option>
+              <option value="Condo">Condo</option>
+              <option value="Townhome">Townhome</option>
+              <option value="Commercial">Commercial</option>
+              <option value="Land">Land</option>
+            </select>
+          </Field>
+          <Field label="Year built">
+            <input name="yearBuilt" type="number" min={1800} max={2030} style={inputStyle()} placeholder="e.g. 1998" />
+          </Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Field label="Beds">
+            <input name="beds" type="number" min={0} style={inputStyle()} placeholder="3" />
+          </Field>
+          <Field label="Baths">
+            <input name="baths" type="number" min={0} step={0.5} style={inputStyle()} placeholder="2" />
+          </Field>
+          <Field label="Sq ft">
+            <input name="sqft" type="number" min={0} style={inputStyle()} placeholder="1200" />
+          </Field>
+        </div>
+        <Field label="Parcel / APN">
+          <input name="parcelApn" style={inputStyle()} placeholder="e.g. 123-456-789" />
+        </Field>
+        <Field label="Current owner">
+          <input name="currentOwner" style={inputStyle()} placeholder="Owner name" />
+        </Field>
         <FormButtons onCancel={onClose} submitting={submitting} submitLabel="Create property" />
       </form>
     </ModalShell>
