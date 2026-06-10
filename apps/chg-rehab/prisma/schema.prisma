@@ -52,6 +52,7 @@ model Company {
   cpThreads            CpMessageThread[]     @relation("CpThreadL1")
   cpBidInvitations     CpBidInvitation[]     @relation("CpBidInvFromCompany")
   cpOnboardingInvites  CpOnboardingInvite[]  @relation("CpOnboardingInvCompany")
+  pmSpaces             PmSpace[]
 }
 
 model User {
@@ -78,6 +79,9 @@ model User {
   notifications            Notification[]
   notificationPreferences  UserNotificationPreference[]
   company                  Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pmTaskAssignees          PmTaskAssignee[]
+  pmComments               PmComment[]
+  pmActivity               PmActivity[]
 
   @@index([companyId])
   @@index([companyId, active])
@@ -1486,4 +1490,144 @@ model CpSentMessage {
 
   @@index([toAddress])
   @@index([sentAt])
+}
+
+// ─── Project Manager (PM) Module ─────────────────────────────────────────────
+
+model PmSpace {
+  id        String     @id @default(cuid())
+  companyId String
+  name      String
+  color     String?    @default("#3B82F6")
+  icon      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lists     PmList[]
+  statuses  PmStatus[]
+  tags      PmTag[]
+
+  @@index([companyId])
+}
+
+model PmList {
+  id        String   @id @default(cuid())
+  spaceId   String
+  name      String
+  color     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  space     PmSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks     PmTask[]
+
+  @@index([spaceId])
+}
+
+model PmStatus {
+  id        String   @id @default(cuid())
+  spaceId   String
+  name      String
+  color     String   @default("#6B7280")
+  type      String   @default("open") // open | active | done | closed
+  order     Int      @default(0)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  space     PmSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks     PmTask[]
+
+  @@index([spaceId])
+}
+
+model PmTask {
+  id            String    @id @default(cuid())
+  listId        String
+  statusId      String?
+  parentTaskId  String?
+  name          String
+  description   String?
+  priority      String?   @default("normal") // urgent | high | normal | low
+  taskType      String?   @default("task")   // task | bug | feature | milestone
+  dueDate       DateTime?
+  startDate     DateTime?
+  timeEstimate  Int?      // minutes
+  sprintPoints  Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  list          PmList           @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status        PmStatus?        @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  parent        PmTask?          @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks      PmTask[]         @relation("PmSubtasks")
+  assignees     PmTaskAssignee[]
+  comments      PmComment[]
+  activity      PmActivity[]
+  tags          PmTaskTag[]
+
+  @@index([listId])
+  @@index([statusId])
+  @@index([parentTaskId])
+}
+
+model PmTaskAssignee {
+  taskId String
+  userId String
+
+  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model PmComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model PmActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  type      String   // task_created | status_changed | assignee_added | comment_added
+  data      Json?
+  createdAt DateTime @default(now())
+
+  task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model PmTag {
+  id      String      @id @default(cuid())
+  spaceId String
+  name    String
+  color   String?
+
+  space   PmSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks   PmTaskTag[]
+
+  @@index([spaceId])
+}
+
+model PmTaskTag {
+  taskId String
+  tagId  String
+
+  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
 }
