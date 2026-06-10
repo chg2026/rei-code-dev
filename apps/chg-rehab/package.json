@@ -21,6 +21,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@google-cloud/storage": "^7.19.0",
     "@prisma/client": "^6.19.3",
     "@stripe/react-stripe-js": "^6.3.0",
