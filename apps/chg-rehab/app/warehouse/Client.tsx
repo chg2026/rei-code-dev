@@ -104,7 +104,7 @@ export default function WarehouseClient(props: {
       <div className="proj-bar">
         <div className="proj-l">
           <span className="proj-addr">Warehouse — Company-wide inventory</span>
-          <span className="proj-chip">CHG Software</span>
+          <span className="proj-chip">Materials Warehouse</span>
         </div>
         <div className="proj-r">
           <span className="proj-ts">All items can be allocated to any active project</span>

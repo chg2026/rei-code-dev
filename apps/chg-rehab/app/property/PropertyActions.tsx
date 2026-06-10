@@ -298,9 +298,9 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
         <ErrorBanner error={error} />
         <Field label="Address"><input name="address" required style={inputStyle()} placeholder="2247 Meadowbrook Blvd." /></Field>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 70px 90px", gap: 8 }}>
-          <Field label="City"><input name="city" required defaultValue="Cleveland" style={inputStyle()} /></Field>
-          <Field label="State"><input name="state" required defaultValue="OH" maxLength={2} style={inputStyle()} /></Field>
-          <Field label="ZIP"><input name="zip" required defaultValue="44106" style={inputStyle()} /></Field>
+          <Field label="City"><input name="city" required placeholder="e.g. Cleveland" style={inputStyle()} /></Field>
+          <Field label="State"><input name="state" required placeholder="OH" maxLength={2} style={inputStyle()} /></Field>
+          <Field label="ZIP"><input name="zip" required placeholder="44106" style={inputStyle()} /></Field>
         </div>
         <Field label="Status">
           <select name="status" defaultValue="Acquired" style={inputStyle()}>
