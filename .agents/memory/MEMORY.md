@@ -1,3 +1,4 @@
 - [Prisma vs Supabase cross-schema FK](prisma-supabase-cross-schema.md) — `prisma db push` on chg-rehab fails on the public.account_products→auth.users FK; create new tables via raw SQL.
 - [Checkpoint rollback can't restore CHG data](checkpoint-rollback-supabase.md) — CHG/Investor data lives in Supabase (DATABASE_URL), so Replit checkpoint rollback won't restore it; use Supabase backups or re-seed.
 - [Warehouse catalog self-heal](warehouse-catalog-self-heal.md) — standard catalog auto-seeds (lib/warehouseSeed.ts) when a company has 0 departments; advisory-lock + tx; keep trigger narrow.
+- [Prisma client stale vs schema](prisma-client-stale-vs-schema.md) — node_modules @prisma/client drifts from committed chg-rehab schema; regenerate before trusting tsc; regen can surface other features' pre-existing breakage.

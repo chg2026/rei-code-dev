@@ -24,7 +24,6 @@ export type PmTaskRow = {
   doneDate: string | null;
   subtaskCount: number;
   assignees: PmAssignee[];
-  tags: PmTag[];
 };
 
 export type PmListLite = { id: string; name: string; color: string | null; order: number };
@@ -34,7 +33,6 @@ export type PmSpaceWithLists = {
   name: string;
   color: string | null;
   icon: string | null;
-  order: number;
   lists: PmListLite[];
   _count?: { lists: number };
 };

@@ -24,7 +24,7 @@ export default async function PmSpacePage({ params }: { params: Promise<{ spaceI
 
   const spacesRaw = await prisma.pmSpace.findMany({
     where: { companyId: user.companyId },
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ createdAt: "asc" }],
     include: {
       lists: {
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -39,7 +39,6 @@ export default async function PmSpacePage({ params }: { params: Promise<{ spaceI
     name: s.name,
     color: s.color,
     icon: s.icon,
-    order: s.order,
     lists: s.lists,
     _count: s._count,
   }));

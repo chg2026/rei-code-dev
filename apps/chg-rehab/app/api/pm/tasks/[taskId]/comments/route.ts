@@ -5,7 +5,10 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 async function ownedTask(companyId: string, taskId: string) {
-  return prisma.pmTask.findFirst({ where: { id: taskId, companyId }, select: { id: true } });
+  return prisma.pmTask.findFirst({
+    where: { id: taskId, list: { space: { companyId } } },
+    select: { id: true },
+  });
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -19,20 +22,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ taskId:
   const comments = await prisma.pmComment.findMany({
     where: { taskId },
     orderBy: { createdAt: "asc" },
-    include: { author: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } } },
+    include: { user: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } } },
   });
 
   return NextResponse.json({
     comments: comments.map((c) => ({
       id: c.id,
       body: c.body,
-      isEdited: c.isEdited,
       createdAt: c.createdAt.toISOString(),
       author: {
-        id: c.author.id,
-        name: [c.author.firstName, c.author.lastName].filter(Boolean).join(" ") || c.author.email || "User",
-        initials: (c.author.initials ||
-          [(c.author.firstName ?? "")[0], (c.author.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase(),
+        id: c.user.id,
+        name: [c.user.firstName, c.user.lastName].filter(Boolean).join(" ") || c.user.email || "User",
+        initials: (c.user.initials ||
+          [(c.user.firstName ?? "")[0], (c.user.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase(),
       },
     })),
   });
@@ -51,10 +53,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
   if (!text) return NextResponse.json({ error: "Empty comment" }, { status: 400 });
 
   const comment = await prisma.pmComment.create({
-    data: { taskId, authorId: user.id, body: text },
+    data: { taskId, userId: user.id, body: text },
   });
   await prisma.pmActivity.create({
-    data: { taskId, userId: user.id, type: "commented" },
+    data: { taskId, userId: user.id, type: "comment_added" },
   });
 
   return NextResponse.json({ id: comment.id });

@@ -18,7 +18,7 @@ export async function GET() {
 
   const spaces = await prisma.pmSpace.findMany({
     where: { companyId: user.companyId },
-    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ createdAt: "asc" }],
     include: {
       lists: {
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -45,9 +45,7 @@ export async function POST(req: Request) {
       name,
       color: body.color ?? null,
       icon: body.icon ?? null,
-      statuses: {
-        create: DEFAULT_STATUSES.map((s) => ({ companyId: user.companyId, ...s })),
-      },
+      statuses: { create: DEFAULT_STATUSES },
     },
     include: { statuses: true },
   });
