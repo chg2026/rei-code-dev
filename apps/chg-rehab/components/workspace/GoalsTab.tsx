@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import s from "./styles.module.css";
+import CreateTaskModal from "./CreateTaskModal";
 
 type Goal = {
   id: string;
@@ -27,6 +28,7 @@ export default function GoalsTab() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<null | "company" | "user">(null);
   const [draft, setDraft] = useState({ title: "", target: 1, metricMode: "count" });
+  const [taskGoal, setTaskGoal] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +97,7 @@ export default function GoalsTab() {
         <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
           <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => bump(g, -1)}>−</button>
           <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => bump(g, 1)}>+</button>
+          <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => setTaskGoal({ id: g.id, title: g.title })}>+ Task</button>
           <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => removeGoal(g.id)} style={{ marginLeft: "auto", color: "var(--danger)" }}>Delete</button>
         </div>
       </div>
@@ -168,6 +171,16 @@ export default function GoalsTab() {
           </div>
         </div>
       ) : null}
+      {taskGoal && (
+        <CreateTaskModal
+          open
+          initialLinkType="goal"
+          initialLinkId={taskGoal.id}
+          initialLinkLabel={taskGoal.title}
+          onCreated={() => setTaskGoal(null)}
+          onClose={() => setTaskGoal(null)}
+        />
+      )}
     </div>
   );
 }

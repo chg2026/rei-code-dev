@@ -9,6 +9,9 @@ export type CreateTaskModalProps = {
   onCreated?: (taskId: string) => void;
   initialTitle?: string;
   initialDueDate?: string;
+  initialLinkType?: string;
+  initialLinkId?: string;
+  initialLinkLabel?: string;
   sourceMessageId?: string | null;
 };
 
@@ -23,6 +26,9 @@ export default function CreateTaskModal({
   onCreated,
   initialTitle = "",
   initialDueDate,
+  initialLinkType,
+  initialLinkId,
+  initialLinkLabel,
   sourceMessageId = null,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState(initialTitle);
@@ -77,9 +83,9 @@ export default function CreateTaskModal({
           assigneeId: assigneeId || null,
           priority,
           dueDate: dueDate || null,
-          linkType: linkParts?.type ?? null,
-          linkId: linkParts?.id ?? null,
-          linkLabel: linkParts?.label ?? null,
+          linkType: initialLinkType ?? linkParts?.type ?? null,
+          linkId: initialLinkId ?? linkParts?.id ?? null,
+          linkLabel: initialLinkLabel ?? linkParts?.label ?? null,
           sourceMessageId,
         }),
       });
@@ -92,7 +98,7 @@ export default function CreateTaskModal({
     } finally {
       setBusy(false);
     }
-  }, [title, assigneeId, priority, dueDate, linkParts, sourceMessageId, onCreated, onClose]);
+  }, [title, assigneeId, priority, dueDate, linkParts, initialLinkType, initialLinkId, initialLinkLabel, sourceMessageId, onCreated, onClose]);
 
   if (!open) return null;
 
