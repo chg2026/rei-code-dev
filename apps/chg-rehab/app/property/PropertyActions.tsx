@@ -290,6 +290,14 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
             sqft: fd.get("sqft") || null,
             parcelApn: fd.get("parcelApn"),
             currentOwner: fd.get("currentOwner"),
+            rentalRegNumber: fd.get("rentalRegNumber"),
+            rentalRegExpiry: fd.get("rentalRegExpiry"),
+            leadSafeCert: fd.get("leadSafeCert"),
+            leadSafeCertNumber: fd.get("leadSafeCertNumber"),
+            leadSafeCertExpiry: fd.get("leadSafeCertExpiry"),
+            insuranceProvider: fd.get("insuranceProvider"),
+            insuranceDateStart: fd.get("insuranceDateStart"),
+            insuranceDateExpiry: fd.get("insuranceDateExpiry"),
           }),
         });
         if (!res.ok) {
@@ -303,6 +311,9 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
         router.refresh();
       }}>
         <ErrorBanner error={error} />
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)", padding: "0 0 8px", lineHeight: 1.5 }}>
+          Fill in what you know now — all fields can be updated after creation. Upload photos and documents from the property record.
+        </div>
         <Field label="Address"><input name="address" required style={inputStyle()} placeholder="2247 Meadowbrook Blvd." /></Field>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 70px 90px", gap: 8 }}>
           <Field label="City"><input name="city" required placeholder="e.g. Cleveland" style={inputStyle()} /></Field>
@@ -352,6 +363,40 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
         <Field label="Current owner">
           <input name="currentOwner" style={inputStyle()} placeholder="Owner name" />
         </Field>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label="Rental registration #">
+            <input name="rentalRegNumber" style={inputStyle()} placeholder="Registration number" />
+          </Field>
+          <Field label="Rental registration expiry">
+            <input name="rentalRegExpiry" type="date" style={inputStyle()} />
+          </Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Field label="Lead safe certified">
+            <select name="leadSafeCert" style={inputStyle()}>
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </Field>
+          <Field label="Lead safe cert #">
+            <input name="leadSafeCertNumber" style={inputStyle()} placeholder="Cert number" />
+          </Field>
+          <Field label="Lead safe cert expiry">
+            <input name="leadSafeCertExpiry" type="date" style={inputStyle()} />
+          </Field>
+        </div>
+        <Field label="Insurance provider / policy #">
+          <input name="insuranceProvider" style={inputStyle()} placeholder="Provider / policy #" />
+        </Field>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label="Policy start date">
+            <input name="insuranceDateStart" type="date" style={inputStyle()} />
+          </Field>
+          <Field label="Policy expiry date">
+            <input name="insuranceDateExpiry" type="date" style={inputStyle()} />
+          </Field>
+        </div>
         <FormButtons onCancel={onClose} submitting={submitting} submitLabel="Create property" />
       </form>
     </ModalShell>

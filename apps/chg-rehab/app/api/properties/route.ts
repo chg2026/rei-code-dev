@@ -45,6 +45,14 @@ export async function POST(req: Request) {
   const yearBuilt = body.yearBuilt != null && body.yearBuilt !== "" ? Number(body.yearBuilt) : null;
   const parcelApn = String(body.parcelApn || "").trim() || null;
   const currentOwner = String(body.currentOwner || "").trim() || null;
+  const rentalRegNumber = String(body.rentalRegNumber || "").trim() || null;
+  const rentalRegExpiry = String(body.rentalRegExpiry || "").trim() || null;
+  const leadSafeCert = String(body.leadSafeCert || "").trim() || null;
+  const leadSafeCertNumber = String(body.leadSafeCertNumber || "").trim() || null;
+  const leadSafeCertExpiry = String(body.leadSafeCertExpiry || "").trim() || null;
+  const insuranceProvider = String(body.insuranceProvider || "").trim() || null;
+  const insuranceDateStart = String(body.insuranceDateStart || "").trim() || null;
+  const insuranceDateExpiry = String(body.insuranceDateExpiry || "").trim() || null;
 
   if (!address) return NextResponse.json({ error: "Address required" }, { status: 400 });
   if (!city || !state || !zip) {
@@ -69,6 +77,14 @@ export async function POST(req: Request) {
     yearBuilt: yearBuilt ?? undefined,
     parcelApn: parcelApn ?? undefined,
     currentOwner: currentOwner ?? undefined,
+    rentalRegNumber: rentalRegNumber ?? undefined,
+    rentalRegExpiry: rentalRegExpiry ?? undefined,
+    leadSafeCert: leadSafeCert ?? undefined,
+    leadSafeCertNumber: leadSafeCertNumber ?? undefined,
+    leadSafeCertExpiry: leadSafeCertExpiry ?? undefined,
+    insuranceProvider: insuranceProvider ?? undefined,
+    insuranceDateStart: insuranceDateStart ?? undefined,
+    insuranceDateExpiry: insuranceDateExpiry ?? undefined,
     createdManually: true,
   };
 
