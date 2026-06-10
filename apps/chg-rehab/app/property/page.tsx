@@ -361,6 +361,8 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
         )}
       </div>
 
+      <SmartStatusBanner property={property} project={project} meta={m} />
+
       <div className="body-split">
         <div className="body-main">
           {!project && (
@@ -579,6 +581,102 @@ async function HistoryTab({ propertyId, companyId }: { propertyId: string; compa
 }
 
 // ── Financials ────────────────────────────────────────────────────────
+async function SmartStatusBanner({
+  property,
+  project,
+  meta,
+}: {
+  property: { id: string; status: string | null };
+  project: { id: string } | null;
+  meta: PropertyMeta;
+}) {
+  const status = (property.status || "").toLowerCase();
+
+  // Determine which banner to show
+  let banner: { color: string; bg: string; border: string; icon: string; title: string; body: string; cta: string; href: string } | null = null;
+
+  if (status.includes("acquired") && !status.includes("rehab")) {
+    const hasAnalysis = await prisma.propertyFinancialSection.count({
+      where: { propertyId: property.id, section: { startsWith: "underwriting_" } },
+    });
+    if (!hasAnalysis) {
+      banner = {
+        bg: "#FAEEDA", border: "rgba(99,56,6,0.2)", color: "#633806",
+        icon: "📊",
+        title: "Run your underwriting analysis",
+        body: "This property is acquired. Compare Flip, BRRRR, and Flip & Rent before committing to a strategy.",
+        cta: "Open underwriting →",
+        href: `/underwriting?propertyId=${property.id}`,
+      };
+    }
+  } else if (status.includes("rehab")) {
+    if (!project) {
+      banner = {
+        bg: "#E8EFF1", border: "rgba(31,77,92,0.2)", color: "#143641",
+        icon: "🏗️",
+        title: "Set up your rehab project",
+        body: "Track scope, budget, schedule, and contractor assignments for this active rehab.",
+        cta: "Go to Rehab Manager →",
+        href: `/rehab`,
+      };
+    } else if (!meta.purchasePrice) {
+      banner = {
+        bg: "#FEF9EC", border: "rgba(146,64,14,0.2)", color: "#92400E",
+        icon: "💰",
+        title: "Add financial inputs",
+        body: "Purchase price and rehab budget are missing. Add them so your financials tab calculates correctly.",
+        cta: "Edit financials →",
+        href: `/property?id=${property.id}&tab=financials`,
+      };
+    }
+  } else if (status.includes("rental") || status.includes("tenanted")) {
+    const leaseCount = await prisma.lease.count({ where: { propertyId: property.id } });
+    if (!leaseCount) {
+      banner = {
+        bg: "#EAF3DE", border: "rgba(29,158,117,0.2)", color: "#27500A",
+        icon: "🏠",
+        title: "Add tenant & lease information",
+        body: "This is an active rental. Add the current lease agreement and tenant details.",
+        cta: "Go to Tenants tab →",
+        href: `/property?id=${property.id}&tab=tenants`,
+      };
+    }
+  } else if (status.includes("listed")) {
+    banner = {
+      bg: "#EDE9FE", border: "rgba(109,40,217,0.2)", color: "#4C1D95",
+      icon: "🏷️",
+      title: "Property is listed for sale",
+      body: "Track your listing activity, price changes, days on market, and buyer leads in the Documents and Financials tabs.",
+      cta: "View financials →",
+      href: `/property?id=${property.id}&tab=financials`,
+    };
+  }
+
+  if (!banner) return null;
+
+  return (
+    <div style={{
+      margin: "0 16px 12px",
+      padding: "12px 16px",
+      background: banner.bg,
+      border: `0.5px solid ${banner.border}`,
+      borderRadius: 8,
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 12,
+    }}>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{banner.icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: banner.color, marginBottom: 3 }}>{banner.title}</div>
+        <div style={{ fontSize: 12, color: banner.color, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>{banner.body}</div>
+        <a href={banner.href} style={{ fontSize: 12, fontWeight: 600, color: banner.color, textDecoration: "none", borderBottom: `1px solid ${banner.color}` }}>
+          {banner.cta}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 async function FinancialsTab({ property, companyId }: { property: NonNullable<Awaited<ReturnType<typeof prisma.property.findFirst>>>; companyId: string }) {
   const m = (property.meta || {}) as PropertyMeta;
   const project = await prisma.project.findFirst({
