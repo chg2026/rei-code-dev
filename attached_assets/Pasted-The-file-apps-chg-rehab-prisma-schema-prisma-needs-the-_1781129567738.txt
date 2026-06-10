@@ -1,0 +1,150 @@
+The file apps/chg-rehab/prisma/schema.prisma needs the Pm* models added back cleanly.
+
+First run: git show a2df120:apps/chg-rehab/prisma/schema.prisma > apps/chg-rehab/prisma/schema.prisma
+This restores the last good schema with all Ws* models.
+
+Then append these Pm* models at the very end of apps/chg-rehab/prisma/schema.prisma (after all existing models). Add them with correct indentation:
+
+model PmSpace {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  color     String?
+  icon      String?
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lists     PmList[]
+  statuses  PmStatus[]
+  tags      PmTag[]
+  @@index([companyId])
+}
+
+model PmList {
+  id        String    @id @default(cuid())
+  companyId String
+  spaceId   String
+  name      String
+  color     String?
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks     PmTask[]
+  statuses  PmStatus[]
+  @@index([companyId])
+  @@index([spaceId])
+}
+
+model PmStatus {
+  id        String   @id @default(cuid())
+  companyId String
+  spaceId   String?
+  listId    String?
+  name      String
+  color     String   @default("#6B7280")
+  type      String   @default("open")
+  order     Int      @default(0)
+  isDefault Boolean  @default(false)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  list      PmList?  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tasks     PmTask[]
+  @@index([companyId])
+}
+
+model PmTag {
+  id        String     @id @default(cuid())
+  companyId String
+  spaceId   String
+  name      String
+  color     String     @default("#E5E7EB")
+  textColor String     @default("#374151")
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks     PmTaskTag[]
+  @@index([companyId])
+}
+
+model PmTask {
+  id           String    @id @default(cuid())
+  companyId    String
+  listId       String
+  parentTaskId String?
+  createdById  String
+  name         String
+  description  String?
+  taskType     String    @default("task")
+  statusId     String?
+  priority     String?
+  coverImage   String?
+  startDate    DateTime?
+  dueDate      DateTime?
+  closedDate   DateTime?
+  doneDate     DateTime?
+  timeEstimate Int?
+  sprintPoints Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  list         PmList    @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status       PmStatus? @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  createdBy    User      @relation("PmTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  parent       PmTask?   @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     PmTask[]  @relation("PmSubtasks")
+  assignees    PmTaskAssignee[]
+  tags         PmTaskTag[]
+  comments     PmComment[]
+  activity     PmActivity[]
+  @@index([companyId])
+  @@index([listId])
+  @@index([parentTaskId])
+}
+
+model PmTaskAssignee {
+  taskId String
+  userId String
+  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation("PmAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  @@id([taskId, userId])
+}
+
+model PmTaskTag {
+  taskId String
+  tagId  String
+  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([taskId, tagId])
+}
+
+model PmComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User     @relation("PmComments", fields: [authorId], references: [id], onDelete: Cascade)
+  @@index([taskId])
+}
+
+model PmActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+  task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation("PmActivityLog", fields: [userId], references: [id], onDelete: Cascade)
+  @@index([taskId])
+}
+
+After appending, run:
+  cd apps/chg-rehab && npx prisma format && npx prisma generate
+
+Report whether it succeeds.

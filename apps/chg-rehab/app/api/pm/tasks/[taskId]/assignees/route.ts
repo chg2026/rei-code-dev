@@ -5,10 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 async function ownedTask(companyId: string, taskId: string) {
-  return prisma.pmTask.findFirst({
-    where: { id: taskId, list: { space: { companyId } } },
-    select: { id: true },
-  });
+  return prisma.pmTask.findFirst({ where: { id: taskId, companyId }, select: { id: true } });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
@@ -34,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ taskId:
     update: {},
   });
   await prisma.pmActivity.create({
-    data: { taskId, userId: user.id, type: "assignee_added", data: { userId: target.id } },
+    data: { taskId, userId: user.id, type: "assignee_added", payload: { userId: target.id } },
   });
 
   return NextResponse.json({ ok: true });

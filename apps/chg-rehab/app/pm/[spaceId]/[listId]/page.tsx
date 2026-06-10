@@ -5,8 +5,6 @@ import PmLayout from "@/components/pm/PmLayout";
 
 export const dynamic = "force-dynamic";
 
-const isDone = (s: { type: string } | null) => !!s && (s.type === "done" || s.type === "closed");
-
 export default async function PmListPage({
   params,
 }: {
@@ -19,7 +17,7 @@ export default async function PmListPage({
   const [spacesRaw, space, list] = await Promise.all([
     prisma.pmSpace.findMany({
       where: { companyId: user.companyId },
-      orderBy: [{ createdAt: "asc" }],
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
       include: {
         lists: {
           orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -35,13 +33,13 @@ export default async function PmListPage({
         statuses: { orderBy: { order: "asc" } },
       },
     }),
-    prisma.pmList.findFirst({ where: { id: listId, spaceId, space: { companyId: user.companyId } } }),
+    prisma.pmList.findFirst({ where: { id: listId, spaceId, companyId: user.companyId } }),
   ]);
 
   if (!space || !list) redirect("/pm");
 
   const tasksRaw = await prisma.pmTask.findMany({
-    where: { listId, parentTaskId: null },
+    where: { listId, companyId: user.companyId, parentTaskId: null },
     orderBy: { createdAt: "asc" },
     include: {
       status: { select: { id: true, name: true, color: true, type: true } },
@@ -50,6 +48,7 @@ export default async function PmListPage({
           user: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
         },
       },
+      tags: { include: { tag: true } },
       _count: { select: { subtasks: true } },
     },
   });
@@ -57,14 +56,14 @@ export default async function PmListPage({
   const tasks = tasksRaw.map((t) => ({
     id: t.id,
     name: t.name,
-    taskType: t.taskType ?? "task",
+    taskType: t.taskType,
     priority: t.priority,
     statusId: t.statusId,
     status: t.status,
     parentTaskId: t.parentTaskId,
     startDate: t.startDate?.toISOString() ?? null,
     dueDate: t.dueDate?.toISOString() ?? null,
-    doneDate: isDone(t.status) ? t.updatedAt.toISOString() : null,
+    doneDate: t.doneDate?.toISOString() ?? null,
     subtaskCount: t._count.subtasks,
     assignees: t.assignees.map((a) => ({
       id: a.user.id,
@@ -73,6 +72,7 @@ export default async function PmListPage({
         [(a.user.firstName ?? "")[0], (a.user.lastName ?? "")[0]].filter(Boolean).join("") ||
         "?").toUpperCase(),
     })),
+    tags: t.tags.map((x) => x.tag),
   }));
 
   const spaces = spacesRaw.map((s) => ({
@@ -80,6 +80,7 @@ export default async function PmListPage({
     name: s.name,
     color: s.color,
     icon: s.icon,
+    order: s.order,
     lists: s.lists,
     _count: s._count,
   }));

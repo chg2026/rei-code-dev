@@ -17,11 +17,11 @@ model Session {
 }
 
 model Company {
-  id                   String                @id @default(cuid())
+  id                   String                   @id @default(cuid())
   name                 String
   legalName            String?
   ein                  String?
-  createdAt            DateTime              @default(now())
+  createdAt            DateTime                 @default(now())
   activityLog          ActivityLogEntry[]
   settings             CompanySetting?
   contacts             Contact[]
@@ -45,43 +45,61 @@ model Company {
   offerings            Offering[]
   investorDocuments    InvestorDocument[]
   investorInvites      InvestorInvite[]
-  cpOperatorEdges      CpOperatorEdge[]      @relation("CpEdgeLayer1")
-  cpJobsAwarded        CpJob[]               @relation("CpJobAwardedBy")
-  cpQuotesReceived     CpQuote[]             @relation("CpQuoteToCompany")
-  cpInvoicesReceived   CpInvoice[]           @relation("CpInvoiceToCompany")
-  cpThreads            CpMessageThread[]     @relation("CpThreadL1")
-  cpBidInvitations     CpBidInvitation[]     @relation("CpBidInvFromCompany")
-  cpOnboardingInvites  CpOnboardingInvite[]  @relation("CpOnboardingInvCompany")
+  cpOperatorEdges      CpOperatorEdge[]         @relation("CpEdgeLayer1")
+  cpJobsAwarded        CpJob[]                  @relation("CpJobAwardedBy")
+  cpQuotesReceived     CpQuote[]                @relation("CpQuoteToCompany")
+  cpInvoicesReceived   CpInvoice[]              @relation("CpInvoiceToCompany")
+  cpThreads            CpMessageThread[]        @relation("CpThreadL1")
+  cpBidInvitations     CpBidInvitation[]        @relation("CpBidInvFromCompany")
+  cpOnboardingInvites  CpOnboardingInvite[]     @relation("CpOnboardingInvCompany")
+  wsTasks              WsTask[]
+  wsChannels           WsChannel[]
+  wsMessages           WsMessage[]
+  wsGoals              WsGoal[]
+  wsReminders          WsReminder[]
+  wsCalendarEvents     WsCalendarEvent[]
   pmSpaces             PmSpace[]
+  pmLists              PmList[]
+  pmStatuses           PmStatus[]
+  pmTags               PmTag[]
+  pmTasks              PmTask[]
 }
 
 model User {
-  id                       String                        @id
-  companyId                String
-  email                    String?                       @unique
-  firstName                String?
-  lastName                 String?
-  profileImageUrl          String?
-  role                     UserRole                      @default(ProjectManager)
-  initials                 String?
-  emailOptOut              Boolean                       @default(false)
-  active                   Boolean                       @default(true)
-  deactivatedAt            DateTime?
-  notifyQuietStart         String?
-  notifyQuietEnd           String?
-  notifyQuietOverride      Boolean                       @default(false)
-  createdAt                DateTime                      @default(now())
-  updatedAt                DateTime                      @default(now()) @updatedAt
-  activityEntries          ActivityLogEntry[]
-  uploadedDocuments        Document[]                    @relation("DocUploader")
-  approvedDraws            Draw[]                        @relation("DrawApprover")
-  projectAssignments       ProjectAssignment[]
-  notifications            Notification[]
-  notificationPreferences  UserNotificationPreference[]
-  company                  Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  pmTaskAssignees          PmTaskAssignee[]
-  pmComments               PmComment[]
-  pmActivity               PmActivity[]
+  id                      String                       @id
+  companyId               String
+  email                   String?                      @unique
+  firstName               String?
+  lastName                String?
+  profileImageUrl         String?
+  role                    UserRole                     @default(ProjectManager)
+  initials                String?
+  emailOptOut             Boolean                      @default(false)
+  active                  Boolean                      @default(true)
+  deactivatedAt           DateTime?
+  notifyQuietStart        String?
+  notifyQuietEnd          String?
+  notifyQuietOverride     Boolean                      @default(false)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @default(now()) @updatedAt
+  activityEntries         ActivityLogEntry[]
+  uploadedDocuments       Document[]                   @relation("DocUploader")
+  approvedDraws           Draw[]                       @relation("DrawApprover")
+  projectAssignments      ProjectAssignment[]
+  notifications           Notification[]
+  notificationPreferences UserNotificationPreference[]
+  company                 Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  wsTasksAssigned         WsTask[]                     @relation("WsTaskAssignee")
+  wsTasksCreated          WsTask[]                     @relation("WsTaskCreator")
+  wsChannelMembers        WsChannelMember[]
+  wsMessages              WsMessage[]                  @relation("WsMessageAuthor")
+  wsGoals                 WsGoal[]
+  wsReminders             WsReminder[]
+  wsCalendarEvents        WsCalendarEvent[]
+  pmTasksCreated          PmTask[]                     @relation("PmTaskCreator")
+  pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
+  pmComments              PmComment[]                  @relation("PmComments")
+  pmActivity              PmActivity[]                 @relation("PmActivityLog")
 
   @@index([companyId])
   @@index([companyId, active])
@@ -96,7 +114,7 @@ model UserNotificationPreference {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, event])
   @@index([userId])
@@ -173,19 +191,19 @@ model PipelineDeal {
 }
 
 model Project {
-  id                    String                 @id @default(cuid())
-  companyId             String
-  propertyId            String
-  code                  String                 // 'CHG-2247'
-  name                  String
-  status                ProjectStatus          @default(Planning)
-  budget                Decimal?               @db.Decimal(14, 2)
-  startDate             DateTime?
-  endDate               DateTime?
-  currentPhase          Int?
-  meta                  Json?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @default(now()) @updatedAt
+  id           String        @id @default(cuid())
+  companyId    String
+  propertyId   String
+  code         String // 'CHG-2247'
+  name         String
+  status       ProjectStatus @default(Planning)
+  budget       Decimal?      @db.Decimal(14, 2)
+  startDate    DateTime?
+  endDate      DateTime?
+  currentPhase Int?
+  meta         Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
 
   company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property              Property               @relation(fields: [propertyId], references: [id])
@@ -307,25 +325,25 @@ model ProjectAssignment {
 }
 
 model Contact {
-  id             String                    @id @default(cuid())
-  companyId      String
-  type           ContactType
-  name           String
-  company        String?
-  email          String?
-  phone          String?
-  address        String?
-  trade          String?
-  rating         Int?
-  notes          String?
-  meta           Json?
-  emailOptOut    Boolean                   @default(false)
-  emailOptOutAt  DateTime?
-  createdAt      DateTime                  @default(now())
+  id            String      @id @default(cuid())
+  companyId     String
+  type          ContactType
+  name          String
+  company       String?
+  email         String?
+  phone         String?
+  address       String?
+  trade         String?
+  rating        Int?
+  notes         String?
+  meta          Json?
+  emailOptOut   Boolean     @default(false)
+  emailOptOutAt DateTime?
+  createdAt     DateTime    @default(now())
 
-  org            Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  complianceDocs ContractorComplianceDoc[]
-  assignments    ContractorAssignment[]
+  org              Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  complianceDocs   ContractorComplianceDoc[]
+  assignments      ContractorAssignment[]
   notificationLogs ContactNotificationLog[]
 
   @@index([companyId, type])
@@ -336,17 +354,17 @@ model Contact {
 // `ProjectAssignment` because that table links users (employees) to projects,
 // whereas contractors live in `Contact` and are external.
 model ContractorAssignment {
-  id          String   @id @default(cuid())
-  companyId   String
-  contactId   String
-  projectId   String
-  role        String   // e.g. "GC", "Electrical sub"
-  status      String   @default("Active") // Active | Completed | Removed
-  assignedAt  DateTime @default(now())
-  assignedBy  String?
+  id         String   @id @default(cuid())
+  companyId  String
+  contactId  String
+  projectId  String
+  role       String // e.g. "GC", "Electrical sub"
+  status     String   @default("Active") // Active | Completed | Removed
+  assignedAt DateTime @default(now())
+  assignedBy String?
 
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, contactId, role])
   @@index([companyId])
@@ -355,27 +373,27 @@ model ContractorAssignment {
 }
 
 model ContractorComplianceDoc {
-  id        String    @id @default(cuid())
+  id        String                           @id @default(cuid())
   contactId String
   type      String
   name      String
   expiresAt DateTime?
   fileKey   String?
-  status    String    @default("Active")
-  createdAt DateTime  @default(now())
-  contact   Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status    String                           @default("Active")
+  createdAt DateTime                         @default(now())
+  contact   Contact                          @relation(fields: [contactId], references: [id], onDelete: Cascade)
   versions  ContractorComplianceDocVersion[]
 
   @@index([contactId])
 }
 
 model ContractorComplianceDocVersion {
-  id         String    @id @default(cuid())
+  id         String                  @id @default(cuid())
   docId      String
   name       String
   expiresAt  DateTime?
   fileKey    String?
-  replacedAt DateTime  @default(now())
+  replacedAt DateTime                @default(now())
   doc        ContractorComplianceDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@index([docId])
@@ -551,25 +569,25 @@ model Invite {
 }
 
 model Subscription {
-  id                       String    @id @default(cuid())
-  companyId                String    @unique
-  plan                     String    @default("Operator") // Starter | Operator | Enterprise
-  status                   String    @default("inactive") // active | trialing | past_due | canceled | inactive | incomplete
-  seatLimit                Int       @default(25)
-  stripeCustomerId         String?
-  stripeSubscriptionId     String?
-  stripePriceId            String?
-  stripeProductId          String?
-  currentPeriodEnd         DateTime?
-  cancelAtPeriodEnd        Boolean   @default(false)
-  defaultPaymentMethodId   String?
-  paymentMethodBrand       String?
-  paymentMethodLast4       String?
-  paymentMethodExpMonth    Int?
-  paymentMethodExpYear     Int?
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @default(now()) @updatedAt
-  company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id                     String    @id @default(cuid())
+  companyId              String    @unique
+  plan                   String    @default("Operator") // Starter | Operator | Enterprise
+  status                 String    @default("inactive") // active | trialing | past_due | canceled | inactive | incomplete
+  seatLimit              Int       @default(25)
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  stripeProductId        String?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean   @default(false)
+  defaultPaymentMethodId String?
+  paymentMethodBrand     String?
+  paymentMethodLast4     String?
+  paymentMethodExpMonth  Int?
+  paymentMethodExpYear   Int?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @default(now()) @updatedAt
+  company                Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model CompanySetting {
@@ -666,68 +684,68 @@ enum DocStatus {
 }
 
 model Notification {
-  id            String    @id @default(cuid())
-  companyId     String
-  userId        String
-  event         String
-  channel       String
-  title         String
-  body          String?
-  link          String?
-  meta          Json?
-  status        String    @default("Pending")
-  urgent        Boolean   @default(false)
-  scheduledFor  DateTime?
-  sentAt        DateTime?
-  failedAt      DateTime?
-  failureReason String?
-  resolvedAt    DateTime?
-  resolvedById  String?
+  id             String    @id @default(cuid())
+  companyId      String
+  userId         String
+  event          String
+  channel        String
+  title          String
+  body           String?
+  link           String?
+  meta           Json?
+  status         String    @default("Pending")
+  urgent         Boolean   @default(false)
+  scheduledFor   DateTime?
+  sentAt         DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  resolvedAt     DateTime?
+  resolvedById   String?
   resolvedReason String?
-  readAt        DateTime?
-  dedupeKey     String?
-  createdAt     DateTime  @default(now())
+  readAt         DateTime?
+  dedupeKey      String?
+  createdAt      DateTime  @default(now())
 
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, channel, dedupeKey])
   @@index([companyId, userId, channel, readAt])
   @@index([companyId, channel, status, scheduledFor])
   @@index([companyId, channel, status, failedAt])
   @@index([companyId, channel, status, resolvedAt])
-  @@unique([userId, channel, dedupeKey])
 }
 
 model NotificationState {
-  id                       String    @id @default(cuid())
-  companyId                String    @unique
-  lastDigestSweepAt        DateTime?
-  lastSweepAttemptAt       DateTime?
-  lastLapseSweepAt         DateTime?
-  lastStaleAlertAt         DateTime?
-  lastWeeklyAlertRecapAt   DateTime?
-  lastManualSweepAt        DateTime?
-  lastManualSweepByUserId  String?
-  lastManualSweepByName    String?
-  updatedAt                DateTime  @default(now()) @updatedAt
+  id                      String    @id @default(cuid())
+  companyId               String    @unique
+  lastDigestSweepAt       DateTime?
+  lastSweepAttemptAt      DateTime?
+  lastLapseSweepAt        DateTime?
+  lastStaleAlertAt        DateTime?
+  lastWeeklyAlertRecapAt  DateTime?
+  lastManualSweepAt       DateTime?
+  lastManualSweepByUserId String?
+  lastManualSweepByName   String?
+  updatedAt               DateTime  @default(now()) @updatedAt
 
-  company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model StaleSweepAlertLog {
-  id              String   @id @default(cuid())
-  companyId       String
-  sentAt          DateTime @default(now())
-  staleForMs      Float?
-  thresholdMs     Int
-  throttleMs      Int
-  recipientCount  Int
-  deliveredCount  Int
-  failedCount     Int
-  recipients      Json
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  companyId      String
+  sentAt         DateTime @default(now())
+  staleForMs     Float?
+  thresholdMs    Int
+  throttleMs     Int
+  recipientCount Int
+  deliveredCount Int
+  failedCount    Int
+  recipients     Json
+  createdAt      DateTime @default(now())
 
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, sentAt])
 }
@@ -749,8 +767,8 @@ model ContactNotificationLog {
   resolvedReason String?
   sentAt         DateTime  @default(now())
 
-  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@unique([contactId, event, dedupeKey])
   @@index([companyId, contactId])
@@ -767,64 +785,64 @@ model ContactNotificationLog {
 // ─────────────────────────────────────────────────────────────────────────
 
 model Investor {
-  id                  String                          @id // Supabase auth uid
-  companyId           String
-  email               String?                         @unique
-  firstName           String?
-  lastName            String?
-  phone               String?
-  accreditedStatus    InvestorAccreditedStatus        @default(Unverified)
-  status              InvestorStatus                  @default(Lead)
-  portalLastLoginAt   DateTime?
-  bannerDismissedAt   Json?                           // { [bannerKey]: ISO datetime }
-  createdAt           DateTime                        @default(now())
-  updatedAt           DateTime                        @default(now()) @updatedAt
+  id                String                   @id // Supabase auth uid
+  companyId         String
+  email             String?                  @unique
+  firstName         String?
+  lastName          String?
+  phone             String?
+  accreditedStatus  InvestorAccreditedStatus @default(Unverified)
+  status            InvestorStatus           @default(Lead)
+  portalLastLoginAt DateTime?
+  bannerDismissedAt Json? // { [bannerKey]: ISO datetime }
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @default(now()) @updatedAt
 
-  company             Company                         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  subscriptions       InvestorSubscription[]
-  documents           InvestorDocument[]
-  activities          InvestorActivity[]
-  communications      InvestorCommunication[]
-  notes               InvestorNote[]
-  notificationPrefs   InvestorNotificationPreference[]
+  company           Company                          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscriptions     InvestorSubscription[]
+  documents         InvestorDocument[]
+  activities        InvestorActivity[]
+  communications    InvestorCommunication[]
+  notes             InvestorNote[]
+  notificationPrefs InvestorNotificationPreference[]
 
   @@index([companyId, status])
 }
 
 model Offering {
-  id              String                @id @default(cuid())
-  companyId       String
-  propertyId      String?
-  name            String
-  propertyType    OfferingPropertyType  @default(Other)
-  marketCity      String?
-  marketState     String?
-  description     String?
-  targetIrrLow    Decimal?              @db.Decimal(6, 2)
-  targetIrrHigh   Decimal?              @db.Decimal(6, 2)
-  prefReturnPct   Decimal?              @db.Decimal(6, 2)
-  holdMonths      Int?
-  minInvestment   Decimal?              @db.Decimal(14, 2)
-  raiseTarget     Decimal?              @db.Decimal(14, 2)
-  raisedToHard    Decimal?              @db.Decimal(14, 2)
-  raisedToSoft    Decimal?              @db.Decimal(14, 2)
-  closeDate       DateTime?
-  stage           OfferingStage         @default(Prospecting)
-  status          OfferingStatus        @default(Active)
-  coverImageUrl   String?
+  id                   String               @id @default(cuid())
+  companyId            String
+  propertyId           String?
+  name                 String
+  propertyType         OfferingPropertyType @default(Other)
+  marketCity           String?
+  marketState          String?
+  description          String?
+  targetIrrLow         Decimal?             @db.Decimal(6, 2)
+  targetIrrHigh        Decimal?             @db.Decimal(6, 2)
+  prefReturnPct        Decimal?             @db.Decimal(6, 2)
+  holdMonths           Int?
+  minInvestment        Decimal?             @db.Decimal(14, 2)
+  raiseTarget          Decimal?             @db.Decimal(14, 2)
+  raisedToHard         Decimal?             @db.Decimal(14, 2)
+  raisedToSoft         Decimal?             @db.Decimal(14, 2)
+  closeDate            DateTime?
+  stage                OfferingStage        @default(Prospecting)
+  status               OfferingStatus       @default(Active)
+  coverImageUrl        String?
   coverImageObjectPath String?
-  documentObjectPaths  String[]         @default([])
-  wireInstructions     Json?            // { bankName, routingNumber, accountNumber, beneficiary, swift?, memo? }
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @default(now()) @updatedAt
+  documentObjectPaths  String[]             @default([])
+  wireInstructions     Json? // { bankName, routingNumber, accountNumber, beneficiary, swift?, memo? }
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @default(now()) @updatedAt
 
-  company         Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  property        Property?             @relation(fields: [propertyId], references: [id])
-  subscriptions   InvestorSubscription[]
-  capitalCalls    CapitalCall[]
-  distributions   Distribution[]
-  documents       InvestorDocument[]
-  updates         DealUpdate[]
+  company       Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property      Property?              @relation(fields: [propertyId], references: [id])
+  subscriptions InvestorSubscription[]
+  capitalCalls  CapitalCall[]
+  distributions Distribution[]
+  documents     InvestorDocument[]
+  updates       DealUpdate[]
 
   @@index([companyId, status])
   @@index([companyId, stage])
@@ -833,28 +851,28 @@ model Offering {
 // Investor↔Offering subscription (cap-table row). Named `InvestorSubscription`
 // because chg-rehab already owns a `Subscription` model for Stripe billing.
 model InvestorSubscription {
-  id                    String                       @id @default(cuid())
+  id                    String                     @id @default(cuid())
   investorId            String
   offeringId            String
-  committedAmount       Decimal                      @db.Decimal(14, 2)
-  fundedAmount          Decimal                      @default(0) @db.Decimal(14, 2)
-  commitmentType        SubscriptionCommitmentType   @default(Soft)
+  committedAmount       Decimal                    @db.Decimal(14, 2)
+  fundedAmount          Decimal                    @default(0) @db.Decimal(14, 2)
+  commitmentType        SubscriptionCommitmentType @default(Soft)
   signedAt              DateTime?
   fundedAt              DateTime?
-  ownershipPct          Decimal?                     @db.Decimal(8, 4)
-  currentValue          Decimal?                     @db.Decimal(14, 2)
-  lifetimeDistributions Decimal                      @default(0) @db.Decimal(14, 2)
-  irrToDate             Decimal?                     @db.Decimal(6, 2)
-  cocToDate             Decimal?                     @db.Decimal(6, 2)
-  status                InvestorSubscriptionStatus   @default(Pending)
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @default(now()) @updatedAt
+  ownershipPct          Decimal?                   @db.Decimal(8, 4)
+  currentValue          Decimal?                   @db.Decimal(14, 2)
+  lifetimeDistributions Decimal                    @default(0) @db.Decimal(14, 2)
+  irrToDate             Decimal?                   @db.Decimal(6, 2)
+  cocToDate             Decimal?                   @db.Decimal(6, 2)
+  status                InvestorSubscriptionStatus @default(Pending)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @default(now()) @updatedAt
 
-  investor              Investor                     @relation(fields: [investorId], references: [id], onDelete: Cascade)
-  offering              Offering                     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  callAllocations       CapitalCallAllocation[]
+  investor                Investor                 @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  offering                Offering                 @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  callAllocations         CapitalCallAllocation[]
   distributionAllocations DistributionAllocation[]
-  documents             SubscriptionDocument[]
+  documents               SubscriptionDocument[]
 
   @@unique([investorId, offeringId])
   @@index([offeringId, status])
@@ -865,16 +883,16 @@ model InvestorSubscription {
 // Subscription (the legal sub doc, future). `signedAt` populated when the
 // investor checks the e-sign disclaimer; `signedName` is the typed name.
 model SubscriptionDocument {
-  id              String                @id @default(cuid())
-  subscriptionId  String
-  kind            SubscriptionDocKind   @default(Receipt)
-  objectPath      String?
-  signedAt        DateTime?
-  signedName      String?
-  signedIp        String?
-  createdAt       DateTime              @default(now())
+  id             String              @id @default(cuid())
+  subscriptionId String
+  kind           SubscriptionDocKind @default(Receipt)
+  objectPath     String?
+  signedAt       DateTime?
+  signedName     String?
+  signedIp       String?
+  createdAt      DateTime            @default(now())
 
-  subscription    InvestorSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
 }
@@ -885,90 +903,90 @@ enum SubscriptionDocKind {
 }
 
 model CapitalCall {
-  id            String                  @id @default(cuid())
-  offeringId    String
-  noticeNumber  String
-  totalAmount   Decimal                 @db.Decimal(14, 2)
-  dueDate       DateTime?
-  status        CapitalCallStatus       @default(Draft)
-  issuedAt      DateTime?
-  memo          String?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @default(now()) @updatedAt
+  id           String            @id @default(cuid())
+  offeringId   String
+  noticeNumber String
+  totalAmount  Decimal           @db.Decimal(14, 2)
+  dueDate      DateTime?
+  status       CapitalCallStatus @default(Draft)
+  issuedAt     DateTime?
+  memo         String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @default(now()) @updatedAt
 
-  offering      Offering                @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  allocations   CapitalCallAllocation[]
+  offering    Offering                @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  allocations CapitalCallAllocation[]
 
   @@unique([offeringId, noticeNumber])
   @@index([offeringId, status])
 }
 
 model CapitalCallAllocation {
-  id              String     @id @default(cuid())
-  capitalCallId   String
-  subscriptionId  String
-  amountDue       Decimal    @db.Decimal(14, 2)
-  amountReceived  Decimal    @default(0) @db.Decimal(14, 2)
-  receivedAt      DateTime?
+  id             String    @id @default(cuid())
+  capitalCallId  String
+  subscriptionId String
+  amountDue      Decimal   @db.Decimal(14, 2)
+  amountReceived Decimal   @default(0) @db.Decimal(14, 2)
+  receivedAt     DateTime?
 
-  capitalCall     CapitalCall          @relation(fields: [capitalCallId], references: [id], onDelete: Cascade)
-  subscription    InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  capitalCall  CapitalCall          @relation(fields: [capitalCallId], references: [id], onDelete: Cascade)
+  subscription InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@unique([capitalCallId, subscriptionId])
   @@index([subscriptionId])
 }
 
 model Distribution {
-  id              String                  @id @default(cuid())
-  offeringId      String
-  periodLabel     String
-  distributionType DistributionType       @default(CashFlow)
-  totalAmount     Decimal                 @db.Decimal(14, 2)
-  perDollarRate   Decimal?                @db.Decimal(10, 6)
-  paidOn          DateTime?
-  status          DistributionStatus      @default(Pending)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @default(now()) @updatedAt
+  id               String             @id @default(cuid())
+  offeringId       String
+  periodLabel      String
+  distributionType DistributionType   @default(CashFlow)
+  totalAmount      Decimal            @db.Decimal(14, 2)
+  perDollarRate    Decimal?           @db.Decimal(10, 6)
+  paidOn           DateTime?
+  status           DistributionStatus @default(Pending)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now()) @updatedAt
 
-  offering        Offering                @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  allocations     DistributionAllocation[]
+  offering    Offering                 @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  allocations DistributionAllocation[]
 
   @@index([offeringId, status])
 }
 
 model DistributionAllocation {
-  id              String                       @id @default(cuid())
-  distributionId  String
-  subscriptionId  String
-  amount          Decimal                      @db.Decimal(14, 2)
-  wireRef         String?
-  status          DistributionAllocationStatus @default(Pending)
+  id             String                       @id @default(cuid())
+  distributionId String
+  subscriptionId String
+  amount         Decimal                      @db.Decimal(14, 2)
+  wireRef        String?
+  status         DistributionAllocationStatus @default(Pending)
 
-  distribution    Distribution         @relation(fields: [distributionId], references: [id], onDelete: Cascade)
-  subscription    InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  distribution Distribution         @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  subscription InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@unique([distributionId, subscriptionId])
   @@index([subscriptionId])
 }
 
 model InvestorDocument {
-  id            String                  @id @default(cuid())
-  companyId     String
-  investorId    String?
-  offeringId    String?
-  name          String
-  docType       InvestorDocType         @default(Other)
-  objectPath    String?
-  sizeBytes     Int?
-  uploadedById  String?
-  uploadedAt    DateTime                @default(now())
-  viewedAt      DateTime?
-  taxYear       Int?
+  id           String          @id @default(cuid())
+  companyId    String
+  investorId   String?
+  offeringId   String?
+  name         String
+  docType      InvestorDocType @default(Other)
+  objectPath   String?
+  sizeBytes    Int?
+  uploadedById String?
+  uploadedAt   DateTime        @default(now())
+  viewedAt     DateTime?
+  taxYear      Int?
 
-  company       Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  investor      Investor?               @relation(fields: [investorId], references: [id], onDelete: Cascade)
-  offering      Offering?               @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  activities    InvestorActivity[]
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  investor   Investor?          @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  offering   Offering?          @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  activities InvestorActivity[]
 
   @@index([investorId])
   @@index([offeringId, docType])
@@ -976,78 +994,78 @@ model InvestorDocument {
 }
 
 model DealUpdate {
-  id            String                @id @default(cuid())
-  offeringId    String
-  updateType    DealUpdateType        @default(Quarterly)
-  title         String
-  body          String?
-  metricsJson   Json?
-  postedById    String?
-  postedAt      DateTime              @default(now())
-  published     Boolean               @default(false)
+  id          String         @id @default(cuid())
+  offeringId  String
+  updateType  DealUpdateType @default(Quarterly)
+  title       String
+  body        String?
+  metricsJson Json?
+  postedById  String?
+  postedAt    DateTime       @default(now())
+  published   Boolean        @default(false)
 
-  offering      Offering              @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  activities    InvestorActivity[]
+  offering   Offering           @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  activities InvestorActivity[]
 
   @@index([offeringId, postedAt])
 }
 
 model InvestorActivity {
-  id                    String                  @id @default(cuid())
+  id                    String               @id @default(cuid())
   investorId            String
-  eventType             InvestorActivityType    @default(Other)
+  eventType             InvestorActivityType @default(Other)
   title                 String
   description           String?
   relatedSubscriptionId String?
   relatedDocumentId     String?
   relatedUpdateId       String?
   readAt                DateTime?
-  createdAt             DateTime                @default(now())
+  createdAt             DateTime             @default(now())
 
-  investor              Investor                @relation(fields: [investorId], references: [id], onDelete: Cascade)
-  relatedDocument       InvestorDocument?       @relation(fields: [relatedDocumentId], references: [id])
-  relatedUpdate         DealUpdate?             @relation(fields: [relatedUpdateId], references: [id])
+  investor        Investor          @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  relatedDocument InvestorDocument? @relation(fields: [relatedDocumentId], references: [id])
+  relatedUpdate   DealUpdate?       @relation(fields: [relatedUpdateId], references: [id])
 
   @@index([investorId, createdAt])
 }
 
 model InvestorCommunication {
-  id           String                       @id @default(cuid())
-  investorId   String
-  channel      InvestorCommunicationChannel @default(Note)
-  subject      String?
-  body         String?
-  durationMin  Int?
-  loggedById   String?
-  loggedAt     DateTime                     @default(now())
+  id          String                       @id @default(cuid())
+  investorId  String
+  channel     InvestorCommunicationChannel @default(Note)
+  subject     String?
+  body        String?
+  durationMin Int?
+  loggedById  String?
+  loggedAt    DateTime                     @default(now())
 
-  investor     Investor                     @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
   @@index([investorId, loggedAt])
 }
 
 model InvestorNote {
-  id          String    @id @default(cuid())
-  investorId  String
-  body        String
-  authorId    String?
-  createdAt   DateTime  @default(now())
+  id         String   @id @default(cuid())
+  investorId String
+  body       String
+  authorId   String?
+  createdAt  DateTime @default(now())
 
-  investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
   @@index([investorId])
 }
 
 model InvestorNotificationPreference {
-  id          String    @id @default(cuid())
-  investorId  String
-  event       String    // distribution | document | update | newdeal | captable
-  email       Boolean   @default(true)
-  inApp       Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  id         String   @id @default(cuid())
+  investorId String
+  event      String // distribution | document | update | newdeal | captable
+  email      Boolean  @default(true)
+  inApp      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
-  investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  investor Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
   @@unique([investorId, event])
   @@index([investorId])
@@ -1155,20 +1173,20 @@ enum InvestorCommunicationChannel {
 }
 
 model InvestorInvite {
-  id           String              @id @default(cuid())
+  id           String    @id @default(cuid())
   companyId    String
   email        String
   firstName    String?
   lastName     String?
-  token        String              @unique
+  token        String    @unique
   invitedById  String?
   consumedAt   DateTime?
   consumedById String?
   expiresAt    DateTime
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @default(now()) @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
 
-  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([email])
@@ -1183,39 +1201,39 @@ model InvestorInvite {
 // ─────────────────────────────────────────────────────────────────────────
 
 model CpAccount {
-  id                 String     @id // Supabase auth uid
-  email              String     @unique
-  contactName        String
-  companyName        String
-  phone              String?
-  trade              String?
-  licenseNumber      String?
-  planTier           String     @default("free") // free | pro
-  status             String     @default("Active") // Active | Suspended
-  contractorPortalEnabled Boolean @default(true)
-  messagingEnabled   Boolean    @default(true)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @default(now()) @updatedAt
-  lastLoginAt        DateTime?
+  id                      String    @id // Supabase auth uid
+  email                   String    @unique
+  contactName             String
+  companyName             String
+  phone                   String?
+  trade                   String?
+  licenseNumber           String?
+  planTier                String    @default("free") // free | pro
+  status                  String    @default("Active") // Active | Suspended
+  contractorPortalEnabled Boolean   @default(true)
+  messagingEnabled        Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @default(now()) @updatedAt
+  lastLoginAt             DateTime?
 
   // Relations
-  operatorOf         CpOperatorEdge[] @relation("CpEdgeOperator")
-  invitedBy          CpOperatorEdge[] @relation("CpEdgeContractor")
-  jobsAsContractor   CpJob[]    @relation("CpJobContractor")
-  jobsAwardedByMe    CpJob[]    @relation("CpJobAwardedByAccount")
-  quotesSent         CpQuote[]  @relation("CpQuoteFrom")
-  quotesReceived     CpQuote[]  @relation("CpQuoteToContractor")
-  invoicesSent       CpInvoice[] @relation("CpInvoiceFrom")
-  invoicesReceived   CpInvoice[] @relation("CpInvoiceToContractor")
-  complianceDocs     CpComplianceDoc[]
-  messagesSent       CpMessage[]
-  threadsAsA         CpMessageThread[] @relation("CpThreadA")
-  threadsAsB         CpMessageThread[] @relation("CpThreadB")
-  bidsInvited        CpBidInvitation[] @relation("CpBidInvited")
-  bidProposals       CpBidProposal[]
-  onboardingInvites  CpOnboardingInvite[] @relation("CpOnboardingInviter")
-  quotaUsage         CpQuotaUsage[]
-  sentMessageLog     CpSentMessage[]   @relation("CpSentMessageRecipient")
+  operatorOf        CpOperatorEdge[]     @relation("CpEdgeOperator")
+  invitedBy         CpOperatorEdge[]     @relation("CpEdgeContractor")
+  jobsAsContractor  CpJob[]              @relation("CpJobContractor")
+  jobsAwardedByMe   CpJob[]              @relation("CpJobAwardedByAccount")
+  quotesSent        CpQuote[]            @relation("CpQuoteFrom")
+  quotesReceived    CpQuote[]            @relation("CpQuoteToContractor")
+  invoicesSent      CpInvoice[]          @relation("CpInvoiceFrom")
+  invoicesReceived  CpInvoice[]          @relation("CpInvoiceToContractor")
+  complianceDocs    CpComplianceDoc[]
+  messagesSent      CpMessage[]
+  threadsAsA        CpMessageThread[]    @relation("CpThreadA")
+  threadsAsB        CpMessageThread[]    @relation("CpThreadB")
+  bidsInvited       CpBidInvitation[]    @relation("CpBidInvited")
+  bidProposals      CpBidProposal[]
+  onboardingInvites CpOnboardingInvite[] @relation("CpOnboardingInviter")
+  quotaUsage        CpQuotaUsage[]
+  sentMessageLog    CpSentMessage[]      @relation("CpSentMessageRecipient")
 }
 
 // The relationship graph: who can see whom.
@@ -1223,16 +1241,16 @@ model CpAccount {
 // `layer1CompanyId` is set, OR a Layer-2 CpAccount.id when an L2 invited
 // an L3. `contractorId` is always the CpAccount on the receiving end.
 model CpOperatorEdge {
-  id              String     @id @default(cuid())
-  contractorId    String
-  inviterAccountId String?   // Set if invited by an L2 CpAccount (so contractorId is L3)
-  layer1CompanyId String?    // Set if invited by an L1 chg-rehab Company (so contractorId is L2)
-  source          String     @default("invite") // invite | manual | import
-  createdAt       DateTime   @default(now())
+  id               String   @id @default(cuid())
+  contractorId     String
+  inviterAccountId String? // Set if invited by an L2 CpAccount (so contractorId is L3)
+  layer1CompanyId  String? // Set if invited by an L1 chg-rehab Company (so contractorId is L2)
+  source           String   @default("invite") // invite | manual | import
+  createdAt        DateTime @default(now())
 
-  contractor      CpAccount  @relation("CpEdgeContractor", fields: [contractorId], references: [id], onDelete: Cascade)
-  inviter         CpAccount? @relation("CpEdgeOperator", fields: [inviterAccountId], references: [id], onDelete: SetNull)
-  layer1Company   Company?   @relation("CpEdgeLayer1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
+  contractor    CpAccount  @relation("CpEdgeContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  inviter       CpAccount? @relation("CpEdgeOperator", fields: [inviterAccountId], references: [id], onDelete: SetNull)
+  layer1Company Company?   @relation("CpEdgeLayer1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
 
   @@unique([contractorId, inviterAccountId, layer1CompanyId])
   @@index([contractorId])
@@ -1241,58 +1259,58 @@ model CpOperatorEdge {
 }
 
 model CpJob {
-  id             String      @id @default(cuid())
-  contractorId   String
-  name           String
-  subtitle       String?
-  trade          String?
-  contractAmount Decimal     @default(0) @db.Decimal(14, 2)
-  invoicedAmount Decimal     @default(0) @db.Decimal(14, 2)
-  paidAmount     Decimal     @default(0) @db.Decimal(14, 2)
-  progressPct    Int         @default(0)
-  dueDate        String?     // free-form per prototype
-  status         String      @default("upcoming") // bid | upcoming | active | complete
-  photoRequested Boolean     @default(false)
+  id                 String   @id @default(cuid())
+  contractorId       String
+  name               String
+  subtitle           String?
+  trade              String?
+  contractAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  invoicedAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  paidAmount         Decimal  @default(0) @db.Decimal(14, 2)
+  progressPct        Int      @default(0)
+  dueDate            String? // free-form per prototype
+  status             String   @default("upcoming") // bid | upcoming | active | complete
+  photoRequested     Boolean  @default(false)
   // The party who awarded the job — either an L1 Company or an L2 CpAccount.
-  awardedByCompanyId  String?
-  awardedByAccountId  String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @default(now()) @updatedAt
+  awardedByCompanyId String?
+  awardedByAccountId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
 
-  contractor     CpAccount   @relation("CpJobContractor", fields: [contractorId], references: [id], onDelete: Cascade)
-  awardedByCompany Company?  @relation("CpJobAwardedBy", fields: [awardedByCompanyId], references: [id], onDelete: SetNull)
-  awardedByAccount CpAccount? @relation("CpJobAwardedByAccount", fields: [awardedByAccountId], references: [id], onDelete: SetNull, map: "CpJob_awardedByAccountId_fkey")
-  quotes         CpQuote[]
-  invoices       CpInvoice[]
-  photos         CpJobPhoto[]
-  threads        CpMessageThread[]
+  contractor       CpAccount         @relation("CpJobContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  awardedByCompany Company?          @relation("CpJobAwardedBy", fields: [awardedByCompanyId], references: [id], onDelete: SetNull)
+  awardedByAccount CpAccount?        @relation("CpJobAwardedByAccount", fields: [awardedByAccountId], references: [id], onDelete: SetNull, map: "CpJob_awardedByAccountId_fkey")
+  quotes           CpQuote[]
+  invoices         CpInvoice[]
+  photos           CpJobPhoto[]
+  threads          CpMessageThread[]
 
   @@index([contractorId, status])
 }
 
 model CpQuote {
-  id              String     @id @default(cuid())
-  number          String     @unique
-  fromAccountId   String     // contractor sending the quote
-  jobId           String?
-  jobName         String     // free-form description
-  recipientType   String     // operator | contractor (L1 or L2/L3)
-  toCompanyId     String?    // if to L1 operator
-  toAccountId     String?    // if to L2/L3 contractor
-  totalAmount     Decimal    @db.Decimal(14, 2)
-  notes           String?
-  status          String     @default("pending") // pending | accepted | declined
-  viewed          Boolean    @default(false)
-  sentAt          DateTime   @default(now())
-  respondedAt     DateTime?
-  isExternal      Boolean    @default(false) // true → counts toward free-tier quota
-  createdAt       DateTime   @default(now())
+  id            String    @id @default(cuid())
+  number        String    @unique
+  fromAccountId String // contractor sending the quote
+  jobId         String?
+  jobName       String // free-form description
+  recipientType String // operator | contractor (L1 or L2/L3)
+  toCompanyId   String? // if to L1 operator
+  toAccountId   String? // if to L2/L3 contractor
+  totalAmount   Decimal   @db.Decimal(14, 2)
+  notes         String?
+  status        String    @default("pending") // pending | accepted | declined
+  viewed        Boolean   @default(false)
+  sentAt        DateTime  @default(now())
+  respondedAt   DateTime?
+  isExternal    Boolean   @default(false) // true → counts toward free-tier quota
+  createdAt     DateTime  @default(now())
 
-  fromAccount     CpAccount  @relation("CpQuoteFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
-  toCompany       Company?   @relation("CpQuoteToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
-  toAccount       CpAccount? @relation("CpQuoteToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
-  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  lineItems       CpQuoteLineItem[]
+  fromAccount CpAccount         @relation("CpQuoteFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toCompany   Company?          @relation("CpQuoteToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
+  toAccount   CpAccount?        @relation("CpQuoteToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
+  job         CpJob?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  lineItems   CpQuoteLineItem[]
 
   @@index([fromAccountId, status])
   @@index([toCompanyId, status])
@@ -1300,72 +1318,72 @@ model CpQuote {
 }
 
 model CpQuoteLineItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   quoteId     String
   description String
-  qty         Decimal  @default(1) @db.Decimal(14, 4)
-  unitPrice   Decimal  @default(0) @db.Decimal(14, 2)
-  ord         Int      @default(0)
+  qty         Decimal @default(1) @db.Decimal(14, 4)
+  unitPrice   Decimal @default(0) @db.Decimal(14, 2)
+  ord         Int     @default(0)
 
-  quote       CpQuote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote CpQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
   @@index([quoteId])
 }
 
 model CpInvoice {
-  id              String     @id @default(cuid())
-  number          String     @unique
-  fromAccountId   String
-  jobId           String?
-  jobName         String
-  description     String?
-  totalAmount     Decimal    @db.Decimal(14, 2)
-  status          String     @default("pending") // pending | approved | paid | rejected
-  toCompanyId     String?
-  toAccountId     String?
-  submittedAt     DateTime   @default(now())
-  approvedAt      DateTime?
-  paidAt          DateTime?
+  id            String    @id @default(cuid())
+  number        String    @unique
+  fromAccountId String
+  jobId         String?
+  jobName       String
+  description   String?
+  totalAmount   Decimal   @db.Decimal(14, 2)
+  status        String    @default("pending") // pending | approved | paid | rejected
+  toCompanyId   String?
+  toAccountId   String?
+  submittedAt   DateTime  @default(now())
+  approvedAt    DateTime?
+  paidAt        DateTime?
 
-  fromAccount     CpAccount  @relation("CpInvoiceFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
-  toCompany       Company?   @relation("CpInvoiceToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
-  toAccount       CpAccount? @relation("CpInvoiceToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
-  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  fromAccount CpAccount  @relation("CpInvoiceFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toCompany   Company?   @relation("CpInvoiceToCompany", fields: [toCompanyId], references: [id], onDelete: SetNull)
+  toAccount   CpAccount? @relation("CpInvoiceToContractor", fields: [toAccountId], references: [id], onDelete: SetNull)
+  job         CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   @@index([fromAccountId, status])
   @@index([toCompanyId, status])
 }
 
 model CpComplianceDoc {
-  id            String     @id @default(cuid())
-  accountId     String
-  name          String
-  docType       String     // compliance | tax | contract | other
-  fileName      String?
-  expiresAt     DateTime?
-  status        String     @default("current") // current | expiring | expired | missing
-  uploadedAt    DateTime   @default(now())
+  id         String    @id @default(cuid())
+  accountId  String
+  name       String
+  docType    String // compliance | tax | contract | other
+  fileName   String?
+  expiresAt  DateTime?
+  status     String    @default("current") // current | expiring | expired | missing
+  uploadedAt DateTime  @default(now())
 
-  account       CpAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, docType])
 }
 
 model CpJobPhoto {
-  id          String   @id @default(cuid())
-  jobId       String
-  phase       String
-  caption     String?
-  objectPath  String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  jobId      String
+  phase      String
+  caption    String?
+  objectPath String?
+  createdAt  DateTime @default(now())
 
-  job         CpJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job CpJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
 }
 
 model CpMessageThread {
-  id              String     @id @default(cuid())
+  id              String   @id @default(cuid())
   jobId           String?
   subject         String
   // Two participants: A is the contractor account; B can be either an
@@ -1373,14 +1391,14 @@ model CpMessageThread {
   contractorAId   String
   contractorBId   String?
   layer1CompanyId String?
-  lastMessageAt   DateTime   @default(now())
-  createdAt       DateTime   @default(now())
+  lastMessageAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
 
-  job             CpJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  contractorA     CpAccount  @relation("CpThreadA", fields: [contractorAId], references: [id], onDelete: Cascade)
-  contractorB     CpAccount? @relation("CpThreadB", fields: [contractorBId], references: [id], onDelete: SetNull)
-  layer1Company   Company?   @relation("CpThreadL1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
-  messages        CpMessage[]
+  job           CpJob?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  contractorA   CpAccount   @relation("CpThreadA", fields: [contractorAId], references: [id], onDelete: Cascade)
+  contractorB   CpAccount?  @relation("CpThreadB", fields: [contractorBId], references: [id], onDelete: SetNull)
+  layer1Company Company?    @relation("CpThreadL1", fields: [layer1CompanyId], references: [id], onDelete: SetNull)
+  messages      CpMessage[]
 
   @@index([contractorAId])
   @@index([contractorBId])
@@ -1388,75 +1406,75 @@ model CpMessageThread {
 }
 
 model CpMessage {
-  id          String           @id @default(cuid())
-  threadId    String
-  senderAccountId String?      // null when sender is an L1 operator user
-  senderCompanyId String?      // set when L1 operator
-  senderName  String
-  body        String
-  unread      Boolean          @default(true)
-  createdAt   DateTime         @default(now())
+  id              String   @id @default(cuid())
+  threadId        String
+  senderAccountId String? // null when sender is an L1 operator user
+  senderCompanyId String? // set when L1 operator
+  senderName      String
+  body            String
+  unread          Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
-  thread      CpMessageThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  sender      CpAccount?       @relation(fields: [senderAccountId], references: [id], onDelete: SetNull)
+  thread CpMessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender CpAccount?      @relation(fields: [senderAccountId], references: [id], onDelete: SetNull)
 
   @@index([threadId, createdAt])
 }
 
 model CpBidInvitation {
-  id              String     @id @default(cuid())
+  id               String    @id @default(cuid())
   invitedAccountId String
-  jobName         String
-  jobLocation     String?
-  trade           String?
-  scopeRangeLow   Decimal?   @db.Decimal(14, 2)
-  scopeRangeHigh  Decimal?   @db.Decimal(14, 2)
-  bidDueAt        DateTime?
-  fromCompanyId   String?
-  fromAccountId   String?
-  status          String     @default("open") // open | submitted | awarded | closed
-  createdAt       DateTime   @default(now())
+  jobName          String
+  jobLocation      String?
+  trade            String?
+  scopeRangeLow    Decimal?  @db.Decimal(14, 2)
+  scopeRangeHigh   Decimal?  @db.Decimal(14, 2)
+  bidDueAt         DateTime?
+  fromCompanyId    String?
+  fromAccountId    String?
+  status           String    @default("open") // open | submitted | awarded | closed
+  createdAt        DateTime  @default(now())
 
-  invitedAccount  CpAccount  @relation("CpBidInvited", fields: [invitedAccountId], references: [id], onDelete: Cascade)
-  fromCompany     Company?   @relation("CpBidInvFromCompany", fields: [fromCompanyId], references: [id], onDelete: SetNull)
-  proposals       CpBidProposal[]
+  invitedAccount CpAccount       @relation("CpBidInvited", fields: [invitedAccountId], references: [id], onDelete: Cascade)
+  fromCompany    Company?        @relation("CpBidInvFromCompany", fields: [fromCompanyId], references: [id], onDelete: SetNull)
+  proposals      CpBidProposal[]
 
   @@index([invitedAccountId, status])
 }
 
 model CpBidProposal {
-  id              String     @id @default(cuid())
-  invitationId    String
-  fromAccountId   String
-  amount          Decimal    @db.Decimal(14, 2)
-  durationDays    Int?
-  notes           String?
-  status          String     @default("submitted") // submitted | awarded | declined
-  submittedAt     DateTime   @default(now())
+  id            String   @id @default(cuid())
+  invitationId  String
+  fromAccountId String
+  amount        Decimal  @db.Decimal(14, 2)
+  durationDays  Int?
+  notes         String?
+  status        String   @default("submitted") // submitted | awarded | declined
+  submittedAt   DateTime @default(now())
 
-  invitation      CpBidInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
-  fromAccount     CpAccount       @relation(fields: [fromAccountId], references: [id], onDelete: Cascade)
+  invitation  CpBidInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  fromAccount CpAccount       @relation(fields: [fromAccountId], references: [id], onDelete: Cascade)
 
   @@unique([invitationId, fromAccountId])
 }
 
 model CpOnboardingInvite {
-  id              String     @id @default(cuid())
-  email           String
-  companyName     String?
-  contactName     String?
-  trade           String?
-  token           String     @unique
+  id               String    @id @default(cuid())
+  email            String
+  companyName      String?
+  contactName      String?
+  trade            String?
+  token            String    @unique
   // Inviter is either an L1 company (CHG operator user) or an L2 contractor.
   inviterCompanyId String?
   inviterAccountId String?
-  consumedAt      DateTime?
-  consumedById    String?
-  expiresAt       DateTime
-  createdAt       DateTime   @default(now())
+  consumedAt       DateTime?
+  consumedById     String?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
 
-  inviterCompany  Company?   @relation("CpOnboardingInvCompany", fields: [inviterCompanyId], references: [id], onDelete: SetNull)
-  inviterAccount  CpAccount? @relation("CpOnboardingInviter", fields: [inviterAccountId], references: [id], onDelete: SetNull)
+  inviterCompany Company?   @relation("CpOnboardingInvCompany", fields: [inviterCompanyId], references: [id], onDelete: SetNull)
+  inviterAccount CpAccount? @relation("CpOnboardingInviter", fields: [inviterAccountId], references: [id], onDelete: SetNull)
 
   @@index([email])
   @@index([inviterCompanyId])
@@ -1464,13 +1482,13 @@ model CpOnboardingInvite {
 }
 
 model CpQuotaUsage {
-  id          String   @id @default(cuid())
-  accountId   String
-  yearMonth   String   // YYYY-MM
-  quotesUsed  Int      @default(0)
-  updatedAt   DateTime @default(now()) @updatedAt
+  id         String   @id @default(cuid())
+  accountId  String
+  yearMonth  String // YYYY-MM
+  quotesUsed Int      @default(0)
+  updatedAt  DateTime @default(now()) @updatedAt
 
-  account     CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, yearMonth])
 }
@@ -1478,7 +1496,7 @@ model CpQuotaUsage {
 // Stub notification log — magic-link emails / SMS land here in dev.
 model CpSentMessage {
   id          String   @id @default(cuid())
-  channel     String   // email | sms
+  channel     String // email | sms
   toAddress   String
   toAccountId String?
   subject     String?
@@ -1486,23 +1504,167 @@ model CpSentMessage {
   meta        Json?
   sentAt      DateTime @default(now())
 
-  toAccount   CpAccount? @relation("CpSentMessageRecipient", fields: [toAccountId], references: [id], onDelete: SetNull)
+  toAccount CpAccount? @relation("CpSentMessageRecipient", fields: [toAccountId], references: [id], onDelete: SetNull)
 
   @@index([toAddress])
   @@index([sentAt])
 }
 
-// ─── Project Manager (PM) Module ─────────────────────────────────────────────
+// ========================================================================
+// Workspace module (Command Center + Messages) — added Task #1.
+// Domain data for the operator-facing workspace lives in Replit Postgres
+// via Prisma. Notifications reuse the existing Notification table with
+// channel="inApp" and event values prefixed with "workspace.*".
+// ========================================================================
+
+model WsTask {
+  id              String    @id @default(cuid())
+  companyId       String
+  createdById     String
+  assigneeId      String?
+  title           String
+  description     String?
+  priority        String    @default("Medium") // Urgent | Medium | Low
+  dueDate         DateTime?
+  done            Boolean   @default(false)
+  doneAt          DateTime?
+  linkType        String? // "deal" | "project"
+  linkId          String?
+  linkLabel       String? // denormalised display label e.g. "210 Harbour Ln (Rehab)"
+  sourceMessageId String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User       @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee      User?      @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  sourceMessage WsMessage? @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, done, dueDate])
+  @@index([companyId, assigneeId, done])
+  @@index([companyId, createdById, done])
+}
+
+model WsChannel {
+  id        String   @id @default(cuid())
+  companyId String
+  kind      String // "team" | "contractor" | "investor"
+  slug      String? // for team channels: "general", "acquisitions", etc.
+  name      String
+  partyType String? // "CpAccount" | "Investor"
+  partyId   String? // CpAccount.id or Investor.id for DM channels
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members  WsChannelMember[]
+  messages WsMessage[]
+
+  @@unique([companyId, kind, slug])
+  @@unique([companyId, kind, partyType, partyId])
+  @@index([companyId, kind])
+}
+
+model WsChannelMember {
+  id         String    @id @default(cuid())
+  channelId  String
+  userId     String
+  lastReadAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  channel WsChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+}
+
+model WsMessage {
+  id              String   @id @default(cuid())
+  companyId       String
+  channelId       String
+  authorUserId    String? // null = system message
+  authorLabel     String? // for system or external party messages
+  body            String
+  convertedTaskId String? // populated when a task is created from this message
+  createdAt       DateTime @default(now())
+
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  channel       WsChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author        User?     @relation("WsMessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  convertedTask WsTask?   @relation("WsMessageConvertedTask")
+
+  @@index([channelId, createdAt])
+  @@index([companyId, createdAt])
+}
+
+model WsGoal {
+  id          String   @id @default(cuid())
+  companyId   String
+  ownerUserId String? // null = company-wide goal
+  title       String
+  scope       String   @default("company") // "company" | "user"
+  period      String? // e.g. "2026-Q2"
+  metricMode  String   @default("count") // "count" | "percent"
+  current     Int      @default(0)
+  target      Int      @default(1)
+  done        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner   User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, scope])
+  @@index([companyId, ownerUserId])
+}
+
+model WsReminder {
+  id        String    @id @default(cuid())
+  companyId String
+  userId    String? // null = company-wide
+  title     String
+  source    String? // breadcrumb e.g. "Documents hub · Insurance & COI"
+  link      String?
+  remindAt  DateTime?
+  urgent    Boolean   @default(false)
+  done      Boolean   @default(false)
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, done, remindAt])
+  @@index([companyId, userId, done])
+}
+
+model WsCalendarEvent {
+  id          String    @id @default(cuid())
+  companyId   String
+  createdById String?
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime?
+  link        String?
+  createdAt   DateTime  @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, startAt])
+}
 
 model PmSpace {
   id        String     @id @default(cuid())
   companyId String
   name      String
-  color     String?    @default("#3B82F6")
+  color     String?
   icon      String?
+  order     Int        @default(0)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @default(now()) @updatedAt
-
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lists     PmList[]
   statuses  PmStatus[]
@@ -1512,86 +1674,119 @@ model PmSpace {
 }
 
 model PmList {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
+  companyId String
   spaceId   String
   name      String
   color     String?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  space     PmSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  order     Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
   tasks     PmTask[]
+  statuses  PmStatus[]
 
+  @@index([companyId])
   @@index([spaceId])
 }
 
 model PmStatus {
   id        String   @id @default(cuid())
-  spaceId   String
+  companyId String
+  spaceId   String?
+  listId    String?
   name      String
   color     String   @default("#6B7280")
-  type      String   @default("open") // open | active | done | closed
+  type      String   @default("open")
   order     Int      @default(0)
   isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  space     PmSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  list      PmList?  @relation(fields: [listId], references: [id], onDelete: Cascade)
   tasks     PmTask[]
 
-  @@index([spaceId])
+  @@index([companyId])
+}
+
+model PmTag {
+  id        String      @id @default(cuid())
+  companyId String
+  spaceId   String
+  name      String
+  color     String      @default("#E5E7EB")
+  textColor String      @default("#374151")
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  space     PmSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tasks     PmTaskTag[]
+
+  @@index([companyId])
 }
 
 model PmTask {
-  id            String    @id @default(cuid())
-  listId        String
-  statusId      String?
-  parentTaskId  String?
-  name          String
-  description   String?
-  priority      String?   @default("normal") // urgent | high | normal | low
-  taskType      String?   @default("task")   // task | bug | feature | milestone
-  dueDate       DateTime?
-  startDate     DateTime?
-  timeEstimate  Int?      // minutes
-  sprintPoints  Int?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @default(now()) @updatedAt
+  id           String           @id @default(cuid())
+  companyId    String
+  listId       String
+  parentTaskId String?
+  createdById  String
+  name         String
+  description  String?
+  taskType     String           @default("task")
+  statusId     String?
+  priority     String?
+  coverImage   String?
+  startDate    DateTime?
+  dueDate      DateTime?
+  closedDate   DateTime?
+  doneDate     DateTime?
+  timeEstimate Int?
+  sprintPoints Int?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  list         PmList           @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status       PmStatus?        @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  createdBy    User             @relation("PmTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  parent       PmTask?          @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     PmTask[]         @relation("PmSubtasks")
+  assignees    PmTaskAssignee[]
+  tags         PmTaskTag[]
+  comments     PmComment[]
+  activity     PmActivity[]
 
-  list          PmList           @relation(fields: [listId], references: [id], onDelete: Cascade)
-  status        PmStatus?        @relation(fields: [statusId], references: [id], onDelete: SetNull)
-  parent        PmTask?          @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subtasks      PmTask[]         @relation("PmSubtasks")
-  assignees     PmTaskAssignee[]
-  comments      PmComment[]
-  activity      PmActivity[]
-  tags          PmTaskTag[]
-
+  @@index([companyId])
   @@index([listId])
-  @@index([statusId])
   @@index([parentTaskId])
 }
 
 model PmTaskAssignee {
   taskId String
   userId String
-
   task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation("PmAssignments", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
-  @@index([userId])
+}
+
+model PmTaskTag {
+  taskId String
+  tagId  String
+  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
 }
 
 model PmComment {
   id        String   @id @default(cuid())
   taskId    String
-  userId    String
+  authorId  String
   body      String
+  isEdited  Boolean  @default(false)
   createdAt DateTime @default(now())
-
+  updatedAt DateTime @default(now()) @updatedAt
   task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  author    User     @relation("PmComments", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
@@ -1600,34 +1795,11 @@ model PmActivity {
   id        String   @id @default(cuid())
   taskId    String
   userId    String
-  type      String   // task_created | status_changed | assignee_added | comment_added
-  data      Json?
+  type      String
+  payload   Json?
   createdAt DateTime @default(now())
-
   task      PmTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation("PmActivityLog", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
-}
-
-model PmTag {
-  id      String      @id @default(cuid())
-  spaceId String
-  name    String
-  color   String?
-
-  space   PmSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  tasks   PmTaskTag[]
-
-  @@index([spaceId])
-}
-
-model PmTaskTag {
-  taskId String
-  tagId  String
-
-  task   PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([taskId, tagId])
 }

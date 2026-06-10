@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 async function ownedList(companyId: string, listId: string) {
-  return prisma.pmList.findFirst({ where: { id: listId, space: { companyId } } });
+  return prisma.pmList.findFirst({ where: { id: listId, companyId } });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ listId: string }> }) {

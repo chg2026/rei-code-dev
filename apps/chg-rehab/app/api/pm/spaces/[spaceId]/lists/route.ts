@@ -13,7 +13,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ spaceId
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const lists = await prisma.pmList.findMany({
-    where: { spaceId },
+    where: { spaceId, companyId: user.companyId },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
   });
   return NextResponse.json({ lists });
@@ -33,7 +33,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ spaceId
 
   const order = await prisma.pmList.count({ where: { spaceId } });
   const list = await prisma.pmList.create({
-    data: { spaceId, name, color: body.color ?? null, order },
+    data: {
+      companyId: user.companyId,
+      spaceId,
+      name,
+      color: body.color ?? null,
+      order,
+    },
   });
   return NextResponse.json({ id: list.id, list });
 }
