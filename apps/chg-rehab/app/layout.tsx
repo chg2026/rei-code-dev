@@ -69,7 +69,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <TopNav user={user} companyName={companyName} />
           <div className="main-col">
             <div className="topbar">
-              <div className="spacer" />
+              <form action="/search" method="GET" style={{ display: "flex", alignItems: "center", flex: 1, maxWidth: 400 }}>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--stone)", pointerEvents: "none" }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input name="q" type="search" placeholder="Search or ask AI anything…" style={{ width: "100%", padding: "7px 12px 7px 30px", fontSize: 12, border: "1px solid var(--border-1)", borderRadius: 8, background: "var(--paper)", color: "var(--ink)", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </form>
               {isAdmin ? <BillingNavIndicator /> : <BillingNavBadge />}
               <NotificationBell />
               <AppSwitcher
