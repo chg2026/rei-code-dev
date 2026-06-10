@@ -52,10 +52,7 @@ type ProfileRow = {
   phone: string | null;
   email: string | null;
   profile_score: number | null;
-  accounts:
-    | { name: string | null; plan_tier: string | null }
-    | { name: string | null; plan_tier: string | null }[]
-    | null;
+  account_id: string | null;
 };
 
 async function loadProfileInitial(
@@ -68,12 +65,22 @@ async function loadProfileInitial(
   const admin = getSupabaseAdminClient();
   const { data } = await admin
     .from("user_profiles")
-    .select("full_name, phone, email, profile_score, accounts ( name, plan_tier )")
+    .select("full_name, phone, email, profile_score, account_id")
     .eq("id", userId)
     .maybeSingle<ProfileRow>();
-  const account = Array.isArray(data?.accounts)
-    ? data?.accounts?.[0] ?? null
-    : data?.accounts ?? null;
+
+  // accounts is linked via user_profiles.account_id -> accounts.id (not the
+  // user id), so the previous embedded join was the broken part. Fetch the
+  // account separately keyed on account_id.
+  const account = data?.account_id
+    ? (
+        await admin
+          .from("accounts")
+          .select("name, plan_tier")
+          .eq("id", data.account_id)
+          .maybeSingle<{ name: string | null; plan_tier: string | null }>()
+      ).data ?? null
+    : null;
   return {
     fullName: data?.full_name || [firstName, lastName].filter(Boolean).join(" ") || "",
     phone: data?.phone ?? "",
