@@ -99,6 +99,8 @@ body {
   background: var(--paper);
   border-right: 1px solid var(--border-1);
   padding: 20px 16px 24px;
+  width: 260px;
+  min-width: 260px;
   display: flex;
   flex-direction: column;
   gap: 20px;
