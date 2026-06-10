@@ -638,8 +638,8 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
         <div style={{ padding: "14px 16px", background: "var(--bg-secondary)", borderBottom: "0.5px solid var(--border-lo)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
             <Summary label="Total invested"          val={formatMoney(totalInvested)}    color="#1F4D5C" />
-            <Summary label="Projected net profit"    val={formatMoney(projectedNet)}     color="#1D9E75" />
-            <Summary label="Projected ROI"           val={`${projectedRoi}%`}             color="#1D9E75" sub="(sell scenario)" />
+            <Summary label="Projected net profit"    val={!m.arv || m.arv <= 0 ? "—" : formatMoney(projectedNet)}     color="#1D9E75" />
+            <Summary label="Projected ROI"           val={!m.arv || m.arv <= 0 ? "—" : `${projectedRoi}%`}             color="#1D9E75" sub="(sell scenario)" />
           </div>
         </div>
         <div style={{ padding: "10px 16px", background: "#EAF3DE", borderBottom: "0.5px solid var(--border-lo)" }}>

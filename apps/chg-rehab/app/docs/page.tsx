@@ -42,7 +42,7 @@ export default async function DocsPage(props: {
   const sp = await props.searchParams;
   const level: Level = (LEVEL_VALUES as string[]).includes(sp.level ?? "")
     ? (sp.level as Level)
-    : "Project";
+    : "Property";
   const status = (STATUS_VALUES as readonly string[]).includes(sp.status ?? "")
     ? (sp.status as (typeof STATUS_VALUES)[number])
     : "all-status";

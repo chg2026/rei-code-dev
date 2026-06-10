@@ -126,7 +126,7 @@ export default function CalendarTab() {
           {loading ? (
             <div className={s.empty} style={{ padding: 20 }}>Loading…</div>
           ) : upcoming.length === 0 ? (
-            <div className={s.empty} style={{ padding: 20 }}>Nothing scheduled.</div>
+            <div className={s.empty} style={{ padding: 20 }}>No upcoming events this month</div>
           ) : upcoming.map((e) => {
             const d = new Date(e.when);
             const content = (
