@@ -65,28 +65,49 @@ async function loadProfileInitial(
   const admin = getSupabaseAdminClient();
   const { data } = await admin
     .from("user_profiles")
-    .select("full_name, phone, email, profile_score, account_id")
+    .select("full_name, phone, email, profile_score")
     .eq("id", userId)
     .maybeSingle<ProfileRow>();
 
   // accounts is linked via user_profiles.account_id -> accounts.id (not the
-  // user id), so the previous embedded join was the broken part. Fetch the
-  // account separately keyed on account_id.
-  const account = data?.account_id
-    ? (
-        await admin
-          .from("accounts")
-          .select("name, plan_tier")
-          .eq("id", data.account_id)
-          .maybeSingle<{ name: string | null; plan_tier: string | null }>()
-      ).data ?? null
-    : null;
+  // user id), and the plan lives on account_products keyed by account_id, so
+  // the previous embedded join was the broken part. Resolve account_id first,
+  // then look up the account name and active plan separately.
+  const { data: acctData } = await admin
+    .from("user_profiles")
+    .select("account_id")
+    .eq("id", userId)
+    .maybeSingle<{ account_id: string | null }>();
+
+  const accountId = acctData?.account_id ?? null;
+
+  let accountName: string | null = null;
+  let planTier: string | null = null;
+
+  if (accountId) {
+    const { data: acct } = await admin
+      .from("accounts")
+      .select("name")
+      .eq("id", accountId)
+      .maybeSingle<{ name: string | null }>();
+    accountName = acct?.name ?? null;
+
+    const { data: entitlement } = await admin
+      .from("account_products")
+      .select("plan")
+      .eq("account_id", accountId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle<{ plan: string | null }>();
+    planTier = entitlement?.plan ?? null;
+  }
+
   return {
     fullName: data?.full_name || [firstName, lastName].filter(Boolean).join(" ") || "",
     phone: data?.phone ?? "",
     email: data?.email ?? fallbackEmail,
-    accountName: account?.name ?? null,
-    planTier: account?.plan_tier ?? null,
+    accountName: accountName,
+    planTier: planTier,
     role,
     profileScore: data?.profile_score ?? null,
   };
