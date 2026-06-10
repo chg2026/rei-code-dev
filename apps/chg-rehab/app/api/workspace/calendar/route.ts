@@ -4,9 +4,14 @@ import { getCurrentUser } from "@/lib/auth";
 
 /**
  * GET /api/workspace/calendar?month=YYYY-MM — returns calendar events for the
- * given month, drawn from: pipeline closing dates, project start/end dates,
- * document expirations, distribution scheduled dates, manual WsCalendarEvent
- * rows, and any task with a dueDate.
+ * given month, drawn from:
+ *  - tasks with a dueDate
+ *  - upcoming pipeline closings (expected close date from deal.meta.closingDate)
+ *  - actual pipeline closings (closedAt) for history within the month
+ *  - project phase milestones (Phase start/end dates)
+ *  - document expirations
+ *  - investor distribution scheduled dates
+ *  - manual WsCalendarEvent rows
  */
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -24,21 +29,36 @@ export async function GET(req: Request) {
   const end = new Date(Date.UTC(y, m, 1));
   const range = { gte: start, lt: end };
 
-  const [tasks, deals, projects, docs, dists, manual] = await Promise.all([
+  const [tasks, closedDeals, openDeals, phases, docs, dists, manual] = await Promise.all([
     prisma.wsTask.findMany({
       where: { companyId: user.companyId, dueDate: range },
       select: { id: true, title: true, dueDate: true, priority: true },
     }),
+    // Actual closings recorded in this month (history).
     prisma.pipelineDeal.findMany({
       where: { companyId: user.companyId, closedAt: range },
       select: { id: true, address: true, code: true, closedAt: true },
     }),
-    prisma.project.findMany({
+    // Open deals whose expected closing date (meta.closingDate) may land in-month.
+    prisma.pipelineDeal.findMany({
+      where: { companyId: user.companyId, closedAt: null },
+      select: { id: true, address: true, meta: true },
+      take: 300,
+    }),
+    // Project phase milestones (start/end) — the closest thing to milestones.
+    prisma.phase.findMany({
       where: {
-        companyId: user.companyId,
+        project: { companyId: user.companyId },
         OR: [{ startDate: range }, { endDate: range }],
       },
-      select: { id: true, name: true, code: true, startDate: true, endDate: true },
+      select: {
+        id: true,
+        name: true,
+        number: true,
+        startDate: true,
+        endDate: true,
+        project: { select: { name: true } },
+      },
     }),
     prisma.document.findMany({
       where: { companyId: user.companyId, status: "Active", expiresAt: range },
@@ -56,20 +76,41 @@ export async function GET(req: Request) {
 
   type Ev = { id: string; title: string; when: string; kind: string; link: string | null };
   const events: Ev[] = [];
+
   for (const t of tasks) {
     if (t.dueDate) events.push({ id: `task:${t.id}`, title: t.title, when: t.dueDate.toISOString(), kind: "task", link: "/command-center" });
   }
-  for (const d of deals) {
-    if (d.closedAt) events.push({ id: `deal:${d.id}`, title: `Deal closing: ${d.address}`, when: d.closedAt.toISOString(), kind: "deal", link: "/pipeline" });
+
+  for (const d of openDeals) {
+    const meta = (d.meta as Record<string, unknown> | null) ?? {};
+    const raw = meta.closingDate;
+    if (typeof raw !== "string" && !(raw instanceof Date)) continue;
+    const cd = new Date(raw as string | Date);
+    if (Number.isNaN(cd.getTime()) || cd < start || cd >= end) continue;
+    events.push({
+      id: `deal-expected:${d.id}`,
+      title: `Expected closing: ${d.address}`,
+      when: cd.toISOString(),
+      kind: "deal",
+      link: "/pipeline",
+    });
   }
-  for (const p of projects) {
+
+  for (const d of closedDeals) {
+    if (d.closedAt) events.push({ id: `deal-closed:${d.id}`, title: `Deal closed: ${d.address}`, when: d.closedAt.toISOString(), kind: "deal", link: "/pipeline" });
+  }
+
+  for (const p of phases) {
+    const label = `Phase ${p.number}: ${p.name}`;
+    const proj = p.project?.name ? ` (${p.project.name})` : "";
     if (p.startDate && p.startDate >= start && p.startDate < end) {
-      events.push({ id: `proj-start:${p.id}`, title: `${p.name} starts`, when: p.startDate.toISOString(), kind: "project", link: "/rehab" });
+      events.push({ id: `phase-start:${p.id}`, title: `${label} starts${proj}`, when: p.startDate.toISOString(), kind: "milestone", link: "/rehab" });
     }
     if (p.endDate && p.endDate >= start && p.endDate < end) {
-      events.push({ id: `proj-end:${p.id}`, title: `${p.name} target close`, when: p.endDate.toISOString(), kind: "project", link: "/rehab" });
+      events.push({ id: `phase-end:${p.id}`, title: `${label} due${proj}`, when: p.endDate.toISOString(), kind: "milestone", link: "/rehab" });
     }
   }
+
   for (const d of docs) {
     if (d.expiresAt) events.push({ id: `doc:${d.id}`, title: `${d.name} expires`, when: d.expiresAt.toISOString(), kind: "doc", link: "/docs" });
   }
@@ -79,6 +120,7 @@ export async function GET(req: Request) {
   for (const e of manual) {
     events.push({ id: `cal:${e.id}`, title: e.title, when: e.startAt.toISOString(), kind: "event", link: e.link });
   }
+
   events.sort((a, b) => a.when.localeCompare(b.when));
 
   return NextResponse.json({ month: `${y}-${String(m).padStart(2, "0")}`, events });
