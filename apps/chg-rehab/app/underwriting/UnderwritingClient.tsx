@@ -8,20 +8,68 @@ type Property = {
   city: string | null;
   state: string | null;
   status: string | null;
+  meta: unknown;
 };
 
-export default function UnderwritingClient({ properties, initialAnalysisId, initialPropertyId }: { properties: Property[]; initialAnalysisId?: string | null; initialPropertyId?: string | null }) {
-  const [selectedId, setSelectedId] = useState<string>(
-    initialPropertyId && properties.some(p => p.id === initialPropertyId)
-      ? initialPropertyId
-      : (properties[0]?.id ?? "")
-  );
+type InitialInputs = {
+  purchase: string | null;
+  rehab: string | null;
+  arv: string | null;
+  closing: string | null;
+  holding: string | null;
+  strategy: string | null;
+};
 
-  const selected = properties.find(p => p.id === selectedId);
+export default function UnderwritingClient({
+  properties,
+  initialPropertyId,
+  initialInputs,
+}: {
+  properties: Property[];
+  initialPropertyId?: string | null;
+  initialInputs?: InitialInputs | null;
+}) {
+  const initialSelected =
+    (initialPropertyId ? properties.find((p) => p.id === initialPropertyId) : null) ??
+    properties[0] ??
+    null;
 
-  const iframeSrc = selected
-    ? `/underwriting-calc.html?propertyId=${encodeURIComponent(selected.id)}&address=${encodeURIComponent(selected.address)}&city=${encodeURIComponent(selected.city ?? "")}&state=${encodeURIComponent(selected.state ?? "")}&status=${encodeURIComponent(selected.status ?? "")}${initialAnalysisId ? `&analysisId=${encodeURIComponent(initialAnalysisId)}` : ""}`
-    : "/underwriting-calc.html";
+  const [selectedId, setSelectedId] = useState<string>(initialSelected?.id ?? "");
+
+  const selected = properties.find((p) => p.id === selectedId) ?? null;
+
+  // Get property meta for pre-population when no explicit inputs passed
+  const meta = (selected?.meta && typeof selected.meta === "object")
+    ? (selected.meta as Record<string, unknown>)
+    : {};
+
+  // Explicit inputs (from saved analysis URL params) take priority.
+  // Fall back to property record values.
+  const purchase = initialInputs?.purchase ?? (meta.purchasePrice ? String(meta.purchasePrice) : null);
+  const rehab = initialInputs?.rehab ?? null;
+  const arv = initialInputs?.arv ?? (meta.arv ? String(meta.arv) : null);
+  const closing = initialInputs?.closing ?? (meta.closingCosts ? String(meta.closingCosts) : null);
+  const holding = initialInputs?.holding ?? null;
+  const strategy = initialInputs?.strategy ?? null;
+
+  function buildIframeSrc(prop: Property | null) {
+    if (!prop) return "/underwriting-calc.html";
+    const p = new URLSearchParams();
+    p.set("propertyId", prop.id);
+    p.set("address", prop.address);
+    if (prop.city) p.set("city", prop.city);
+    if (prop.state) p.set("state", prop.state);
+    if (prop.status) p.set("status", prop.status);
+    if (purchase) p.set("purchase", purchase);
+    if (rehab) p.set("rehab", rehab);
+    if (arv) p.set("arv", arv);
+    if (closing) p.set("closing", closing);
+    if (holding) p.set("holding", holding);
+    if (strategy) p.set("strategy", strategy);
+    return `/underwriting-calc.html?${p.toString()}`;
+  }
+
+  const iframeSrc = buildIframeSrc(selected);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
@@ -67,17 +115,11 @@ export default function UnderwritingClient({ properties, initialAnalysisId, init
         )}
       </div>
 
-      {/* Calculator iframe */}
+      {/* Calculator iframe — key forces remount on property/input change */}
       <iframe
         key={iframeSrc}
         src={iframeSrc}
-        style={{
-          flex: 1,
-          border: "none",
-          width: "100%",
-          height: "100%",
-          display: "block",
-        }}
+        style={{ flex: 1, border: "none", width: "100%", height: "100%", display: "block" }}
         title="Underwriting Calculator"
       />
     </div>

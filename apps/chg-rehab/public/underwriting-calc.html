@@ -1832,26 +1832,45 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     });
   }
 
-  var analysisId = params.get("analysisId");
-  if (analysisId && window._propertyId) {
-    fetch('/api/properties/' + window._propertyId + '/underwriting/' + analysisId)
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        if (!data || !data.inputs) return;
-        var inp = data.inputs;
-        window.addEventListener("DOMContentLoaded", function() {
-          function setVal(id, v) { var el = document.getElementById(id); if (el && v) { el.value = v; el.dispatchEvent(new Event('input',{bubbles:true})); } }
-          setVal('ap-price', inp.purchase);
-          setVal('ap-rehab', inp.rehab);
-          setVal('f-arv', inp.arv);
-          setVal('ap-closing', inp.closing);
-          setVal('ap-holding', inp.holding);
-          if (inp.downPayment) setVal('ap-down', inp.downPayment);
-          if (inp.interestRate) setVal('ap-rate', inp.interestRate);
-          setTimeout(function(){ try { recalcFlip(); recalcB(); recalc(); } catch(e){} }, 300);
-        });
-      }).catch(function(){});
-  }
+  window.addEventListener("DOMContentLoaded", function() {
+    function setVal(id, v) {
+      if (!v) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    var purchase = params.get("purchase");
+    var rehab = params.get("rehab");
+    var arv = params.get("arv");
+    var closing = params.get("closing");
+    var holding = params.get("holding");
+    var strategy = params.get("strategy");
+
+    if (purchase) setVal('ap-price', purchase);
+    if (rehab) setVal('ap-rehab', rehab);
+    if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
+    if (closing) setVal('ap-closing', closing);
+    if (holding) setVal('ap-holding', holding);
+
+    // Switch to the correct strategy tab if specified
+    if (strategy) {
+      var tabMap = { brrrr: 'tab-brrrr', flip: 'tab-flip', wholesale: 'tab-wholesale' };
+      var tabId = tabMap[strategy.toLowerCase()];
+      if (tabId) {
+        var tab = document.getElementById(tabId);
+        if (tab) tab.click();
+      }
+    }
+
+    // Trigger recalculation after a short delay to let the DOM settle
+    setTimeout(function() {
+      try { recalcFlip(); } catch(e) {}
+      try { recalcB(); } catch(e) {}
+      try { recalc(); } catch(e) {}
+    }, 200);
+  });
 })();
 // ─── HELPERS ───
 const $=id=>document.getElementById(id);

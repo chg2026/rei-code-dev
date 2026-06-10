@@ -944,7 +944,17 @@ function AnalysisList({ sections, propertyId }: { sections: { id: string; sectio
             {/* Actions */}
             <div style={{ padding: "10px 20px", display: "flex", gap: 10, alignItems: "center" }}>
               <Link
-                href={`/underwriting?propertyId=${encodeURIComponent(propertyId)}&analysisId=${encodeURIComponent(s.id)}`}
+                href={(() => {
+                  const p = new URLSearchParams();
+                  p.set("propertyId", propertyId);
+                  if (inputs.purchase) p.set("purchase", String(inputs.purchase));
+                  if (inputs.rehab) p.set("rehab", String(inputs.rehab));
+                  if (inputs.arv) p.set("arv", String(inputs.arv));
+                  if (inputs.closing) p.set("closing", String(inputs.closing));
+                  if (inputs.holding) p.set("holding", String(inputs.holding));
+                  if (d.strategy) p.set("strategy", String(d.strategy));
+                  return `/underwriting?${p.toString()}`;
+                })()}
                 style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
               >
                 Open full report →

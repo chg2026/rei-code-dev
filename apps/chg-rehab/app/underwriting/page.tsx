@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function UnderwritingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ analysisId?: string; propertyId?: string }>;
+  searchParams?: Promise<Record<string, string | undefined>>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -23,9 +23,23 @@ export default async function UnderwritingPage({
       city: true,
       state: true,
       status: true,
+      meta: true,
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return <UnderwritingClient properties={properties} initialAnalysisId={sp.analysisId ?? null} initialPropertyId={sp.propertyId ?? null} />;
+  return (
+    <UnderwritingClient
+      properties={properties}
+      initialPropertyId={sp.propertyId ?? null}
+      initialInputs={{
+        purchase: sp.purchase ?? null,
+        rehab: sp.rehab ?? null,
+        arv: sp.arv ?? null,
+        closing: sp.closing ?? null,
+        holding: sp.holding ?? null,
+        strategy: sp.strategy ?? null,
+      }}
+    />
+  );
 }
