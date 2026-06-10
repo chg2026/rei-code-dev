@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/session";
 import WorkspaceNewPill from "@/components/WorkspaceNewPill";
+import OnboardingChecklist from "./OnboardingChecklist";
 
 type NavItem = { href: string; label: string };
 type NavSection = { label?: string; items: NavItem[] };
@@ -118,6 +119,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
             })}
           </div>
         ))}
+        <OnboardingChecklist />
       </aside>
     </>
   );
