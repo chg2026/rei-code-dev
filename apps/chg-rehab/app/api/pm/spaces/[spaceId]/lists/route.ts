@@ -1,43 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest, { params }: { params: { spaceId: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { spaceId } = await params;
 
-  const space = await prisma.pmSpace.findFirst({ where: { id: params.spaceId, companyId: user.companyId } });
+  const space = await prisma.pmSpace.findFirst({ where: { id: spaceId, companyId: user.companyId } });
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const lists = await prisma.pmList.findMany({
-    where: { spaceId: params.spaceId },
-    orderBy: { order: "asc" },
+    where: { spaceId, companyId: user.companyId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
   });
-
   return NextResponse.json({ lists });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { spaceId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { spaceId } = await params;
 
-  const space = await prisma.pmSpace.findFirst({ where: { id: params.spaceId, companyId: user.companyId } });
+  const space = await prisma.pmSpace.findFirst({ where: { id: spaceId, companyId: user.companyId } });
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const body = await req.json();
-  if (!body.name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as { name?: string; color?: string };
+  const name = (body.name ?? "").trim();
+  if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
-  const count = await prisma.pmList.count({ where: { spaceId: params.spaceId } });
+  const order = await prisma.pmList.count({ where: { spaceId } });
   const list = await prisma.pmList.create({
     data: {
-      spaceId: params.spaceId,
-      name: body.name.trim(),
+      companyId: user.companyId,
+      spaceId,
+      name,
       color: body.color ?? null,
-      order: count,
+      order,
     },
   });
-
-  return NextResponse.json({ list }, { status: 201 });
+  return NextResponse.json({ id: list.id, list });
 }

@@ -21,7 +21,13 @@ const BASE_MODULES: { href: string; label: string }[] = [
   { href: "/admin", label: "Admin Settings" },
 ];
 
-export default function TopNav({ user }: { user: SessionUser }) {
+export default function TopNav({
+  user,
+  companyName,
+}: {
+  user: SessionUser;
+  companyName?: string | null;
+}) {
   const pathname = usePathname();
   // Super Admin tab is only rendered for users with the platform-wide flag.
   // Append after Admin Settings so the company-admin tab stays in its
@@ -41,7 +47,7 @@ export default function TopNav({ user }: { user: SessionUser }) {
 
   return (
     <header className="topbar">
-      <div className="brand">
+      <div className="brand" title={companyName ?? undefined}>
         CHG <span>Rehab</span>
       </div>
       <nav className="module-nav">

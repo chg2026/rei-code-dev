@@ -1,439 +1,255 @@
 "use client";
 
-import React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { PRIORITIES, type PmStatus } from "./types";
 
-interface PmTaskDetailProps {
-  taskId: string;
-  onClose: () => void;
-  onUpdated: (task: any) => void;
+type Member = { id: string; name: string; initials: string; email: string | null };
+type Assignee = { id: string; name: string; initials: string };
+type Comment = { id: string; body: string; createdAt: string; author: Assignee };
+type Activity = { id: string; type: string; createdAt: string; user: Assignee };
+type Subtask = { id: string; name: string; statusId: string | null; status: PmStatus | null; doneDate: string | null; assignees: Assignee[] };
+type TaskDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  taskType: string;
+  priority: string | null;
+  statusId: string | null;
+  status: PmStatus | null;
+  listId: string;
+  timeEstimate: number | null;
+  sprintPoints: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  assignees: Assignee[];
+  subtasks: Subtask[];
+  comments: Comment[];
+  activity: Activity[];
+  statuses: PmStatus[];
+};
+
+function dateInput(iso: string | null) {
+  return iso ? iso.slice(0, 10) : "";
+}
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-const MARINE = "#1F4D5C";
+export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: string; onClose: () => void; onUpdated: () => void }) {
+  const [task, setTask] = useState<TaskDetail | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [comment, setComment] = useState("");
+  const [subtaskName, setSubtaskName] = useState("");
+  const [showActivity, setShowActivity] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
-const PRIORITIES = ["urgent", "high", "normal", "low"] as const;
-const TASK_TYPES = ["task", "bug", "feature", "milestone"] as const;
-const PRIORITY_COLORS: Record<string, string> = { urgent: "#EF4444", high: "#F59E0B", normal: "#3B82F6", low: "#9CA3AF" };
-
-export default function PmTaskDetail({ taskId, onClose, onUpdated }: PmTaskDetailProps) {
-  const [task, setTask] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [activityOpen, setActivityOpen] = React.useState(false);
-  const [commentText, setCommentText] = React.useState("");
-  const [savingComment, setSavingComment] = React.useState(false);
-  const [subtaskInput, setSubtaskInput] = React.useState("");
-  const [addingSubtask, setAddingSubtask] = React.useState(false);
-
-  const fetchTask = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/pm/tasks/${taskId}`);
-      const data = await res.json();
-      if (data.task) setTask(data.task);
-    } finally {
-      setLoading(false);
+  const load = useCallback(async () => {
+    const r = await fetch(`/api/pm/tasks/${taskId}`, { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      setTask(d.task);
+      setName(d.task.name);
+      setDescription(d.task.description ?? "");
     }
   }, [taskId]);
 
-  React.useEffect(() => { fetchTask(); }, [fetchTask]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    fetch("/api/workspace/mentions", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { users: [] }))
+      .then((d) => setMembers(d.users ?? []))
+      .catch(() => undefined);
+  }, []);
 
-  const patch = async (updates: Record<string, any>) => {
-    const res = await fetch(`/api/pm/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
+  const patch = useCallback(async (data: Record<string, unknown>) => {
+    await fetch(`/api/pm/tasks/${taskId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+    await load();
+    onUpdated();
+  }, [taskId, load, onUpdated]);
+
+  const toggleAssignee = async (userId: string, has: boolean) => {
+    await fetch(`/api/pm/tasks/${taskId}/assignees`, {
+      method: has ? "DELETE" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
     });
-    const data = await res.json();
-    if (data.task) {
-      setTask((prev: any) => ({ ...prev, ...data.task }));
-      onUpdated({ ...task, ...data.task });
-    }
+    await load();
+    onUpdated();
   };
 
-  const submitComment = async () => {
-    if (!commentText.trim()) return;
-    setSavingComment(true);
-    try {
-      const res = await fetch(`/api/pm/tasks/${taskId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: commentText.trim() }),
-      });
-      const data = await res.json();
-      if (data.comment) {
-        setTask((prev: any) => ({ ...prev, comments: [...(prev.comments ?? []), data.comment] }));
-        setCommentText("");
-      }
-    } finally {
-      setSavingComment(false);
-    }
+  const addComment = async () => {
+    const body = comment.trim();
+    if (!body) return;
+    await fetch(`/api/pm/tasks/${taskId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) });
+    setComment("");
+    await load();
   };
 
   const addSubtask = async () => {
-    if (!subtaskInput.trim() || !task) return;
-    setAddingSubtask(true);
-    try {
-      const res = await fetch(`/api/pm/lists/${task.listId}/tasks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: subtaskInput.trim(), statusId: task.statusId, parentTaskId: taskId }),
-      });
-      // Note: parentTaskId isn't directly on the create body in our API, but we add it via a separate patch
-      const data = await res.json();
-      if (data.task) {
-        // Patch to set parentTaskId
-        await fetch(`/api/pm/tasks/${data.task.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ parentTaskId: taskId }),
-        });
-        setTask((prev: any) => ({ ...prev, subtasks: [...(prev.subtasks ?? []), data.task] }));
-        setSubtaskInput("");
-      }
-    } finally {
-      setAddingSubtask(false);
-    }
+    const n = subtaskName.trim();
+    if (!n || !task) return;
+    await fetch(`/api/pm/lists/${task.listId}/tasks`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: n, parentTaskId: task.id }) });
+    setSubtaskName("");
+    await load();
+    onUpdated();
+  };
+
+  const toggleSubtask = async (st: Subtask) => {
+    if (!task) return;
+    const done = !!st.doneDate;
+    const target = done
+      ? task.statuses.find((s) => s.type === "open" || s.isDefault) ?? task.statuses[0]
+      : task.statuses.find((s) => s.type === "done" || s.type === "closed");
+    if (!target) return;
+    await fetch(`/api/pm/tasks/${st.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ statusId: target.id }) });
+    await load();
+    onUpdated();
   };
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.15)", zIndex: 199 }}
-      />
-
-      {/* Panel */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: 480,
-          height: "100vh",
-          background: "#FFFFFF",
-          boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
-          zIndex: 200,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, color: "#9CA3AF", fontSize: 13 }}>
-            Loading…
-          </div>
-        ) : !task ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, color: "#9CA3AF", fontSize: 13 }}>
-            Task not found
-          </div>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.20)", zIndex: 190 }} />
+      <div style={{ position: "fixed", top: 0, right: 0, width: 480, maxWidth: "100vw", height: "100%", background: "var(--bg-primary)", boxShadow: "var(--shadow-md)", zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {!task ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Loading…</div>
         ) : (
           <>
-            {/* Header */}
-            <div
-              style={{
-                padding: "14px 16px",
-                borderBottom: "1px solid #E5E7EB",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                flexShrink: 0,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  background: "#F3F4F6",
-                  color: "#6B7280",
-                  textTransform: "uppercase",
-                  marginTop: 3,
-                  flexShrink: 0,
-                }}
-              >
-                {task.taskType ?? "task"}
-              </span>
-              <h1
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => {
-                  const val = e.currentTarget.textContent?.trim();
-                  if (val && val !== task.name) patch({ name: val });
-                }}
-                style={{
-                  flex: 1,
-                  margin: 0,
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: "#111827",
-                  lineHeight: 1.4,
-                  outline: "none",
-                  borderBottom: "1px solid transparent",
-                }}
-                onFocus={(e) => (e.currentTarget.style.borderBottomColor = MARINE)}
-              >
-                {task.name}
-              </h1>
-              <button
-                onClick={onClose}
-                style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#6B7280", padding: 2, flexShrink: 0 }}
-              >
-                ✕
-              </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "0.5px solid var(--border-lo)" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--marine-ink)", background: "var(--marine-soft)", padding: "2px 8px", borderRadius: 4, textTransform: "capitalize" }}>{task.taskType}</span>
+              <span style={{ flex: 1 }} />
+              <button type="button" onClick={onClose} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-tertiary)", lineHeight: 1 }}>×</button>
             </div>
 
-            {/* Scrollable body */}
             <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-              {/* Fields grid */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                  marginBottom: 16,
-                  padding: 14,
-                  background: "#F9FAFB",
-                  borderRadius: 8,
-                  border: "1px solid #E5E7EB",
-                }}
-              >
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => { if (name.trim() && name !== task.name) patch({ name: name.trim() }); }}
+                style={{ width: "100%", fontSize: 19, fontWeight: 600, fontFamily: "inherit", color: "var(--text-primary)", border: "none", outline: "none", marginBottom: 16, background: "transparent" }}
+              />
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                 <Field label="Status">
-                  <select
-                    value={task.statusId ?? ""}
-                    onChange={(e) => patch({ statusId: e.target.value || null })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  >
-                    <option value="">— None —</option>
-                    {(task.list?.space?.statuses ?? []).map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
+                  <select value={task.statusId ?? ""} onChange={(e) => patch({ statusId: e.target.value || null })} style={selectStyle}>
+                    <option value="">No status</option>
+                    {task.statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </Field>
-
                 <Field label="Priority">
-                  <select
-                    value={task.priority ?? "normal"}
-                    onChange={(e) => patch({ priority: e.target.value })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  >
-                    {PRIORITIES.map((p) => (
-                      <option key={p} value={p} style={{ color: PRIORITY_COLORS[p] }}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-                    ))}
+                  <select value={task.priority ?? ""} onChange={(e) => patch({ priority: e.target.value || null })} style={selectStyle}>
+                    <option value="">None</option>
+                    {PRIORITIES.map((p) => <option key={p} value={p} style={{ textTransform: "capitalize" }}>{p}</option>)}
                   </select>
                 </Field>
-
                 <Field label="Start date">
-                  <input
-                    type="date"
-                    value={task.startDate ? task.startDate.slice(0, 10) : ""}
-                    onChange={(e) => patch({ startDate: e.target.value || null })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  />
+                  <input type="date" value={dateInput(task.startDate)} onChange={(e) => patch({ startDate: e.target.value || null })} style={selectStyle} />
                 </Field>
-
                 <Field label="Due date">
-                  <input
-                    type="date"
-                    value={task.dueDate ? task.dueDate.slice(0, 10) : ""}
-                    onChange={(e) => patch({ dueDate: e.target.value || null })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  />
+                  <input type="date" value={dateInput(task.dueDate)} onChange={(e) => patch({ dueDate: e.target.value || null })} style={selectStyle} />
                 </Field>
-
-                <Field label="Task type">
-                  <select
-                    value={task.taskType ?? "task"}
-                    onChange={(e) => patch({ taskType: e.target.value })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  >
-                    {TASK_TYPES.map((t) => (
-                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                    ))}
-                  </select>
+                <Field label="Time estimate (h)">
+                  <input type="number" min={0} defaultValue={task.timeEstimate ?? ""} onBlur={(e) => patch({ timeEstimate: e.target.value === "" ? null : Number(e.target.value) })} style={selectStyle} />
                 </Field>
-
                 <Field label="Sprint points">
-                  <input
-                    type="number"
-                    min={0}
-                    value={task.sprintPoints ?? ""}
-                    onChange={(e) => patch({ sprintPoints: e.target.value ? Number(e.target.value) : null })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  />
-                </Field>
-
-                <Field label="Time estimate (min)">
-                  <input
-                    type="number"
-                    min={0}
-                    value={task.timeEstimate ?? ""}
-                    onChange={(e) => patch({ timeEstimate: e.target.value ? Number(e.target.value) : null })}
-                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #D1D5DB", background: "#fff", width: "100%" }}
-                  />
-                </Field>
-
-                <Field label="Assignees">
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {(task.assignees ?? []).map((a: any) => (
-                      <div
-                        key={a.userId}
-                        title={`${a.user.firstName ?? ""} ${a.user.lastName ?? ""}`.trim()}
-                        style={{
-                          width: 22, height: 22, borderRadius: "50%",
-                          background: MARINE, color: "#fff", fontSize: 9, fontWeight: 700,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          cursor: "default",
-                        }}
-                      >
-                        {a.user.initials ?? "?"}
-                      </div>
-                    ))}
-                  </div>
+                  <input type="number" min={0} defaultValue={task.sprintPoints ?? ""} onBlur={(e) => patch({ sprintPoints: e.target.value === "" ? null : Number(e.target.value) })} style={selectStyle} />
                 </Field>
               </div>
 
-              {/* Description */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                  Description
-                </label>
+              <Field label="Assignees">
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {task.assignees.map((a) => (
+                    <span key={a.id} title={a.name} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--bg-secondary)", borderRadius: 12, padding: "2px 8px 2px 2px", fontSize: 12 }}>
+                      <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 9, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{a.initials}</span>
+                      {a.name}
+                      <button type="button" onClick={() => toggleAssignee(a.id, true)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-tertiary)", fontSize: 13 }}>×</button>
+                    </span>
+                  ))}
+                  <button type="button" onClick={() => setShowMembers((s) => !s)} style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "1px dashed var(--border-mid)", borderRadius: 12, padding: "3px 10px", cursor: "pointer" }}>+ Assign</button>
+                </div>
+                {showMembers ? (
+                  <div style={{ marginTop: 8, border: "0.5px solid var(--border-lo)", borderRadius: 6, maxHeight: 160, overflowY: "auto" }}>
+                    {members.map((m) => {
+                      const has = task.assignees.some((a) => a.id === m.id);
+                      return (
+                        <div key={m.id} onClick={() => toggleAssignee(m.id, has)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", cursor: "pointer", fontSize: 13, background: has ? "var(--marine-soft)" : "transparent" }}>
+                          <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 9, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>{m.initials}</span>
+                          {m.name}
+                          {has ? <span style={{ marginLeft: "auto", color: "var(--marine)" }}>✓</span> : null}
+                        </div>
+                      );
+                    })}
+                    {members.length === 0 ? <div style={{ padding: 10, fontSize: 12, color: "var(--text-tertiary)" }}>No team members.</div> : null}
+                  </div>
+                ) : null}
+              </Field>
+
+              <div style={{ marginTop: 16 }}>
+                <Label>Description</Label>
                 <textarea
-                  defaultValue={task.description ?? ""}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onBlur={() => { if (description !== (task.description ?? "")) patch({ description: description || null }); }}
                   placeholder="Add description…"
-                  onBlur={(e) => {
-                    const val = e.target.value.trim();
-                    if (val !== (task.description ?? "")) patch({ description: val || null });
-                  }}
                   rows={4}
-                  style={{
-                    width: "100%",
-                    fontSize: 13,
-                    padding: "8px 10px",
-                    border: "1px solid #E5E7EB",
-                    borderRadius: 6,
-                    resize: "vertical",
-                    outline: "none",
-                    color: "#374151",
-                    background: "#fff",
-                    boxSizing: "border-box",
-                    fontFamily: "inherit",
-                  }}
+                  style={{ width: "100%", fontSize: 13, fontFamily: "inherit", color: "var(--text-primary)", border: "0.5px solid var(--border-lo)", borderRadius: 6, padding: 10, outline: "none", resize: "vertical", background: "var(--bg-primary)" }}
                 />
               </div>
 
-              {/* Subtasks */}
-              <Section label={`Subtasks (${task.subtasks?.length ?? 0})`}>
-                {(task.subtasks ?? []).map((sub: any) => (
-                  <div
-                    key={sub.id}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={sub.status?.type === "done"}
-                      onChange={() => {}}
-                      readOnly
-                      style={{ flexShrink: 0 }}
-                    />
-                    <span style={{ fontSize: 13, color: sub.status?.type === "done" ? "#9CA3AF" : "#111827", flex: 1, textDecoration: sub.status?.type === "done" ? "line-through" : "none" }}>
-                      {sub.name}
-                    </span>
-                    {sub.assignees?.slice(0, 1).map((a: any) => (
-                      <div
-                        key={a.userId}
-                        style={{ width: 18, height: 18, borderRadius: "50%", background: MARINE, color: "#fff", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}
-                      >
-                        {a.user.initials ?? "?"}
-                      </div>
-                    ))}
+              <div style={{ marginTop: 20 }}>
+                <Label>Subtasks</Label>
+                {task.subtasks.map((st) => (
+                  <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13 }}>
+                    <input type="checkbox" checked={!!st.doneDate} onChange={() => toggleSubtask(st)} />
+                    <span style={{ textDecoration: st.doneDate ? "line-through" : "none", color: st.doneDate ? "var(--text-tertiary)" : "var(--text-primary)" }}>{st.name}</span>
                   </div>
                 ))}
-                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <input
-                    placeholder="+ Add subtask"
-                    value={subtaskInput}
-                    onChange={(e) => setSubtaskInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addSubtask(); }}
-                    style={{ flex: 1, fontSize: 12, padding: "5px 8px", border: "1px solid #E5E7EB", borderRadius: 4, outline: "none" }}
-                  />
-                  {subtaskInput && (
-                    <button
-                      onClick={addSubtask}
-                      disabled={addingSubtask}
-                      style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", background: MARINE, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
-                    >
-                      Add
-                    </button>
-                  )}
-                </div>
-              </Section>
+                <input
+                  value={subtaskName}
+                  onChange={(e) => setSubtaskName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addSubtask(); }}
+                  placeholder="+ Add subtask"
+                  style={{ width: "100%", marginTop: 6, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", border: "0.5px solid var(--border-lo)", borderRadius: 6, outline: "none" }}
+                />
+              </div>
 
-              {/* Comments */}
-              <Section label={`Comments (${task.comments?.length ?? 0})`}>
-                {(task.comments ?? []).map((c: any) => (
-                  <div key={c.id} style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <div style={{ width: 20, height: 20, borderRadius: "50%", background: MARINE, color: "#fff", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {c.user.initials ?? "?"}
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
-                        {[c.user.firstName, c.user.lastName].filter(Boolean).join(" ") || "User"}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-                        {new Date(c.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </span>
+              <div style={{ marginTop: 20 }}>
+                <Label>Comments</Label>
+                {task.comments.map((c) => (
+                  <div key={c.id} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.author.initials}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12 }}><strong>{c.author.name}</strong> <span style={{ color: "var(--text-tertiary)" }}>{fmtTime(c.createdAt)}</span></div>
+                      <div style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>{c.body}</div>
                     </div>
-                    <p style={{ margin: "0 0 0 26px", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>{c.body}</p>
                   </div>
                 ))}
-                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <textarea
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <input
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addComment(); }}
                     placeholder="Write a comment…"
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && e.metaKey) submitComment(); }}
-                    rows={2}
-                    style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #E5E7EB", borderRadius: 4, resize: "none", outline: "none", fontFamily: "inherit" }}
+                    style={{ flex: 1, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", border: "0.5px solid var(--border-lo)", borderRadius: 6, outline: "none" }}
                   />
-                  <button
-                    onClick={submitComment}
-                    disabled={savingComment || !commentText.trim()}
-                    style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", background: MARINE, color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", alignSelf: "flex-end" }}
-                  >
-                    {savingComment ? "…" : "Send"}
-                  </button>
+                  <button type="button" onClick={addComment} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Send</button>
                 </div>
-              </Section>
+              </div>
 
-              {/* Activity */}
-              <div style={{ marginBottom: 16 }}>
-                <button
-                  onClick={() => setActivityOpen((v) => !v)}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", padding: 0 }}
-                >
-                  {activityOpen ? "▾" : "▸"} Activity ({task.activity?.length ?? 0})
+              <div style={{ marginTop: 20 }}>
+                <button type="button" onClick={() => setShowActivity((s) => !s)} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showActivity ? "▾" : "▸"} Activity ({task.activity.length})
                 </button>
-                {activityOpen && (
-                  <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "2px solid #E5E7EB" }}>
-                    {(task.activity ?? []).map((a: any) => (
-                      <div key={a.id} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#E5E7EB", color: "#6B7280", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                          {a.user?.initials ?? "?"}
-                        </div>
-                        <div>
-                          <span style={{ fontSize: 12, color: "#374151" }}>
-                            <strong>{[a.user?.firstName, a.user?.lastName].filter(Boolean).join(" ") || "User"}</strong>{" "}
-                            {a.type.replace(/_/g, " ")}
-                          </span>
-                          <span style={{ display: "block", fontSize: 11, color: "#9CA3AF" }}>
-                            {new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
+                {showActivity ? (
+                  <div style={{ marginTop: 8 }}>
+                    {task.activity.map((a) => (
+                      <div key={a.id} style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "3px 0" }}>
+                        <strong style={{ color: "var(--text-secondary)" }}>{a.user.name}</strong> {a.type.replace(/_/g, " ")} · {fmtTime(a.createdAt)}
                       </div>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </>
@@ -446,21 +262,23 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: PmTaskDetai
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-        {label}
-      </label>
+      <Label>{label}</Label>
       {children}
     </div>
   );
+}
+function Label({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 11, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 5 }}>{children}</div>;
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-        {label}
-      </div>
-      {children}
-    </div>
-  );
-}
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "6px 8px",
+  fontSize: 13,
+  fontFamily: "inherit",
+  color: "var(--text-primary)",
+  border: "0.5px solid var(--border-lo)",
+  borderRadius: 6,
+  outline: "none",
+  background: "var(--bg-primary)",
+};

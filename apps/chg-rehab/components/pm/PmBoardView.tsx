@@ -1,155 +1,56 @@
 "use client";
 
-import React from "react";
-import PmQuickCreate from "./PmQuickCreate";
+import { PRIORITY_COLORS, type PmStatus, type PmTaskRow } from "./types";
 
-interface PmBoardViewProps {
-  tasks: any[];
-  statuses: any[];
-  listId: string;
-  onTaskClick: (taskId: string) => void;
-  onTaskCreated: (task: any) => void;
+function fmtDate(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#EF4444",
-  high: "#F59E0B",
-  normal: "#3B82F6",
-  low: "#9CA3AF",
-};
-
-export default function PmBoardView({ tasks, statuses, listId, onTaskClick, onTaskCreated }: PmBoardViewProps) {
-  const [quickCreate, setQuickCreate] = React.useState<string | null>(null);
-
-  const tasksByStatus = React.useMemo(() => {
-    const map: Record<string, any[]> = {};
-    statuses.forEach((s) => { map[s.id] = []; });
-    tasks.forEach((t) => {
-      const sid = t.statusId ?? "__none__";
-      if (!map[sid]) map[sid] = [];
-      map[sid].push(t);
-    });
-    return map;
-  }, [tasks, statuses]);
-
+export default function PmBoardView({
+  tasks,
+  statuses,
+  onAddTask,
+  onOpenTask,
+}: {
+  tasks: PmTaskRow[];
+  statuses: PmStatus[];
+  listId: string;
+  onAddTask: (statusId: string) => void;
+  onOpenTask: (taskId: string) => void;
+}) {
   return (
-    <div style={{ display: "flex", gap: 12, padding: 16, overflowX: "auto", flex: 1, alignItems: "flex-start" }}>
-      {statuses.map((status) => {
-        const colTasks = tasksByStatus[status.id] ?? [];
+    <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: "flex", alignItems: "flex-start", padding: 8 }}>
+      {statuses.map((st) => {
+        const colTasks = tasks.filter((t) => t.statusId === st.id);
         return (
-          <div
-            key={status.id}
-            style={{
-              minWidth: 220,
-              width: 220,
-              background: "#F9FAFB",
-              borderRadius: 8,
-              border: "1px solid #E5E7EB",
-              display: "flex",
-              flexDirection: "column",
-              maxHeight: "100%",
-              overflow: "hidden",
-            }}
-          >
-            {/* Column header */}
-            <div
-              style={{
-                padding: "10px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                borderBottom: "1px solid #E5E7EB",
-              }}
-            >
-              <span
-                style={{ width: 8, height: 8, borderRadius: "50%", background: status.color, flexShrink: 0 }}
-              />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", flex: 1 }}>{status.name}</span>
-              <span style={{ fontSize: 11, color: "#9CA3AF" }}>{colTasks.length}</span>
+          <div key={st.id} style={{ minWidth: 240, maxWidth: 240, background: "var(--bg-secondary)", borderRadius: 8, margin: 8, display: "flex", flexDirection: "column", maxHeight: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 12px" }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{st.name}</span>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{colTasks.length}</span>
             </div>
-
-            {/* Cards */}
-            <div style={{ flex: 1, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-              {colTasks.map((task) => (
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {colTasks.map((t) => (
                 <div
-                  key={task.id}
-                  onClick={() => onTaskClick(task.id)}
-                  style={{
-                    background: "#FFFFFF",
-                    borderRadius: 6,
-                    padding: 10,
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                    cursor: "pointer",
-                    border: "1px solid #E5E7EB",
-                  }}
+                  key={t.id}
+                  onClick={() => onOpenTask(t.id)}
+                  style={{ background: "var(--bg-primary)", borderRadius: 6, padding: 10, boxShadow: "var(--shadow-sm)", border: "0.5px solid var(--border-lo)", cursor: "pointer" }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", marginBottom: 8 }}>{task.name}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    {task.assignees?.slice(0, 2).map((a: any) => (
-                      <div
-                        key={a.userId}
-                        title={`${a.user.firstName ?? ""} ${a.user.lastName ?? ""}`.trim()}
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: "50%",
-                          background: "#1F4D5C",
-                          color: "#fff",
-                          fontSize: 9,
-                          fontWeight: 700,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {a.user.initials ?? "?"}
-                      </div>
-                    ))}
-                    {task.dueDate && (
-                      <span style={{ fontSize: 10, color: "#9CA3AF", marginLeft: "auto" }}>
-                        {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                    )}
-                    {task.priority && task.priority !== "normal" && (
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: PRIORITY_COLORS[task.priority] ?? "#9CA3AF",
-                        }}
-                      />
-                    )}
+                  <div style={{ fontSize: 13, color: "var(--text-primary)", marginBottom: 8, lineHeight: 1.35 }}>{t.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {t.priority ? <span title={t.priority} style={{ width: 8, height: 8, borderRadius: "50%", background: PRIORITY_COLORS[t.priority] || "var(--text-tertiary)" }} /> : null}
+                    {t.dueDate ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{fmtDate(t.dueDate)}</span> : null}
+                    <span style={{ flex: 1 }} />
+                    <div style={{ display: "flex" }}>
+                      {t.assignees.slice(0, 3).map((a, i) => (
+                        <span key={a.id} title={a.name} style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 9, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", marginLeft: i ? -6 : 0, border: "1.5px solid var(--bg-primary)" }}>{a.initials}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
-
-              {/* Quick create */}
-              {quickCreate === status.id ? (
-                <PmQuickCreate
-                  listId={listId}
-                  statusId={status.id}
-                  defaultStatus={status}
-                  onCreated={(t) => { onTaskCreated(t); setQuickCreate(null); }}
-                  onCancel={() => setQuickCreate(null)}
-                />
-              ) : (
-                <button
-                  onClick={() => setQuickCreate(status.id)}
-                  style={{
-                    background: "none",
-                    border: "1px dashed #D1D5DB",
-                    borderRadius: 6,
-                    padding: "7px 10px",
-                    fontSize: 12,
-                    color: "#9CA3AF",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  + Add task
-                </button>
-              )}
+              <button type="button" onClick={() => onAddTask(st.id)} style={{ textAlign: "left", padding: "6px 8px", fontSize: 12, color: "var(--text-tertiary)", background: "transparent", border: "none", cursor: "pointer", borderRadius: 6 }}>+ Add task</button>
             </div>
           </div>
         );

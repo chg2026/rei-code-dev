@@ -1,0 +1,190 @@
+Build Phase 1 of the PM module inside CHG Rehab. This creates a ClickUp-style project management system at /pm.
+
+Create all files listed below. Read apps/chg-rehab/prisma/schema.prisma first to confirm Pm* model names, then build:
+
+═══════════════════════════════════════════
+API ROUTES
+═══════════════════════════════════════════
+
+FILE: apps/chg-rehab/app/api/pm/spaces/route.ts
+GET — list all spaces for the company
+POST — create a new space (body: { name, color?, icon? })
+Both require auth. Scope to user.companyId.
+On POST, also seed 5 default statuses for the new space:
+  { name: "To Do", color: "#6B7280", type: "open", order: 0, isDefault: true }
+  { name: "In Progress", color: "#3B82F6", type: "active", order: 1 }
+  { name: "In Review", color: "#F59E0B", type: "active", order: 2 }
+  { name: "Done", color: "#10B981", type: "done", order: 3 }
+  { name: "Cancelled", color: "#EF4444", type: "closed", order: 4 }
+
+FILE: apps/chg-rehab/app/api/pm/spaces/[spaceId]/route.ts
+PATCH — update space (name, color, icon)
+DELETE — delete space
+
+FILE: apps/chg-rehab/app/api/pm/spaces/[spaceId]/lists/route.ts
+GET — list all lists in a space
+POST — create list (body: { name, color? })
+
+FILE: apps/chg-rehab/app/api/pm/lists/[listId]/route.ts
+PATCH — update list
+DELETE — delete list
+
+FILE: apps/chg-rehab/app/api/pm/lists/[listId]/tasks/route.ts
+GET — list tasks in a list. Query params: statusId, assigneeId, priority, done=1.
+  Include: status, assignees (with user name/initials), subtasks count, tags.
+  Return only top-level tasks (parentTaskId IS NULL) unless ?subtasks=1.
+POST — create task. Body: { name, description?, statusId?, priority?, dueDate?, startDate?, assigneeIds?: string[] }
+  On create, log a PmActivity entry (type: "task_created").
+
+FILE: apps/chg-rehab/app/api/pm/tasks/[taskId]/route.ts
+GET — get full task detail. Include: status, assignees, subtasks (with their status+assignees), tags, comments (with author), activity (with user).
+PATCH — update task fields (name, description, statusId, priority, dueDate, startDate, taskType, timeEstimate, sprintPoints). Log activity on status change.
+DELETE — delete task.
+
+FILE: apps/chg-rehab/app/api/pm/tasks/[taskId]/assignees/route.ts
+POST — add assignee (body: { userId })
+DELETE — remove assignee (body: { userId })
+
+FILE: apps/chg-rehab/app/api/pm/tasks/[taskId]/comments/route.ts
+GET — list comments for a task
+POST — create comment (body: { body })
+
+FILE: apps/chg-rehab/app/api/pm/spaces/[spaceId]/statuses/route.ts
+GET — list statuses for a space
+POST — create custom status (body: { name, color, type, order })
+
+═══════════════════════════════════════════
+MAIN PM PAGE
+═══════════════════════════════════════════
+
+FILE: apps/chg-rehab/app/pm/page.tsx
+Server component. Loads all spaces for the user's company. If no spaces exist, shows an empty state with "Create your first space" button. Renders <PmLayout> with spaces as props.
+
+FILE: apps/chg-rehab/app/pm/[spaceId]/page.tsx
+Server component. Loads the space + its lists + statuses. Redirects to first list if lists exist. Renders <PmLayout> with the space selected.
+
+FILE: apps/chg-rehab/app/pm/[spaceId]/[listId]/page.tsx
+Server component. Loads the space + list + tasks (with statuses and assignees). Renders <PmLayout> with the list selected and tasks loaded.
+
+═══════════════════════════════════════════
+CLIENT COMPONENTS
+═══════════════════════════════════════════
+
+FILE: apps/chg-rehab/components/pm/PmLayout.tsx
+"use client"
+Props: { spaces, selectedSpaceId?, selectedListId?, tasks?, statuses?, lists? }
+
+Layout:
+  <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
+    <PmSidebar spaces={spaces} selectedSpaceId={selectedSpaceId} selectedListId={selectedListId} />
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {children or list view}
+    </div>
+  </div>
+
+FILE: apps/chg-rehab/components/pm/PmSidebar.tsx
+"use client"
+Left sidebar showing:
+- "Project Manager" header with "+ New Space" button
+- List of spaces, each expandable to show its lists
+- Each space: colored dot + name + list count
+- Each list: indent + colored dot + name, clickable to navigate to /pm/[spaceId]/[listId]
+- Active list highlighted
+- Space collapsible with chevron
+- "+ New List" button under each space
+
+WIDTH: 220px, background: var(--bg-secondary), border-right: 0.5px solid var(--border-lo)
+
+FILE: apps/chg-rehab/components/pm/PmListView.tsx
+"use client"
+Props: { tasks, statuses, listId, spaceId }
+
+Shows tasks grouped by status. Each group:
+- Group header: colored status dot + status name + count + "+ Add task" button
+- Task rows (see below)
+- Empty group shows only the "+ Add task" row
+
+Task row shows: expand arrow (if has subtasks) | task type icon | task name (clickable) | assignee avatars | due date | priority badge | status chip
+
+State: 
+- quickCreate: which group is open for quick task creation
+- taskDetailId: which task is open in detail panel
+- view: "list" | "board" (toggle in toolbar)
+
+If view === "board", render <PmBoardView> instead.
+
+Include a toolbar above the task list:
+  [ List | Board ] toggle | [ + New Task ] button | [ Filter ] | [ Group by Status ]
+
+FILE: apps/chg-rehab/components/pm/PmBoardView.tsx
+"use client"
+Props: { tasks, statuses, listId }
+
+Kanban board. Each status = one column.
+Column: 200px min-width, background: var(--bg-secondary), border-radius: 8px, margin: 8px
+Column header: status color dot + name + count
+Cards: white, border-radius: 6px, padding: 10px, shadow
+Card shows: task name, assignee avatar, due date, priority dot
+"+ Add task" button at bottom of each column
+
+FILE: apps/chg-rehab/components/pm/PmTaskDetail.tsx
+"use client"
+Props: { taskId, onClose, onUpdated }
+
+Slide-in side panel (position: fixed, right: 0, width: 480px, full height, z-index: 200, shadow).
+Fetches task detail from /api/pm/tasks/[taskId] on mount.
+
+Shows:
+  Header: task type badge | task name (editable h1) | close button | "Open full" icon
+  
+  Fields grid (2 column):
+    Status (dropdown) | Assignees (member picker)
+    Start date | Due date
+    Priority (dropdown: Urgent/High/Normal/Low) | Task type
+    Time estimate | Sprint points
+  
+  Description: textarea with placeholder "Add description…"
+  
+  Subtasks section: list of subtasks with checkboxes, "+ Add subtask" input
+  
+  Comments section: list of comments (author + timestamp + body), comment input at bottom
+  
+  Activity section: collapsible, shows activity log entries
+
+All fields are inline-editable. Changes call PATCH /api/pm/tasks/[taskId] on blur/change.
+
+FILE: apps/chg-rehab/components/pm/PmCreateSpace.tsx
+"use client"
+Modal for creating a new space.
+Fields: name (required), color (color swatches: 8 preset colors)
+On submit: POST /api/pm/spaces, then navigate to new space.
+
+FILE: apps/chg-rehab/components/pm/PmQuickCreate.tsx
+"use client"  
+Props: { listId, statusId, defaultStatus, onCreated }
+Inline task creation input. Shows on "+ Add task" click.
+Just a text input. Press Enter to create. Press Escape to cancel.
+POST /api/pm/lists/[listId]/tasks with { name, statusId }
+
+═══════════════════════════════════════════
+NAVIGATION
+═══════════════════════════════════════════
+
+FILE: apps/chg-rehab/components/TopNav.tsx (update existing)
+Add "Project Manager" to the PORTFOLIO section:
+  { href: "/pm", label: "Project Manager" }
+Add it between "Rehab Manager" and "Warehouse".
+
+═══════════════════════════════════════════
+NOTES
+═══════════════════════════════════════════
+- All API routes must authenticate with getCurrentUser() and scope to user.companyId
+- Use prisma from @/lib/prisma
+- Use NextResponse from next/server
+- All components use inline styles matching the existing CHG design system:
+  Primary: #1F4D5C (marine), Success: #1F7A4D, Warning: #B8895A, Danger: #C81E1E
+  Background: #F5F4F0, Card: #FFFFFF, Border: var(--border-lo)
+- Keep each file focused and clean
+- TypeScript throughout
+
+Build all files. Do not skip any. Report which files were created.

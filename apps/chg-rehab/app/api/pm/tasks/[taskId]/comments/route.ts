@@ -1,49 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-async function authorizeTask(taskId: string, companyId: string) {
-  return prisma.pmTask.findFirst({
-    where: { id: taskId, list: { space: { companyId } } },
-  });
+async function ownedTask(companyId: string, taskId: string) {
+  return prisma.pmTask.findFirst({ where: { id: taskId, companyId }, select: { id: true } });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { taskId: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const task = await authorizeTask(params.taskId, user.companyId);
-  if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { taskId } = await params;
+  if (!(await ownedTask(user.companyId, taskId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const comments = await prisma.pmComment.findMany({
-    where: { taskId: params.taskId },
-    include: { user: { select: { id: true, firstName: true, lastName: true, initials: true } } },
+    where: { taskId },
     orderBy: { createdAt: "asc" },
+    include: { author: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } } },
   });
 
-  return NextResponse.json({ comments });
+  return NextResponse.json({
+    comments: comments.map((c) => ({
+      id: c.id,
+      body: c.body,
+      isEdited: c.isEdited,
+      createdAt: c.createdAt.toISOString(),
+      author: {
+        id: c.author.id,
+        name: [c.author.firstName, c.author.lastName].filter(Boolean).join(" ") || c.author.email || "User",
+        initials: (c.author.initials ||
+          [(c.author.firstName ?? "")[0], (c.author.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase(),
+      },
+    })),
+  });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { taskId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { taskId } = await params;
+  if (!(await ownedTask(user.companyId, taskId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
-  const task = await authorizeTask(params.taskId, user.companyId);
-  if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const body = await req.json();
-  if (!body.body?.trim()) return NextResponse.json({ error: "body is required" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as { body?: string };
+  const text = (body.body ?? "").trim();
+  if (!text) return NextResponse.json({ error: "Empty comment" }, { status: 400 });
 
   const comment = await prisma.pmComment.create({
-    data: { taskId: params.taskId, userId: user.id, body: body.body.trim() },
-    include: { user: { select: { id: true, firstName: true, lastName: true, initials: true } } },
+    data: { taskId, authorId: user.id, body: text },
   });
-
   await prisma.pmActivity.create({
-    data: { taskId: params.taskId, userId: user.id, type: "comment_added" },
+    data: { taskId, userId: user.id, type: "commented" },
   });
 
-  return NextResponse.json({ comment }, { status: 201 });
+  return NextResponse.json({ id: comment.id });
 }

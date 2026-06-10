@@ -1,330 +1,128 @@
 "use client";
 
-import React from "react";
-import PmBoardView from "./PmBoardView";
+import { useCallback, useEffect, useState } from "react";
 import PmQuickCreate from "./PmQuickCreate";
 import PmTaskDetail from "./PmTaskDetail";
+import PmBoardView from "./PmBoardView";
+import { PRIORITY_COLORS, type PmStatus, type PmTaskRow } from "./types";
 
-interface PmListViewProps {
-  tasks: any[];
-  statuses: any[];
-  listId: string;
-  spaceId: string;
+function fmtDate(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#EF4444",
-  high: "#F59E0B",
-  normal: "#3B82F6",
-  low: "#9CA3AF",
-};
+export default function PmListView({
+  tasks: initialTasks,
+  statuses,
+  listId,
+  spaceId,
+}: {
+  tasks: PmTaskRow[];
+  statuses: PmStatus[];
+  listId: string;
+  spaceId: string;
+}) {
+  const [tasks, setTasks] = useState<PmTaskRow[]>(initialTasks);
+  const [view, setView] = useState<"list" | "board">("list");
+  const [quickCreate, setQuickCreate] = useState<string | null>(null);
+  const [taskDetailId, setTaskDetailId] = useState<string | null>(null);
 
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "Urgent",
-  high: "High",
-  normal: "Normal",
-  low: "Low",
-};
+  useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
 
-const MARINE = "#1F4D5C";
+  const refresh = useCallback(async () => {
+    const r = await fetch(`/api/pm/lists/${listId}/tasks`, { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      setTasks(d.tasks ?? []);
+    }
+  }, [listId]);
 
-export default function PmListView({ tasks: initialTasks, statuses, listId, spaceId }: PmListViewProps) {
-  const [view, setView] = React.useState<"list" | "board">("list");
-  const [tasks, setTasks] = React.useState<any[]>(initialTasks);
-  const [quickCreate, setQuickCreate] = React.useState<string | null>(null);
-  const [taskDetailId, setTaskDetailId] = React.useState<string | null>(null);
+  const defaultStatus = statuses.find((s) => s.isDefault)?.id ?? statuses[0]?.id ?? null;
 
-  const tasksByStatus = React.useMemo(() => {
-    const map: Record<string, any[]> = {};
-    statuses.forEach((s) => { map[s.id] = []; });
-    tasks.forEach((t) => {
-      const sid = t.statusId ?? "__none__";
-      if (!map[sid]) map[sid] = [];
-      map[sid].push(t);
-    });
-    return map;
-  }, [tasks, statuses]);
-
-  const handleTaskCreated = (task: any) => {
-    setTasks((prev) => [...prev, task]);
+  const onAddTask = (statusId: string) => {
+    setView("list");
+    setQuickCreate(statusId);
   };
-
-  const handleTaskUpdated = (updated: any) => {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
-  };
-
-  if (view === "board") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-        <Toolbar view={view} onViewChange={setView} listId={listId} onTaskCreated={handleTaskCreated} />
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          <PmBoardView
-            tasks={tasks}
-            statuses={statuses}
-            listId={listId}
-            onTaskClick={setTaskDetailId}
-            onTaskCreated={handleTaskCreated}
-          />
-        </div>
-        {taskDetailId && (
-          <PmTaskDetail
-            taskId={taskDetailId}
-            onClose={() => setTaskDetailId(null)}
-            onUpdated={handleTaskUpdated}
-          />
-        )}
-      </div>
-    );
-  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      <Toolbar view={view} onViewChange={setView} listId={listId} onTaskCreated={handleTaskCreated} />
-
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        {statuses.map((status) => {
-          const groupTasks = tasksByStatus[status.id] ?? [];
-          return (
-            <div key={status.id} style={{ marginBottom: 2 }}>
-              {/* Group header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 16px",
-                  background: "#F9FAFB",
-                  borderTop: "1px solid #E5E7EB",
-                  borderBottom: "1px solid #E5E7EB",
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 1,
-                }}
-              >
-                <span
-                  style={{ width: 8, height: 8, borderRadius: "50%", background: status.color, flexShrink: 0 }}
-                />
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#374151", flex: 1 }}>
-                  {status.name}
-                  <span style={{ fontWeight: 400, color: "#9CA3AF", marginLeft: 6 }}>{groupTasks.length}</span>
-                </span>
-                <button
-                  onClick={() => setQuickCreate(status.id)}
-                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#9CA3AF", padding: "2px 4px" }}
-                >
-                  + Add task
-                </button>
-              </div>
-
-              {/* Task rows */}
-              {groupTasks.map((task) => (
-                <TaskRow key={task.id} task={task} onClick={() => setTaskDetailId(task.id)} />
-              ))}
-
-              {/* Quick create in this group */}
-              {quickCreate === status.id && (
-                <div style={{ padding: "6px 16px", borderBottom: "1px solid #E5E7EB" }}>
-                  <PmQuickCreate
-                    listId={listId}
-                    statusId={status.id}
-                    defaultStatus={status}
-                    onCreated={(t) => { handleTaskCreated(t); setQuickCreate(null); }}
-                    onCancel={() => setQuickCreate(null)}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "0.5px solid var(--border-lo)" }}>
+        <div style={{ display: "flex", border: "1px solid var(--border-mid)", borderRadius: 6, overflow: "hidden" }}>
+          {(["list", "board"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              style={{ padding: "5px 12px", fontSize: 12, fontFamily: "inherit", textTransform: "capitalize", border: "none", cursor: "pointer", background: view === v ? "var(--marine)" : "var(--bg-primary)", color: view === v ? "#fff" : "var(--text-secondary)" }}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={() => onAddTask(defaultStatus ?? "")} style={{ padding: "6px 12px", fontSize: 12, fontFamily: "inherit", background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>+ New Task</button>
+        <span style={{ flex: 1 }} />
+        <button type="button" disabled style={btnMuted}>Filter</button>
+        <button type="button" disabled style={btnMuted}>Group by Status</button>
       </div>
 
-      {taskDetailId && (
+      {view === "board" ? (
+        <PmBoardView tasks={tasks} statuses={statuses} listId={listId} onAddTask={onAddTask} onOpenTask={setTaskDetailId} />
+      ) : (
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
+          {statuses.map((st) => {
+            const groupTasks = tasks.filter((t) => t.statusId === st.id);
+            return (
+              <div key={st.id} style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: st.color }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{st.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{groupTasks.length}</span>
+                  <button type="button" onClick={() => setQuickCreate(st.id)} style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "none", cursor: "pointer", marginLeft: 4 }}>+ Add task</button>
+                </div>
+
+                <div style={{ border: "0.5px solid var(--border-lo)", borderRadius: 8, overflow: "hidden" }}>
+                  {groupTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => setTaskDetailId(t.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderBottom: "0.5px solid var(--border-lo)", cursor: "pointer", background: "var(--bg-primary)" }}
+                    >
+                      <span style={{ width: 14, color: "var(--text-tertiary)", fontSize: 11 }}>{t.subtaskCount > 0 ? "▸" : ""}</span>
+                      <span style={{ flex: 1, fontSize: 13, color: "var(--text-primary)" }}>{t.name}</span>
+                      <div style={{ display: "flex" }}>
+                        {t.assignees.slice(0, 3).map((a, i) => (
+                          <span key={a.id} title={a.name} style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 9, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", marginLeft: i ? -6 : 0, border: "1.5px solid var(--bg-primary)" }}>{a.initials}</span>
+                        ))}
+                      </div>
+                      {t.dueDate ? <span style={{ fontSize: 12, color: "var(--text-tertiary)", minWidth: 56, textAlign: "right" }}>{fmtDate(t.dueDate)}</span> : null}
+                      {t.priority ? <span style={{ fontSize: 11, fontWeight: 600, color: PRIORITY_COLORS[t.priority] || "var(--text-tertiary)", textTransform: "capitalize" }}>{t.priority}</span> : null}
+                      {t.status ? <span style={{ fontSize: 11, fontWeight: 600, color: t.status.color, background: `${t.status.color}1A`, padding: "2px 8px", borderRadius: 10 }}>{t.status.name}</span> : null}
+                    </div>
+                  ))}
+
+                  {quickCreate === st.id ? (
+                    <div style={{ padding: "8px 12px", background: "var(--bg-primary)" }}>
+                      <PmQuickCreate listId={listId} statusId={st.id} defaultStatus={defaultStatus} onCreated={() => { refresh(); }} onCancel={() => setQuickCreate(null)} />
+                    </div>
+                  ) : groupTasks.length === 0 ? (
+                    <div onClick={() => setQuickCreate(st.id)} style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer", background: "var(--bg-primary)" }}>+ Add task</div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {taskDetailId ? (
         <PmTaskDetail
           taskId={taskDetailId}
           onClose={() => setTaskDetailId(null)}
-          onUpdated={handleTaskUpdated}
+          onUpdated={() => { refresh(); }}
         />
-      )}
+      ) : null}
     </div>
   );
 }
 
-function Toolbar({
-  view,
-  onViewChange,
-  listId,
-  onTaskCreated,
-}: {
-  view: "list" | "board";
-  onViewChange: (v: "list" | "board") => void;
-  listId: string;
-  onTaskCreated: (t: any) => void;
-}) {
-  const [showCreate, setShowCreate] = React.useState(false);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "10px 16px",
-        borderBottom: "1px solid #E5E7EB",
-        background: "#FFFFFF",
-        flexShrink: 0,
-      }}
-    >
-      {/* View toggle */}
-      <div style={{ display: "flex", border: "1px solid #E5E7EB", borderRadius: 6, overflow: "hidden" }}>
-        {(["list", "board"] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => onViewChange(v)}
-            style={{
-              padding: "4px 10px",
-              fontSize: 12,
-              fontWeight: view === v ? 600 : 400,
-              background: view === v ? MARINE : "#fff",
-              color: view === v ? "#fff" : "#6B7280",
-              border: "none",
-              cursor: "pointer",
-              textTransform: "capitalize",
-            }}
-          >
-            {v === "list" ? "≡ List" : "⬛ Board"}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {showCreate ? (
-        <div style={{ width: 280 }}>
-          <PmQuickCreate
-            listId={listId}
-            onCreated={(t) => { onTaskCreated(t); setShowCreate(false); }}
-            onCancel={() => setShowCreate(false)}
-          />
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "5px 12px",
-            background: MARINE,
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
-        >
-          + New Task
-        </button>
-      )}
-    </div>
-  );
-}
-
-function TaskRow({ task, onClick }: { task: any; onClick: () => void }) {
-  const hasSubtasks = task._count?.subtasks > 0;
-  const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-  const isOverdue = dueDate && dueDate < new Date() && task.status?.type !== "done";
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 16px",
-        borderBottom: "1px solid #F3F4F6",
-        cursor: "pointer",
-        background: "#fff",
-        transition: "background 0.1s",
-      }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#F9FAFB")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "#fff")}
-    >
-      {/* Expand arrow placeholder */}
-      <span style={{ width: 14, color: "#D1D5DB", fontSize: 10 }}>{hasSubtasks ? "▸" : ""}</span>
-
-      {/* Task type icon */}
-      <span style={{ fontSize: 13 }}>
-        {task.taskType === "bug" ? "🐛" : task.taskType === "feature" ? "✨" : task.taskType === "milestone" ? "🎯" : "☐"}
-      </span>
-
-      {/* Name */}
-      <span style={{ flex: 1, fontSize: 13, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {task.name}
-      </span>
-
-      {/* Assignee avatars */}
-      <div style={{ display: "flex", gap: 2 }}>
-        {(task.assignees ?? []).slice(0, 3).map((a: any) => (
-          <div
-            key={a.userId}
-            title={`${a.user.firstName ?? ""} ${a.user.lastName ?? ""}`.trim()}
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              background: MARINE,
-              color: "#fff",
-              fontSize: 8,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {a.user.initials ?? "?"}
-          </div>
-        ))}
-      </div>
-
-      {/* Due date */}
-      {dueDate && (
-        <span style={{ fontSize: 11, color: isOverdue ? "#EF4444" : "#9CA3AF", minWidth: 60, textAlign: "right" }}>
-          {dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        </span>
-      )}
-
-      {/* Priority */}
-      {task.priority && task.priority !== "normal" && (
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            padding: "2px 6px",
-            borderRadius: 4,
-            background: `${PRIORITY_COLORS[task.priority]}20`,
-            color: PRIORITY_COLORS[task.priority],
-          }}
-        >
-          {PRIORITY_LABELS[task.priority]}
-        </span>
-      )}
-
-      {/* Status chip */}
-      {task.status && (
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            padding: "2px 8px",
-            borderRadius: 10,
-            background: `${task.status.color}20`,
-            color: task.status.color,
-            minWidth: 60,
-            textAlign: "center",
-          }}
-        >
-          {task.status.name}
-        </span>
-      )}
-    </div>
-  );
-}
+const btnMuted: React.CSSProperties = { padding: "6px 12px", fontSize: 12, fontFamily: "inherit", background: "var(--bg-secondary)", color: "var(--text-tertiary)", border: "1px solid var(--border-lo)", borderRadius: 6, cursor: "not-allowed" };
