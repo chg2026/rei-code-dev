@@ -18,7 +18,7 @@ export type FeedEntry = {
 };
 
 const TYPE_META: Record<FeedEntry["type"], { label: string; bg: string; color: string; dot: string; icon: string; iconBg: string }> = {
-  system:      { label: "System log",        bg: "var(--blue-bg)",  color: "var(--blue-txt)",  dot: "#185FA5", icon: "🕐", iconBg: "var(--blue-bg)" },
+  system:      { label: "System log",        bg: "var(--blue-bg)",  color: "var(--blue-txt)",  dot: "#1F4D5C", icon: "🕐", iconBg: "var(--blue-bg)" },
   note:        { label: "Note",              bg: "var(--green-bg)", color: "var(--green-txt)", dot: "#3B6D11", icon: "📝", iconBg: "var(--green-bg)" },
   payment:     { label: "Payment",           bg: "var(--amber-bg)", color: "var(--amber-txt)", dot: "#854F0B", icon: "💳", iconBg: "var(--amber-bg)" },
   document:    { label: "Document",          bg: "#FBEAF0",         color: "#72243E",          dot: "#993856", icon: "📄", iconBg: "#FBEAF0" },

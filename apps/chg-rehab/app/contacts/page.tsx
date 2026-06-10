@@ -176,8 +176,8 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
             {label}{" "}
             <span style={{
               fontSize: 9, padding: "1px 5px", borderRadius: 8,
-              background: tab === t ? "#E6F1FB" : "var(--bg-secondary)",
-              color: tab === t ? "#0C447C" : "var(--text-tertiary)",
+              background: tab === t ? "#E8EFF1" : "var(--bg-secondary)",
+              color: tab === t ? "#143641" : "var(--text-tertiary)",
               marginLeft: 3,
             }}>{count}</span>
           </Link>
@@ -261,7 +261,7 @@ async function ContractorsTab({
                 : meta.status === "DoNotUse" ? "⛔ Do not use"
                 : "Standard";
               const statusStyle = meta.status === "Preferred"
-                ? { background: "#E6F1FB", color: "#0C447C" }
+                ? { background: "#E8EFF1", color: "#143641" }
                 : meta.status === "DoNotUse"
                 ? { background: "#FCEBEB", color: "#791F1F" }
                 : { background: "var(--bg-secondary)", color: "var(--text-tertiary)" };
@@ -461,7 +461,7 @@ async function ContractorDetail({
           value={
             <span style={{
               fontSize: 9, padding: "2px 7px", borderRadius: 10, fontWeight: 500,
-              ...(meta.status === "Preferred" ? { background: "#E6F1FB", color: "#0C447C" }
+              ...(meta.status === "Preferred" ? { background: "#E8EFF1", color: "#143641" }
                 : meta.status === "DoNotUse" ? { background: "#FCEBEB", color: "#791F1F" }
                 : { background: "var(--bg-secondary)", color: "var(--text-tertiary)" }),
             }}>
@@ -509,8 +509,8 @@ async function ContractorDetail({
                 </div>
                 <span style={{
                   fontSize: 9, padding: "2px 5px", borderRadius: 3,
-                  background: isActive ? "#E6F1FB" : "#EAF3DE",
-                  color: isActive ? "#0C447C" : "#27500A",
+                  background: isActive ? "#E8EFF1" : "#EAF3DE",
+                  color: isActive ? "#143641" : "#27500A",
                 }}>
                   {isActive ? "Active →" : "Done"}
                 </span>
@@ -1145,7 +1145,7 @@ function TenantDetail({
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           <div style={{
             width: 42, height: 42, borderRadius: "50%",
-            background: meta.avatarBg ?? "#E6F1FB", color: meta.avatarFg ?? "#0C447C",
+            background: meta.avatarBg ?? "#E8EFF1", color: meta.avatarFg ?? "#143641",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 15, fontWeight: 700, flexShrink: 0,
           }}>{initials}</div>

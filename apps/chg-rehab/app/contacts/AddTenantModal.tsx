@@ -554,13 +554,13 @@ function ModeRadio({
         flex: 1,
         padding: "6px 8px",
         fontSize: 11,
-        background: active ? "#E6F1FB" : "var(--bg-secondary)",
+        background: active ? "#E8EFF1" : "var(--bg-secondary)",
         color: disabled
           ? "var(--text-tertiary)"
           : active
-          ? "#0C447C"
+          ? "#143641"
           : "var(--text-secondary)",
-        border: `0.5px solid ${active ? "#0C447C" : "var(--border-lo)"}`,
+        border: `0.5px solid ${active ? "#143641" : "var(--border-lo)"}`,
         borderRadius: 5,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.55 : 1,

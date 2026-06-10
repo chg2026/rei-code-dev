@@ -1,0 +1,275 @@
+Fix the underwriting pre-population and saved analysis reload. Three files.
+
+─────────────────────────────────────────
+FILE 1: apps/chg-rehab/app/underwriting/page.tsx
+─────────────────────────────────────────
+
+Replace entirely:
+
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import UnderwritingClient from "./UnderwritingClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function UnderwritingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | undefined>>;
+}) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const sp = (await searchParams) || {};
+
+  const properties = await prisma.property.findMany({
+    where: { companyId: user.companyId },
+    select: {
+      id: true,
+      address: true,
+      city: true,
+      state: true,
+      status: true,
+      meta: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return (
+    <UnderwritingClient
+      properties={properties}
+      initialPropertyId={sp.propertyId ?? null}
+      initialInputs={{
+        purchase: sp.purchase ?? null,
+        rehab: sp.rehab ?? null,
+        arv: sp.arv ?? null,
+        closing: sp.closing ?? null,
+        holding: sp.holding ?? null,
+        strategy: sp.strategy ?? null,
+      }}
+    />
+  );
+}
+
+─────────────────────────────────────────
+FILE 2: apps/chg-rehab/app/underwriting/UnderwritingClient.tsx
+─────────────────────────────────────────
+
+Replace entirely with:
+
+"use client";
+
+import { useState } from "react";
+
+type Property = {
+  id: string;
+  address: string;
+  city: string | null;
+  state: string | null;
+  status: string | null;
+  meta: unknown;
+};
+
+type InitialInputs = {
+  purchase: string | null;
+  rehab: string | null;
+  arv: string | null;
+  closing: string | null;
+  holding: string | null;
+  strategy: string | null;
+};
+
+export default function UnderwritingClient({
+  properties,
+  initialPropertyId,
+  initialInputs,
+}: {
+  properties: Property[];
+  initialPropertyId?: string | null;
+  initialInputs?: InitialInputs | null;
+}) {
+  const initialSelected =
+    (initialPropertyId ? properties.find((p) => p.id === initialPropertyId) : null) ??
+    properties[0] ??
+    null;
+
+  const [selectedId, setSelectedId] = useState<string>(initialSelected?.id ?? "");
+
+  const selected = properties.find((p) => p.id === selectedId) ?? null;
+
+  // Get property meta for pre-population when no explicit inputs passed
+  const meta = (selected?.meta && typeof selected.meta === "object")
+    ? (selected.meta as Record<string, unknown>)
+    : {};
+
+  // Explicit inputs (from saved analysis URL params) take priority.
+  // Fall back to property record values.
+  const purchase = initialInputs?.purchase ?? (meta.purchasePrice ? String(meta.purchasePrice) : null);
+  const rehab = initialInputs?.rehab ?? null;
+  const arv = initialInputs?.arv ?? (meta.arv ? String(meta.arv) : null);
+  const closing = initialInputs?.closing ?? (meta.closingCosts ? String(meta.closingCosts) : null);
+  const holding = initialInputs?.holding ?? null;
+  const strategy = initialInputs?.strategy ?? null;
+
+  function buildIframeSrc(prop: Property | null) {
+    if (!prop) return "/underwriting-calc.html";
+    const p = new URLSearchParams();
+    p.set("propertyId", prop.id);
+    p.set("address", prop.address);
+    if (prop.city) p.set("city", prop.city);
+    if (prop.state) p.set("state", prop.state);
+    if (prop.status) p.set("status", prop.status);
+    if (purchase) p.set("purchase", purchase);
+    if (rehab) p.set("rehab", rehab);
+    if (arv) p.set("arv", arv);
+    if (closing) p.set("closing", closing);
+    if (holding) p.set("holding", holding);
+    if (strategy) p.set("strategy", strategy);
+    return `/underwriting-calc.html?${p.toString()}`;
+  }
+
+  const iframeSrc = buildIframeSrc(selected);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
+      {/* Property selector bar */}
+      <div style={{
+        padding: "8px 16px",
+        background: "#fff",
+        borderBottom: "0.5px solid var(--border-lo, #E5E3DE)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+          Analyzing:
+        </span>
+        {properties.length === 0 ? (
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            No properties yet — <a href="/property" style={{ color: "var(--marine, #1F4D5C)" }}>add one first</a>
+          </span>
+        ) : (
+          <select
+            value={selectedId}
+            onChange={e => setSelectedId(e.target.value)}
+            style={{
+              fontSize: 12,
+              padding: "5px 10px",
+              borderRadius: 6,
+              border: "0.5px solid var(--border-mid, #E5E3DE)",
+              background: "#fff",
+              color: "var(--text-primary)",
+              fontFamily: "inherit",
+              minWidth: 280,
+            }}
+          >
+            {properties.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.address}{p.city ? `, ${p.city}` : ""}{p.state ? `, ${p.state}` : ""}
+                {p.status ? ` · ${p.status}` : ""}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Calculator iframe — key forces remount on property/input change */}
+      <iframe
+        key={iframeSrc}
+        src={iframeSrc}
+        style={{ flex: 1, border: "none", width: "100%", height: "100%", display: "block" }}
+        title="Underwriting Calculator"
+      />
+    </div>
+  );
+}
+
+─────────────────────────────────────────
+FILE 3: apps/chg-rehab/public/underwriting-calc.html
+─────────────────────────────────────────
+
+In the IIFE that reads URL params (the one starting with `const params = new URLSearchParams`), find the section that handles `analysisId`. Remove the entire analysisId fetch block:
+
+  var analysisId = params.get("analysisId");
+  if (analysisId && window._propertyId) {
+    fetch('/api/properties/' + window._propertyId + '/underwriting/' + analysisId)
+      ...everything inside this if block...
+  }
+
+Replace it with a simpler direct input-fill (no fetch needed — inputs come directly from URL params):
+
+  window.addEventListener("DOMContentLoaded", function() {
+    function setVal(id, v) {
+      if (!v) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    var purchase = params.get("purchase");
+    var rehab = params.get("rehab");
+    var arv = params.get("arv");
+    var closing = params.get("closing");
+    var holding = params.get("holding");
+    var strategy = params.get("strategy");
+
+    if (purchase) setVal('ap-price', purchase);
+    if (rehab) setVal('ap-rehab', rehab);
+    if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
+    if (closing) setVal('ap-closing', closing);
+    if (holding) setVal('ap-holding', holding);
+
+    // Switch to the correct strategy tab if specified
+    if (strategy) {
+      var tabMap = { brrrr: 'tab-brrrr', flip: 'tab-flip', wholesale: 'tab-wholesale' };
+      var tabId = tabMap[strategy.toLowerCase()];
+      if (tabId) {
+        var tab = document.getElementById(tabId);
+        if (tab) tab.click();
+      }
+    }
+
+    // Trigger recalculation after a short delay to let the DOM settle
+    setTimeout(function() {
+      try { recalcFlip(); } catch(e) {}
+      try { recalcB(); } catch(e) {}
+      try { recalc(); } catch(e) {}
+    }, 200);
+  });
+
+─────────────────────────────────────────
+FILE 4: apps/chg-rehab/app/property/page.tsx
+─────────────────────────────────────────
+
+In the AnalysisList function, find the "Open full report" Link:
+
+              <Link
+                href={`/underwriting?propertyId=${encodeURIComponent(propertyId)}&analysisId=${encodeURIComponent(s.id)}`}
+                style=...
+              >
+                Open full report →
+              </Link>
+
+Replace with a link that passes all saved inputs directly as URL params:
+
+              <Link
+                href={(() => {
+                  const p = new URLSearchParams();
+                  p.set("propertyId", propertyId);
+                  if (inputs.purchase) p.set("purchase", String(inputs.purchase));
+                  if (inputs.rehab) p.set("rehab", String(inputs.rehab));
+                  if (inputs.arv) p.set("arv", String(inputs.arv));
+                  if (inputs.closing) p.set("closing", String(inputs.closing));
+                  if (inputs.holding) p.set("holding", String(inputs.holding));
+                  if (d.strategy) p.set("strategy", String(d.strategy));
+                  return `/underwriting?${p.toString()}`;
+                })()}
+                style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
+              >
+                Open full report →
+              </Link>
+
+Do not change anything else in any file.

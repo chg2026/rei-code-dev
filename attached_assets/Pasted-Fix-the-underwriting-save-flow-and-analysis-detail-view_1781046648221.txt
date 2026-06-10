@@ -1,0 +1,133 @@
+Fix the underwriting save flow and analysis detail view across two files.
+
+─────────────────────────────────────────
+FILE 1: apps/chg-rehab/public/underwriting-calc.html
+─────────────────────────────────────────
+
+CHANGE 1 — Capture more output data when saving.
+
+Find the payload object inside saveBtn.onclick:
+      var payload = {
+        strategy: strategy,
+        savedAt: new Date().toISOString(),
+        inputs: { purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'), closing: raw('ap-closing'), holding: raw('ap-holding') },
+        results: {
+          profit: raw('f-profit') || raw('b-profit-refi'),
+          roi: document.getElementById('f-roi') ? document.getElementById('f-roi').textContent : null,
+        },
+        label: (document.querySelector('.db-name') ? document.querySelector('.db-name').textContent : 'Analysis') + ' — ' + strategy.toUpperCase() + ' — ' + new Date().toLocaleDateString()
+      };
+
+Replace with:
+      function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : null; }
+      var payload = {
+        strategy: strategy,
+        savedAt: new Date().toISOString(),
+        inputs: {
+          purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'),
+          closing: raw('ap-closing'), holding: raw('ap-holding'),
+          downPayment: raw('ap-down'), interestRate: raw('ap-rate'),
+        },
+        results: {
+          profit: txt('f-net') || txt('f-profit') || txt('b-profit-refi'),
+          roi: txt('f-roi') || txt('b-roi'),
+          mao: txt('f-mao'),
+          cashFlow: txt('b-cashflow') || txt('b-monthly-cf'),
+          cocReturn: txt('b-coc'),
+          totalCapital: txt('f-total-capital') || txt('b-capital-needed'),
+          dealStrength: txt('f-deal-strength') || document.querySelector('.deal-badge') ? (document.querySelector('.deal-badge') ? document.querySelector('.deal-badge').textContent.trim() : null) : null,
+        },
+        label: (document.querySelector('.db-name') ? document.querySelector('.db-name').textContent.trim() : 'Analysis') + ' — ' + strategy.toUpperCase() + ' — ' + new Date().toLocaleDateString()
+      };
+
+CHANGE 2 — Wire the two inline "Save" buttons in the bottom bar to trigger the same save.
+
+The inline Save buttons are:
+  <button class="btn-save">Save</button>   (appears twice)
+
+Replace both occurrences with:
+  <button class="btn-save" onclick="var fb=document.getElementById('floating-save-btn');if(fb){fb.click();}">Save</button>
+
+CHANGE 3 — Give the floating save button an id so the inline buttons can find it.
+
+In the saveBtn creation code, find:
+  var saveBtn = document.createElement('button');
+
+Add this line right after it:
+  saveBtn.id = 'floating-save-btn';
+
+─────────────────────────────────────────
+FILE 2: apps/chg-rehab/app/property/page.tsx
+─────────────────────────────────────────
+
+Update the AnalysisPanel to make each analysis clickable and open a full static report in a modal.
+
+Find the AnalysisPanel function at the bottom of the file and replace it entirely with:
+
+async function AnalysisPanel({ propertyId }: { propertyId: string }) {
+  if (!propertyId) return <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 12 }}>Select a property to view analyses.</div>;
+  const sections = await prisma.propertyFinancialSection.findMany({
+    where: { propertyId, section: { startsWith: "underwriting_" } },
+    orderBy: { id: "desc" },
+  });
+  if (sections.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
+        No saved analyses yet. Run an analysis in Underwriting and click &quot;Save analysis to deal.&quot;
+      </div>
+    );
+  }
+  return <AnalysisList sections={sections} />;
+}
+
+Then add this new client component right above the AnalysisPanel function:
+
+"use client" does not work in a server file — instead, create the modal as a client component inline using a details/summary HTML element approach (no useState needed):
+
+function AnalysisList({ sections }: { sections: { id: string; section: string; data: unknown }[] }) {
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = (d.inputs ?? {}) as Record<string, number>;
+        const results = (d.results ?? {}) as Record<string, string | null>;
+        const label = String(d.label ?? s.section);
+        const savedAt = String(d.savedAt ?? "").replace("T", " ").slice(0, 16);
+        return (
+          <details key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
+            <summary style={{ padding: "14px 16px", cursor: "pointer", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{savedAt}</div>
+              </div>
+              <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "var(--bg-secondary)", color: "var(--text-secondary)", fontWeight: 500 }}>
+                View report ▾
+              </span>
+            </summary>
+            <div style={{ borderTop: "0.5px solid var(--border-lo)", padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Inputs</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+                {inputs.purchase ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Purchase price</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.purchase).toLocaleString()}</div></div> : null}
+                {inputs.rehab ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Rehab budget</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.rehab).toLocaleString()}</div></div> : null}
+                {inputs.arv ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ARV</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.arv).toLocaleString()}</div></div> : null}
+                {inputs.closing ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Closing costs</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.closing).toLocaleString()}</div></div> : null}
+                {inputs.holding ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Holding costs</div><div style={{ fontSize: 14, fontWeight: 600 }}>${Number(inputs.holding).toLocaleString()}</div></div> : null}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Results</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+                {results.profit ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Profit</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.profit}</div></div> : null}
+                {results.roi ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ROI</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.roi}</div></div> : null}
+                {results.mao ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>MAO</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.mao}</div></div> : null}
+                {results.cashFlow ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Monthly cash flow</div><div style={{ fontSize: 14, fontWeight: 700, color: "#1F7A4D" }}>{results.cashFlow}</div></div> : null}
+                {results.cocReturn ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>CoC return</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.cocReturn}</div></div> : null}
+                {results.dealStrength ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Deal strength</div><div style={{ fontSize: 14, fontWeight: 700 }}>{results.dealStrength}</div></div> : null}
+              </div>
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+Do not change anything else.

@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
 type Filter = "all" | "rehab" | "rental" | "acq" | "sold";
-type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants";
+type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants" | "analysis";
 
 type SP = { id?: string; q?: string; filter?: Filter; tab?: Tab };
 
@@ -160,7 +160,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
             {visible.map((p) => {
               const active = p.id === selectedId;
               const isRehab = (p.status || "").toLowerCase().includes("rehab");
-              const bg = isRehab ? "background:#E6F1FB;color:#0C447C;" : "background:#EAF3DE;color:#27500A;";
+              const bg = isRehab ? "background:#E8EFF1;color:#143641;" : "background:#EAF3DE;color:#27500A;";
               return (
                 <Link
                   key={p.id}
@@ -218,6 +218,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
                 ["assets", "Asset register"],
                 ["documents", "Documents"],
                 ["tenants", "Tenants"],
+                ["analysis", "Analysis"],
               ] as [Tab, string][]
             ).map(([t, label]) => (
               <Link
@@ -245,6 +246,8 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
               <AssetsTab propertyId={selected.id} />
             ) : tab === "documents" ? (
               <DocumentsTab propertyId={selected.id} companyId={user.companyId} />
+            ) : tab === "analysis" ? (
+              <AnalysisPanel propertyId={selected.id} />
             ) : (
               <TenantsTab property={selected} companyId={user.companyId} />
             )}
@@ -266,7 +269,7 @@ function parseInlineStyle(s: string): Record<string, string> {
 
 function statusBadgeStyle(status: string): React.CSSProperties {
   const s = status.toLowerCase();
-  if (s.includes("rehab")) return { background: "#E6F1FB", color: "#0C447C" };
+  if (s.includes("rehab")) return { background: "#E8EFF1", color: "#143641" };
   if (s.includes("rental") || s.includes("tenanted")) return { background: "#EAF3DE", color: "#27500A" };
   if (s.includes("sold")) return { background: "#EEEDFE", color: "#3C3489" };
   return { background: "#FAEEDA", color: "#633806" };
@@ -322,7 +325,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Total invested</div>
-          <div className="kpi-val" style={{ color: "#185FA5" }}>{formatMoney(totalInvested || null)}</div>
+          <div className="kpi-val" style={{ color: "#1F4D5C" }}>{formatMoney(totalInvested || null)}</div>
           <div className="kpi-sub">Purchase + rehab to date</div>
         </div>
         {isRental ? (
@@ -358,6 +361,8 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
         )}
       </div>
 
+      <SmartStatusBanner property={property} project={project} meta={m} />
+
       <div className="body-split">
         <div className="body-main">
           {!project && (
@@ -385,7 +390,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                 Active project
                 <Link
                   href={`/rehab?project=${project.code}`}
-                  style={{ float: "right", fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: 10, color: "#185FA5", textDecoration: "none" }}
+                  style={{ float: "right", fontWeight: 400, textTransform: "none", letterSpacing: 0, fontSize: 10, color: "#1F4D5C", textDecoration: "none" }}
                 >
                   Open in Rehab Manager →
                 </Link>
@@ -445,7 +450,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                 </span>
               </div>
               {openItems.map((it, i) => {
-                const sevColor = it.severity === "high" ? "#C2410C" : it.severity === "med" ? "#A16207" : "#185FA5";
+                const sevColor = it.severity === "high" ? "#C2410C" : it.severity === "med" ? "#A16207" : "#1F4D5C";
                 const sevBg    = it.severity === "high" ? "#FEF1E5" : it.severity === "med" ? "#FEF7E0" : "#E8F0FA";
                 return (
                   <div key={it.id} style={{
@@ -558,7 +563,7 @@ async function HistoryTab({ propertyId, companyId }: { propertyId: string; compa
               </span>
               <Link
                 href={`/rehab?project=${encodeURIComponent(p.code)}`}
-                style={{ fontSize: 10, color: "#185FA5", textDecoration: "none" }}
+                style={{ fontSize: 10, color: "#1F4D5C", textDecoration: "none" }}
               >
                 Open →
               </Link>
@@ -576,6 +581,102 @@ async function HistoryTab({ propertyId, companyId }: { propertyId: string; compa
 }
 
 // ── Financials ────────────────────────────────────────────────────────
+async function SmartStatusBanner({
+  property,
+  project,
+  meta,
+}: {
+  property: { id: string; status: string | null };
+  project: { id: string } | null;
+  meta: PropertyMeta;
+}) {
+  const status = (property.status || "").toLowerCase();
+
+  // Determine which banner to show
+  let banner: { color: string; bg: string; border: string; icon: string; title: string; body: string; cta: string; href: string } | null = null;
+
+  if (status.includes("acquired") && !status.includes("rehab")) {
+    const hasAnalysis = await prisma.propertyFinancialSection.count({
+      where: { propertyId: property.id, section: { startsWith: "underwriting_" } },
+    });
+    if (!hasAnalysis) {
+      banner = {
+        bg: "#FAEEDA", border: "rgba(99,56,6,0.2)", color: "#633806",
+        icon: "📊",
+        title: "Run your underwriting analysis",
+        body: "This property is acquired. Compare Flip, BRRRR, and Flip & Rent before committing to a strategy.",
+        cta: "Open underwriting →",
+        href: `/underwriting?propertyId=${property.id}`,
+      };
+    }
+  } else if (status.includes("rehab")) {
+    if (!project) {
+      banner = {
+        bg: "#E8EFF1", border: "rgba(31,77,92,0.2)", color: "#143641",
+        icon: "🏗️",
+        title: "Set up your rehab project",
+        body: "Track scope, budget, schedule, and contractor assignments for this active rehab.",
+        cta: "Go to Rehab Manager →",
+        href: `/rehab`,
+      };
+    } else if (!meta.purchasePrice) {
+      banner = {
+        bg: "#FEF9EC", border: "rgba(146,64,14,0.2)", color: "#92400E",
+        icon: "💰",
+        title: "Add financial inputs",
+        body: "Purchase price and rehab budget are missing. Add them so your financials tab calculates correctly.",
+        cta: "Edit financials →",
+        href: `/property?id=${property.id}&tab=financials`,
+      };
+    }
+  } else if (status.includes("rental") || status.includes("tenanted")) {
+    const leaseCount = await prisma.lease.count({ where: { propertyId: property.id } });
+    if (!leaseCount) {
+      banner = {
+        bg: "#EAF3DE", border: "rgba(29,158,117,0.2)", color: "#27500A",
+        icon: "🏠",
+        title: "Add tenant & lease information",
+        body: "This is an active rental. Add the current lease agreement and tenant details.",
+        cta: "Go to Tenants tab →",
+        href: `/property?id=${property.id}&tab=tenants`,
+      };
+    }
+  } else if (status.includes("listed")) {
+    banner = {
+      bg: "#EDE9FE", border: "rgba(109,40,217,0.2)", color: "#4C1D95",
+      icon: "🏷️",
+      title: "Property is listed for sale",
+      body: "Track your listing activity, price changes, days on market, and buyer leads in the Documents and Financials tabs.",
+      cta: "View financials →",
+      href: `/property?id=${property.id}&tab=financials`,
+    };
+  }
+
+  if (!banner) return null;
+
+  return (
+    <div style={{
+      margin: "0 16px 12px",
+      padding: "12px 16px",
+      background: banner.bg,
+      border: `0.5px solid ${banner.border}`,
+      borderRadius: 8,
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 12,
+    }}>
+      <span style={{ fontSize: 20, flexShrink: 0 }}>{banner.icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: banner.color, marginBottom: 3 }}>{banner.title}</div>
+        <div style={{ fontSize: 12, color: banner.color, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>{banner.body}</div>
+        <a href={banner.href} style={{ fontSize: 12, fontWeight: 600, color: banner.color, textDecoration: "none", borderBottom: `1px solid ${banner.color}` }}>
+          {banner.cta}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 async function FinancialsTab({ property, companyId }: { property: NonNullable<Awaited<ReturnType<typeof prisma.property.findFirst>>>; companyId: string }) {
   const m = (property.meta || {}) as PropertyMeta;
   const project = await prisma.project.findFirst({
@@ -634,9 +735,9 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
 
         <div style={{ padding: "14px 16px", background: "var(--bg-secondary)", borderBottom: "0.5px solid var(--border-lo)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-            <Summary label="Total invested"          val={formatMoney(totalInvested)}    color="#185FA5" />
-            <Summary label="Projected net profit"    val={formatMoney(projectedNet)}     color="#1D9E75" />
-            <Summary label="Projected ROI"           val={`${projectedRoi}%`}             color="#1D9E75" sub="(sell scenario)" />
+            <Summary label="Total invested"          val={formatMoney(totalInvested)}    color="#1F4D5C" />
+            <Summary label="Projected net profit"    val={!m.arv || m.arv <= 0 ? "—" : formatMoney(projectedNet)}     color="#1D9E75" />
+            <Summary label="Projected ROI"           val={!m.arv || m.arv <= 0 ? "—" : `${projectedRoi}%`}             color="#1D9E75" sub="(sell scenario)" />
           </div>
         </div>
         <div style={{ padding: "10px 16px", background: "#EAF3DE", borderBottom: "0.5px solid var(--border-lo)" }}>
@@ -817,9 +918,9 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
     return (
       <>
         <div style={{
-          padding: "8px 16px", background: "#E6F1FB",
-          borderBottom: "0.5px solid rgba(24,95,165,0.2)",
-          fontSize: 10, color: "#0C447C",
+          padding: "8px 16px", background: "#E8EFF1",
+          borderBottom: "0.5px solid rgba(31,77,92,0.2)",
+          fontSize: 10, color: "#143641",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <span>Tenant records are managed in the Contacts module</span>
@@ -861,7 +962,7 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: "50%",
-                  background: "#E6F1FB", color: "#0C447C",
+                  background: "#E8EFF1", color: "#143641",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 11, fontWeight: 700, flexShrink: 0,
                 }}>{initials}</div>
@@ -892,4 +993,91 @@ async function TenantsTab({ property, companyId }: { property: NonNullable<Await
       })}
     </>
   );
+}
+
+function AnalysisList({ sections, propertyId }: { sections: { id: string; section: string; data: unknown }[]; propertyId: string }) {
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = (d.inputs ?? {}) as Record<string, unknown>;
+        const results = (d.results ?? {}) as Record<string, string | null>;
+        const label = String(d.label ?? s.section);
+        const savedAt = String(d.savedAt ?? "").replace("T", " ").slice(0, 16);
+        const strategy = String(d.strategy ?? "flip").toUpperCase();
+        const fmtNum = (v: unknown) => v && Number(v) ? `$${Number(v).toLocaleString()}` : null;
+
+        return (
+          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, marginBottom: 12, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "0.5px solid var(--border-lo)" }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{label}</div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>Saved {savedAt}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E8EFF1", color: "#1F4D5C", fontWeight: 700 }}>{strategy}</span>
+                {results.dealStrength && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, background: "#E4F1EA", color: "#0D4A28", fontWeight: 600 }}>{results.dealStrength}</span>}
+              </div>
+            </div>
+
+            {/* Key metrics row */}
+            <div style={{ padding: "14px 20px", display: "flex", gap: 24, flexWrap: "wrap", borderBottom: "0.5px solid var(--border-lo)" }}>
+              {[
+                { label: "Purchase", value: fmtNum(inputs.purchase) },
+                { label: "Rehab", value: fmtNum(inputs.rehab) },
+                { label: "ARV", value: fmtNum(inputs.arv) },
+                { label: "Projected profit", value: results.profit },
+                { label: "ROI on cash", value: results.roiOnCash },
+                { label: "CoC return", value: results.cocReturn },
+                { label: "Monthly cash flow", value: results.monthlyFlow },
+              ].filter(r => r.value).map(r => (
+                <div key={r.label}>
+                  <div style={{ fontSize: 9, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{r.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: r.label.includes("profit") || r.label.includes("ROI") || r.label.includes("cash flow") || r.label.includes("CoC") ? "#1F7A4D" : "var(--text-primary)" }}>{r.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div style={{ padding: "10px 20px", display: "flex", gap: 10, alignItems: "center" }}>
+              <Link
+                href={(() => {
+                  const p = new URLSearchParams();
+                  p.set("propertyId", propertyId);
+                  if (inputs.purchase) p.set("purchase", String(inputs.purchase));
+                  if (inputs.rehab) p.set("rehab", String(inputs.rehab));
+                  if (inputs.arv) p.set("arv", String(inputs.arv));
+                  if (inputs.closing) p.set("closing", String(inputs.closing));
+                  if (inputs.holding) p.set("holding", String(inputs.holding));
+                  if (d.strategy) p.set("strategy", String(d.strategy));
+                  return `/underwriting?${p.toString()}`;
+                })()}
+                style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
+              >
+                Open full report →
+              </Link>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Opens in calculator — use Print for a full printable report</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+async function AnalysisPanel({ propertyId }: { propertyId: string }) {
+  if (!propertyId) return <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 12 }}>Select a property to view analyses.</div>;
+  const sections = await prisma.propertyFinancialSection.findMany({
+    where: { propertyId, section: { startsWith: "underwriting_" } },
+    orderBy: { id: "desc" },
+  });
+  if (sections.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
+        No saved analyses yet. Run an analysis in Underwriting and click &quot;Save analysis to deal.&quot;
+      </div>
+    );
+  }
+  return <AnalysisList sections={sections} propertyId={propertyId} />;
 }

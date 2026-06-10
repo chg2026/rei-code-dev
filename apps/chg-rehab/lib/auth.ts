@@ -88,6 +88,7 @@ function toSessionUser(
   isSuperAdmin = false,
   isInvestor = false,
   isContractor = false,
+  accountProducts: string[] = [],
 ): SessionUser {
   return {
     id: u.id,
@@ -101,7 +102,57 @@ function toSessionUser(
     isSuperAdmin,
     isInvestor,
     isContractor,
+    accountProducts,
   };
+}
+
+/**
+ * Look up the active product codes entitled to an account by joining
+ * `account_products` to `products`. Returns an empty array on missing
+ * accountId or query error so the caller can fail-open to the legacy
+ * role-flag visibility.
+ */
+async function loadAccountProductCodes(accountId: string | null): Promise<string[]> {
+  if (!accountId) return [];
+  try {
+    const admin = getSupabaseAdminClient();
+
+    const { data: apRows, error: apError } = await admin
+      .from("account_products")
+      .select("product_id")
+      .eq("account_id", accountId);
+    if (apError) {
+      console.warn("[auth] account_products lookup failed:", apError.message);
+      return [];
+    }
+    const productIds = Array.from(
+      new Set(
+        ((apRows ?? []) as Array<{ product_id: string | null }>)
+          .map((r) => r.product_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    if (productIds.length === 0) return [];
+
+    const { data: prodRows, error: prodError } = await admin
+      .from("products")
+      .select("code, status")
+      .in("id", productIds);
+    if (prodError) {
+      console.warn("[auth] products lookup failed:", prodError.message);
+      return [];
+    }
+    const codes = new Set<string>();
+    for (const p of (prodRows ?? []) as Array<{ code: string | null; status: string | null }>) {
+      if (p.code && (p.status ?? "active") === "active") {
+        codes.add(p.code);
+      }
+    }
+    return Array.from(codes);
+  } catch (err) {
+    console.warn("[auth] account_products lookup threw:", (err as Error).message);
+    return [];
+  }
 }
 
 /**
@@ -139,11 +190,16 @@ async function resolveCurrentUser(): Promise<SessionUser | null> {
   }
 
   console.log(`[auth:diag] resolveCurrentUser | session=OK | user=${supaUser.id}`);
-  const synced = await syncSupabaseUser(supaUser.id, supaUser.email ?? null, supaUser.phone ?? null);
-  if (!synced) {
-    console.log(`[auth:diag] resolveCurrentUser | user=${supaUser.id} | syncSupabaseUser=null (deactivated, no profile row, wrong role, or lookup error)`);
+  try {
+    const synced = await syncSupabaseUser(supaUser.id, supaUser.email ?? null, supaUser.phone ?? null);
+    if (!synced) {
+      console.log(`[auth:diag] resolveCurrentUser | user=${supaUser.id} | syncSupabaseUser=null (deactivated, no profile row, wrong role, or lookup error)`);
+    }
+    return synced;
+  } catch (e) {
+    console.error("[auth] syncSupabaseUser threw — treating as logged out:", (e as Error).message);
+    return null;
   }
-  return synced;
 }
 
 /**
@@ -160,10 +216,31 @@ async function syncSupabaseUser(
   authEmail: string | null,
   authPhone: string | null
 ): Promise<SessionUser | null> {
-  const existing = await prisma.user.findUnique({ where: { id: authUserId } });
+  const existing =
+    (await prisma.user.findUnique({ where: { id: authUserId } })) ??
+    (authEmail ? await prisma.user.findUnique({ where: { email: authEmail } }) : null);
   if (existing) {
     if (!existing.active) return null;
     return refreshFromSupabase(existing, authEmail);
+  }
+
+  // Fallback: a Prisma User row may already exist with this email but a
+  // different id (e.g. created under a prior auth provider before the
+  // Supabase migration). Without this lookup the create() below would
+  // crash with P2002 unique-constraint-on-email and surface as a generic
+  // "Application error" on /login (digest 145877138). Reuse the existing
+  // row by email so the user can sign in. Full identity reconciliation
+  // (rewriting Prisma User.id to match Supabase auth.uid) is tracked
+  // separately.
+  if (authEmail) {
+    const byEmail = await prisma.user.findUnique({ where: { email: authEmail } });
+    if (byEmail) {
+      console.log(
+        `[auth:diag] syncSupabaseUser | user=${authUserId} | id_lookup=miss | email_fallback=hit | prisma_user_id=${byEmail.id} | action=refresh_existing_by_email`
+      );
+      if (!byEmail.active) return null;
+      return refreshFromSupabase(byEmail, authEmail);
+    }
   }
 
   // First Supabase sign-in for this user — pull profile + account from Supabase.
@@ -362,7 +439,8 @@ async function syncSupabaseUser(
 
   // Users that reach this point passed both is_investor and is_contractor
   // fail-closed checks above, so both flags are known-false for new accounts.
-  return toSessionUser(created, profile.profile_score ?? null, !!profile.is_super_admin, false, false);
+  const accountProducts = await loadAccountProductCodes(accountId);
+  return toSessionUser(created, profile.profile_score ?? null, !!profile.is_super_admin, false, false, accountProducts);
 }
 
 /**
@@ -411,7 +489,8 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
           console.log(`[auth:diag] refreshFromSupabase | user=${existing.id} | profile_source=role_cache | action=return_null | reason=${c.inv ? "is_investor" : "is_contractor"}`);
           return null; // wrong-role, non-super-admin
         }
-        return toSessionUser(existing, c.ps ?? null, !!c.sa, false, false);
+        const cachedAccountProducts = await loadAccountProductCodes(existing.companyId);
+        return toSessionUser(existing, c.ps ?? null, !!c.sa, false, false, cachedAccountProducts);
       }
     } catch {
       // Malformed cookie — fall through to Supabase.
@@ -419,12 +498,29 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
   }
 
   const admin = getSupabaseAdminClient();
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
-    .eq("id", existing.id)
-    .maybeSingle<RefreshProfile>();
-
+  let profile: RefreshProfile | null = null;
+  {
+    const { data: profileById } = await admin
+      .from("user_profiles")
+      .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
+      .eq("email", existing.email ?? authEmail ?? "")
+      .maybeSingle<RefreshProfile>();
+    profile = profileById ?? null;
+  }
+  if (!profile) {
+    const lookupEmail = authEmail || existing.email;
+    if (lookupEmail) {
+      const { data: profileByEmail } = await admin
+        .from("user_profiles")
+        .select("email, full_name, avatar_url, status, profile_score, is_super_admin, is_investor, is_contractor")
+        .eq("email", lookupEmail)
+        .maybeSingle<RefreshProfile>();
+      if (profileByEmail) {
+        console.log(`[auth:diag] refreshFromSupabase | user=${existing.id} | profile_source=supabase_db_email_fallback | profile_row=found`);
+        profile = profileByEmail;
+      }
+    }
+  }
   if (!profile) {
     console.log(`[auth:diag] refreshFromSupabase | user=${existing.id} | profile_source=supabase_db | profile_row=MISSING | action=continue_with_existing_prisma_row`);
   }
@@ -441,6 +537,8 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
   const nextFirst = firstName || existing.firstName;
   const nextLast = lastName ?? existing.lastName;
   const nextImg = profile?.avatar_url ?? existing.profileImageUrl;
+
+  const accountProducts = await loadAccountProductCodes(existing.companyId);
 
   if (
     nextEmail !== existing.email ||
@@ -463,6 +561,7 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
       !!profile?.is_super_admin,
       !!profile?.is_investor,
       !!profile?.is_contractor,
+      accountProducts,
     );
   }
 
@@ -472,5 +571,6 @@ async function refreshFromSupabase(existing: User, authEmail: string | null): Pr
     !!profile?.is_super_admin,
     !!profile?.is_investor,
     !!profile?.is_contractor,
+    accountProducts,
   );
 }

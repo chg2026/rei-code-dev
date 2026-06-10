@@ -1,4 +1,4 @@
-import { sendEmail as replitSendEmail } from "./replitmail";
+import { Resend } from "resend";
 
 export type InviteEmail = {
   to: string;
@@ -9,7 +9,11 @@ export type InviteEmail = {
   expiresAt: Date;
 };
 
-export type SendResult = { delivered: boolean; reason?: string; messageId?: string };
+export type SendResult = {
+  delivered: boolean;
+  reason?: string;
+  messageId?: string;
+};
 
 function escapeHtml(s: string): string {
   return s
@@ -20,55 +24,67 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/**
- * Send the invite-link email via the Replit Mail blueprint.
- *
- * Replit Mail sends to the *authenticated Replit user's* verified email
- * (i.e. the admin who initiated the invite) — it cannot address arbitrary
- * recipients. The admin receives a copy of the join link and can forward it
- * to the invitee. The admin UI also surfaces the link directly so they can
- * copy/paste without waiting for the email.
- */
 export async function sendInviteEmail(msg: InviteEmail): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[email] RESEND_API_KEY is not set — invite email skipped");
+    return { delivered: false, reason: "resend_not_configured" };
+  }
+
+  const resend = new Resend(apiKey);
+
   const expires = msg.expiresAt.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 
-  const subject = `Invite link for ${msg.to} — ${msg.companyName}`;
+  const subject = `You've been invited to join ${msg.companyName} on CHG Rehab`;
+
   const text = [
-    `${msg.inviterName} invited ${msg.to} to join ${msg.companyName} on CHG Rehab as a ${msg.role}.`,
+    `${msg.inviterName} invited you to join ${msg.companyName} on CHG Rehab as a ${msg.role}.`,
     ``,
-    `Forward this join link to ${msg.to} (expires ${expires}):`,
+    `Accept your invite (expires ${expires}):`,
     msg.joinUrl,
     ``,
-    `If you didn't initiate this invite, you can revoke it from the Admin → Users & permissions page.`,
+    `If you weren't expecting this invite, you can ignore this email.`,
   ].join("\n");
 
   const html = `
-    <div style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111">
-      <p><strong>${escapeHtml(msg.inviterName)}</strong> invited
-      <strong>${escapeHtml(msg.to)}</strong> to join
+    <div style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;max-width:480px;margin:0 auto">
+      <p style="font-size:15px"><strong>${escapeHtml(msg.inviterName)}</strong> invited you to join
       <strong>${escapeHtml(msg.companyName)}</strong> on CHG Rehab as a
       <strong>${escapeHtml(msg.role)}</strong>.</p>
-      <p>Forward this join link to ${escapeHtml(msg.to)} (expires ${escapeHtml(expires)}):</p>
-      <p><a href="${escapeHtml(msg.joinUrl)}" style="display:inline-block;padding:10px 16px;background:#0F62FE;color:#fff;border-radius:6px;text-decoration:none">Accept invite</a></p>
-      <p style="word-break:break-all;color:#555;font-size:12px">${escapeHtml(msg.joinUrl)}</p>
-      <p style="color:#666;font-size:12px">If you didn't initiate this invite, you can revoke it from Admin → Users &amp; permissions.</p>
+      <p style="margin:24px 0">
+        <a href="${escapeHtml(msg.joinUrl)}"
+           style="display:inline-block;padding:11px 22px;background:#111827;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500">
+          Accept invite
+        </a>
+      </p>
+      <p style="color:#555;font-size:12px">This invite expires ${escapeHtml(expires)}.</p>
+      <p style="word-break:break-all;color:#888;font-size:11px">${escapeHtml(msg.joinUrl)}</p>
+      <p style="color:#aaa;font-size:11px">If you weren't expecting this invite, you can ignore this email.</p>
     </div>
   `;
 
   try {
-    const res = await replitSendEmail({ subject, text, html });
-    const delivered = (res.accepted?.length ?? 0) > 0;
-    return {
-      delivered,
-      messageId: res.messageId,
-      reason: delivered ? undefined : "rejected_by_provider",
-    };
+    const { data, error } = await resend.emails.send({
+      from: "CHG Rehab <noreply@goldbridgerei.com>",
+      to: [msg.to],
+      subject,
+      html,
+      text,
+    });
+
+    if (error) {
+      console.error("[email] Resend error:", error.message);
+      return { delivered: false, reason: error.message };
+    }
+
+    return { delivered: true, messageId: data?.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error("[email] Resend threw:", message);
     return { delivered: false, reason: `transport_error: ${message}` };
   }
 }

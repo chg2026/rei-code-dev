@@ -201,6 +201,6 @@ across all subcategories (matches the original `prisma/seed.ts` behaviour).
   produced this layout.
 
 ## Scope Rule — IMPORTANT
-Only edit files inside `apps/deallink/`.
-Never modify files in `apps/chg-rehab/`, `apps/investor-portal/`, `apps/contractor-portal/`, `server/`, `packages/`, or any root-level config files.
+Only edit files inside `apps/chg-rehab/`.
+Never modify files in `apps/deallink/`, `apps/investor-portal/`, `apps/contractor-portal/`, `server/`, `packages/`, or any root-level config files.
 If a change requires touching shared code, stop and ask the user first.

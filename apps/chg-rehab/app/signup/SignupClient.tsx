@@ -1,0 +1,370 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+
+const API = process.env.NEXT_PUBLIC_LEGACY_API_BASE_URL?.replace(/\/$/, "") || "https://rei-code-dev.replit.app";
+
+const PRODUCT_NAMES: Record<string, string> = {
+  chg: "CHG Rehab",
+  deallink: "REI Flywheel",
+  "investor-portal": "Investor Portal",
+  "contractor-portal": "Contractor Portal",
+};
+
+type CredentialCheck =
+  | { exists: false }
+  | { exists: true; products: string[] };
+
+export default function SignupClient() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get('token');
+  const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [credentialCheck, setCredentialCheck] = useState<CredentialCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const checkRef = useRef<string>("");
+
+  async function checkCredential(value: string) {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) return;
+    checkRef.current = trimmed;
+    setChecking(true);
+    try {
+      const res = await fetch(`${API}/api/auth/check-credential`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const data = await res.json();
+      if (checkRef.current === trimmed) {
+        setCredentialCheck(data);
+      }
+    } catch {
+      // Fail silently — treat as new user
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  useEffect(() => {
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setEmail(emailParam);
+      checkCredential(emailParam);
+    }
+  }, []);
+
+  // Derive current mode from the credential check result
+  const mode: "unknown" | "new" | "activate" | "already-chg" =
+    !credentialCheck
+      ? "unknown"
+      : !credentialCheck.exists
+      ? "new"
+      : credentialCheck.products.includes("chg")
+      ? "already-chg"
+      : "activate";
+
+  const otherProducts =
+    credentialCheck?.exists
+      ? (credentialCheck as { exists: true; products: string[] }).products
+          .filter((p) => p !== "chg")
+          .map((p) => PRODUCT_NAMES[p] || p)
+      : [];
+
+  async function handleNewSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirmPassword) { setError("Passwords don't match."); return; }
+    if (!companyName.trim()) { setError("Company name is required."); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          company_name: companyName.trim(),
+          product_code: "chg",
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        if (body.error === "already_registered") {
+          setCredentialCheck({ exists: true, products: body.products || [] });
+          setLoading(false);
+          return;
+        }
+        throw new Error(body.message || body.error || "Signup failed.");
+      }
+      // Sign in after account creation
+      const supabase = getSupabaseBrowserClient();
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInErr) throw signInErr;
+      window.location.href = "/pipeline";
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.");
+      setLoading(false);
+    }
+  }
+
+  async function handleActivate(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!password) { setError("Enter your Doorine password to continue."); return; }
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut().catch(() => {});
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInErr) throw new Error("Incorrect password. Please try again.");
+      const token = signInData.session?.access_token;
+      if (!token) throw new Error("Sign-in succeeded but no session returned.");
+      // Activate CHG on the existing account
+      const res = await fetch(`${API}/api/auth/activate-product`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ product_code: "chg" }),
+      });
+      const body = await res.json();
+      if (!res.ok && body.error !== "already_active") {
+        throw new Error(body.message || body.error || "Activation failed.");
+      }
+      window.location.href = "/pipeline";
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Activation failed. Please try again.");
+      setLoading(false);
+    }
+  }
+
+  async function handleInviteAccept(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/invites/use", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: inviteToken, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to accept invite.");
+      }
+      const supabase = getSupabaseBrowserClient();
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password,
+      });
+      if (signInErr) {
+        throw new Error("Account created but sign-in failed. Try signing in at /login.");
+      }
+      window.location.href = "/pipeline";
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to accept invite.");
+      setLoading(false);
+    }
+  }
+
+  if (inviteToken) {
+    return (
+      <div className="login-shell">
+        <div className="login-card">
+          <div className="login-brand">
+            <div className="login-logo">CHG</div>
+            <div className="login-title">CHG <span>Rehab</span></div>
+          </div>
+          <div className="login-sub">You&apos;ve been invited to join a CHG Rehab workspace. Set a password to get started.</div>
+          {error ? <div className="login-error">{error}</div> : null}
+          <form onSubmit={handleInviteAccept} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label className="login-label">
+              Password
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="At least 8 characters" autoFocus />
+            </label>
+            <label className="login-label">
+              Confirm password
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="Repeat password" />
+            </label>
+            <button type="submit" className="login-cta" disabled={loading}>
+              {loading ? "Joining…" : "Accept invite"}
+            </button>
+          </form>
+          <div className="login-foot">© 2026 CHG · Privacy · Terms</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="login-shell">
+      <div className="login-card">
+        <div className="login-brand">
+          <div className="login-logo">CHG</div>
+          <div className="login-title">CHG <span>Rehab</span></div>
+        </div>
+
+        {mode === "already-chg" ? (
+          <>
+            <div className="login-sub">You already have a CHG Rehab account.</div>
+            <a href="/login" className="login-cta" style={{ display: "block", textAlign: "center", marginBottom: 12 }}>
+              Sign in
+            </a>
+            <button
+              type="button"
+              onClick={() => { setCredentialCheck(null); setEmail(""); setPassword(""); }}
+              className="login-cta login-cta-secondary"
+            >
+              Use a different email
+            </button>
+          </>
+        ) : mode === "activate" ? (
+          <>
+            <div className="login-sub">
+              You already have a Doorine account
+              {otherProducts.length > 0 ? ` on ${otherProducts.join(" and ")}` : ""}.
+              Enter your Doorine password to activate CHG Rehab.
+            </div>
+            {error ? <div className="login-error">{error}</div> : null}
+            <form onSubmit={handleActivate} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <label className="login-label">
+                Email
+                <input
+                  type="email"
+                  value={email}
+                  className="login-input"
+                  disabled
+                />
+              </label>
+              <label className="login-label">
+                Doorine password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="login-input"
+                  autoFocus
+                  required
+                  disabled={loading}
+                  placeholder="Your existing Doorine password"
+                />
+              </label>
+              <button type="submit" className="login-cta" disabled={loading}>
+                {loading ? "Activating…" : "Activate CHG Rehab"}
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => { setCredentialCheck(null); setEmail(""); setPassword(""); }}
+              style={{ marginTop: 12, width: "100%", background: "none", border: "none", fontSize: 12, color: "#A8A49C", cursor: "pointer" }}
+            >
+              Use a different email
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="login-sub">Create your CHG Rehab account</div>
+            {error ? <div className="login-error">{error}</div> : null}
+            <form onSubmit={handleNewSignup} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <label className="login-label">
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setCredentialCheck(null); setError(""); }}
+                  onBlur={(e) => checkCredential(e.target.value)}
+                  className="login-input"
+                  required
+                  disabled={loading}
+                  placeholder="you@company.com"
+                />
+                {checking ? (
+                  <span style={{ fontSize: 11, color: "#A8A49C", marginTop: 2 }}>Checking…</span>
+                ) : null}
+              </label>
+              {(mode === "new" || mode === "unknown") && (
+                <>
+                  <label className="login-label">
+                    Company name
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="login-input"
+                      required
+                      disabled={loading}
+                      placeholder="Your company"
+                    />
+                  </label>
+                  <label className="login-label">
+                    Password
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="login-input"
+                      required
+                      disabled={loading}
+                      placeholder="At least 8 characters"
+                    />
+                  </label>
+                  <label className="login-label">
+                    Confirm password
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="login-input"
+                      required
+                      disabled={loading}
+                      placeholder="Repeat password"
+                    />
+                  </label>
+                </>
+              )}
+              <button
+                type="submit"
+                className="login-cta"
+                disabled={loading || checking}
+              >
+                {loading ? "Creating account…" : "Create account"}
+              </button>
+            </form>
+          </>
+        )}
+
+        <div className="login-foot" style={{ marginTop: 20 }}>
+          Already have an account?{" "}
+          <a href="/login" style={{ color: "#C9952A", textDecoration: "none", fontWeight: 600 }}>
+            Sign in
+          </a>
+        </div>
+        <div className="login-foot">© 2026 CHG · Privacy · Terms</div>
+      </div>
+    </div>
+  );
+}

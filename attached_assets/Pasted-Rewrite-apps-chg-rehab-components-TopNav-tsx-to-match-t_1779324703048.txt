@@ -1,0 +1,47 @@
+Rewrite apps/chg-rehab/components/TopNav.tsx to match the new sidebar layout. Keep all existing logic (pathname detection, super admin tab, initials, user data) but restructure the JSX completely.
+
+The component must return a React fragment (<>) containing two elements:
+
+ELEMENT 1 — <aside className="sidebar">
+Structure:
+  - Brand link at top: <Link href="/" className="brand"><span className="brand-mark">CHG</span><span className="brand-sub">Rehab</span></Link>
+
+  - Nav section (no label): Dashboard
+    { href: "/dashboard", label: "Dashboard", icon: grid SVG }
+
+  - Nav section label "Deals", then items:
+    { href: "/pipeline",     label: "Pipeline" }
+    { href: "/underwriting", label: "Underwriting" }
+    { href: "/property",     label: "Property Record" }
+    { href: "/docs",         label: "Documents Hub" }
+
+  - Nav section label "Rehab", then items:
+    { href: "/rehab",               label: "Rehab Manager" }
+    { href: "/warehouse",           label: "Warehouse" }
+    { href: "/contractor-portal",   label: "Contractor Portal" }
+
+  - Nav section label "People", then items:
+    { href: "/contacts",        label: "Contacts" }
+    { href: "/investor-portal", label: "Investor Portal" }
+    { href: "/settings/team",   label: "Team" }
+
+  - Nav section label "Admin", then items:
+    { href: "/billing",  label: "Billing" }
+    { href: "/admin",    label: "Admin Settings" }
+    (If user.isSuperAdmin: { href: "/super-admin", label: "Super Admin" })
+
+  Each nav item: <Link href={item.href} className={active ? "nav-item active" : "nav-item"}>{item.label}</Link>
+  Active detection: pathname === item.href || pathname.startsWith(item.href + "/")
+
+ELEMENT 2 — <div className="topbar">
+  <div className="spacer" />
+  Keep existing: <BillingNavIndicator /> or <BillingNavBadge /> based on user.role
+  Keep existing: <NotificationBell />
+  Keep existing: <AppSwitcher ... />
+  User avatar chip: <Link href="/account" className="avatar-chip"><div className="avatar">{initials}</div>{fullName}</Link>
+  Sign out: <a href="/api/logout" className="sign-out-btn">Sign out</a>
+
+Keep all existing imports. Add import Link from "next/link" if not already there.
+Remove the old horizontal nav markup entirely.
+
+Only edit files inside apps/chg-rehab/. Do not touch any other folder.

@@ -1,0 +1,37 @@
+Update the Add Property form with properly detailed fields. Read both files carefully first.
+
+FILES: apps/chg-rehab/app/property/PropertyActions.tsx and apps/chg-rehab/app/api/properties/route.ts
+
+CHANGES NEEDED:
+
+1. Replace the current single "Rental registration" text input with TWO fields:
+   - Rental registration # (text input, name="rentalRegNumber")
+   - Rental registration expiry (date input, name="rentalRegExpiry")
+
+2. Replace the current "Lead safe certification" yes/no select with THREE fields:
+   - Lead safe cert # (text input, name="leadSafeCertNumber")  
+   - Lead safe cert expiry (date input, name="leadSafeCertExpiry")
+   - Keep the yes/no as a select named "leadSafeCert"
+
+   Lay out as a grid: yes/no | cert # | expiry date
+
+3. Replace the current "Insurance info" single text input with THREE fields:
+   - Insurance provider / policy # (text input, name="insuranceProvider")
+   - Policy start date (date input, name="insuranceDateStart")
+   - Policy expiry date (date input, name="insuranceDateExpiry")
+   Note: file upload for insurance docs is handled in the Documents tab after creation — no file upload in this form.
+
+4. Add a note at the top of the form (right after the modal title area, before the address fields):
+   <div style={{ fontSize: 11, color: "var(--text-tertiary)", padding: "0 0 8px", lineHeight: 1.5 }}>
+     Fill in what you know now — all fields can be updated after creation. Upload photos and documents from the property record.
+   </div>
+
+In the API (route.ts), update the destructuring and meta object to handle the new field names:
+  rentalRegNumber, rentalRegExpiry, leadSafeCertNumber, leadSafeCertExpiry,
+  insuranceProvider, insuranceDateStart, insuranceDateExpiry
+
+Store all as strings in meta (they come in as form strings, no type coercion needed beyond trimming).
+
+In the form's fetch body, send all new field names.
+
+Do not remove any existing fields. Do not change address, city, state, zip, status, purchasePrice, propertyType, beds, baths, sqft, yearBuilt, parcelApn, currentOwner, zoning, floodZone, hoa, hoaAmount fields — keep them exactly as they are.

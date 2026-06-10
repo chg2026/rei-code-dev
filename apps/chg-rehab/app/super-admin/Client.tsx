@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 
-type TabId = "overview" | "accounts" | "users" | "roles" | "products" | "contractor-portal";
+type TabId = "overview" | "accounts" | "users" | "roles" | "products" | "contractor-portal" | "flywheel-buyers" | "flywheel-profiles";
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "accounts", label: "Accounts" },
@@ -9,23 +9,25 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "roles", label: "Roles & Permissions" },
   { id: "products", label: "Products" },
   { id: "contractor-portal", label: "Contractor Portal" },
+  { id: "flywheel-buyers", label: "REI Flywheel Buyers" },
+  { id: "flywheel-profiles", label: "REI Flywheel Wholesalers" },
 ];
 
 const PLANS_BY_PRODUCT: Record<string, string[]> = {
   chg: ["starter", "professional", "enterprise"],
-  deallink: ["free", "pro"],
+  deallink: ["free", "personal", "team"],
   "investor-portal": ["standard"],
   "contractor-portal": ["free", "pro"],
 };
 const PRODUCT_LABEL: Record<string, string> = {
   chg: "CHG CRM",
-  deallink: "Deal Link",
+  deallink: "REI Flywheel",
   "investor-portal": "Investor Portal",
   "contractor-portal": "Contractor Portal",
 };
 const PRODUCT_SHORT: Record<string, string> = {
   chg: "CHG",
-  deallink: "Deal Link",
+  deallink: "REI Flywheel",
   "investor-portal": "Investor",
   "contractor-portal": "Contractor",
 };
@@ -121,6 +123,8 @@ export default function SuperAdminClient({ currentUserId }: { currentUserId: str
       {tab === "roles" && <RolesTab onOk={toast.ok} onError={toast.err} />}
       {tab === "products" && <ProductsTab onOk={toast.ok} onError={toast.err} />}
       {tab === "contractor-portal" && <ContractorPortalTab onError={toast.err} />}
+      {tab === "flywheel-buyers" && <FlywheelBuyersTab onError={toast.err} />}
+      {tab === "flywheel-profiles" && <FlywheelProfilesTab onOk={toast.ok} onError={toast.err} />}
 
       {toast.node}
     </div>
@@ -1999,6 +2003,201 @@ function ContractorPortalTab({ onError }: { onError: (t: string) => void }) {
           </table>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ── REI Flywheel Buyers ─────────────────────────────────────────────────────
+type FlywheelBuyer = {
+  id: string;
+  account_id: string;
+  name: string | null;
+  phone: string | null;
+  source: string | null;
+  im_registered_at: string | null;
+  created_at: string;
+  wholesaler: { handle: string; name: string } | null;
+};
+
+function FlywheelBuyersTab({ onError }: { onError: (t: string) => void }) {
+  const [buyers, setBuyers] = useState<FlywheelBuyer[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const d = await apiFetch<{ buyers: FlywheelBuyer[] }>("/api/super-admin/flywheel-buyers");
+        if (!cancelled) setBuyers(d.buyers);
+      } catch (e) {
+        if (!cancelled) onError(`Load failed: ${(e as Error).message}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onError]);
+
+  if (loading) return <div style={{ padding: 24, color: "#6b7280" }}>Loading buyers…</div>;
+  if (!buyers) return <div style={{ padding: 24, color: "#b91c1c" }}>Failed to load.</div>;
+
+  const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", marginBottom: 14 }}>
+        Every buyer captured across all REI Flywheel wholesaler profiles.
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#fafafa" }}>
+              {["Name", "Phone", "Wholesaler", "Source", "Registered", "Joined"].map((h) => (
+                <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {buyers.map((b) => (
+              <tr key={b.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>{b.name || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{b.phone || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>
+                  {b.wholesaler ? (
+                    <>
+                      <div style={{ fontWeight: 600 }}>{b.wholesaler.name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>@{b.wholesaler.handle}</div>
+                    </>
+                  ) : "—"}
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{b.source || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{fmtDate(b.im_registered_at)}</td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{fmtDate(b.created_at)}</td>
+              </tr>
+            ))}
+            {buyers.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No buyers yet.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── REI Flywheel Wholesalers ────────────────────────────────────────────────
+type FlywheelProfile = {
+  handle: string;
+  name: string | null;
+  city: string | null;
+  is_ambassador: boolean;
+  created_at: string | null;
+};
+
+function FlywheelProfilesTab({ onOk, onError }: { onOk: (t: string) => void; onError: (t: string) => void }) {
+  const [profiles, setProfiles] = useState<FlywheelProfile[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const d = await apiFetch<{ profiles?: FlywheelProfile[] } | FlywheelProfile[]>(
+          "/api/super-admin/flywheel-profiles"
+        );
+        const list = Array.isArray(d) ? d : d.profiles || [];
+        if (!cancelled) setProfiles(list);
+      } catch (e) {
+        if (!cancelled) onError(`Load failed: ${(e as Error).message}`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [onError]);
+
+  async function toggleAmbassador(handle: string, next: boolean) {
+    setBusy(handle);
+    // Optimistic update
+    setProfiles((prev) =>
+      prev ? prev.map((p) => (p.handle === handle ? { ...p, is_ambassador: next } : p)) : prev
+    );
+    try {
+      await apiFetch(`/api/super-admin/flywheel-profiles/${encodeURIComponent(handle)}/ambassador`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_ambassador: next }),
+      });
+      onOk(next ? "Ambassador badge awarded." : "Ambassador badge removed.");
+    } catch (e) {
+      // Roll back on failure
+      setProfiles((prev) =>
+        prev ? prev.map((p) => (p.handle === handle ? { ...p, is_ambassador: !next } : p)) : prev
+      );
+      onError(`Update failed: ${(e as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 24, color: "#6b7280" }}>Loading wholesalers…</div>;
+  if (!profiles) return <div style={{ padding: 24, color: "#b91c1c" }}>Failed to load.</div>;
+
+  const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", marginBottom: 14 }}>
+        Every REI Flywheel wholesaler profile. Award the Ambassador badge to recognise top partners.
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#fafafa" }}>
+              {["Handle", "Name", "City", "Ambassador", "Joined"].map((h) => (
+                <th key={h} style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280", textTransform: "uppercase", textAlign: "left", fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {profiles.map((p) => (
+              <tr key={p.handle} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <td style={{ padding: "8px 10px", fontSize: 12, fontWeight: 600 }}>@{p.handle}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{p.name || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>{p.city || "—"}</td>
+                <td style={{ padding: "8px 10px", fontSize: 12 }}>
+                  <button
+                    type="button"
+                    disabled={busy === p.handle}
+                    onClick={() => toggleAmbassador(p.handle, !p.is_ambassador)}
+                    style={{
+                      cursor: busy === p.handle ? "default" : "pointer",
+                      padding: "4px 10px",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      border: p.is_ambassador ? "1px solid #d4a017" : "1px solid #d1d5db",
+                      background: p.is_ambassador ? "#fef3c7" : "#f9fafb",
+                      color: p.is_ambassador ? "#92660d" : "#6b7280",
+                      opacity: busy === p.handle ? 0.6 : 1,
+                    }}
+                  >
+                    {p.is_ambassador ? "✓ Ambassador" : "Award Badge"}
+                  </button>
+                </td>
+                <td style={{ padding: "8px 10px", fontSize: 11, color: "#6b7280" }}>{fmtDate(p.created_at)}</td>
+              </tr>
+            ))}
+            {profiles.length === 0 ? (
+              <tr><td colSpan={5} style={{ padding: 24, textAlign: "center", fontSize: 13, color: "#6b7280" }}>No wholesalers yet.</td></tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

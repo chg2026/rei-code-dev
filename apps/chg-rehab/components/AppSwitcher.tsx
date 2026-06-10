@@ -30,23 +30,23 @@ const PRODUCTS: Product[] = [
     code: "chg",
     name: "CHG Platform",
     tagline: "Operations platform",
-    color: "#0C447C",
+    color: "#143641",
     initial: "C",
     devBareHost: true,
     productionUrl: (process.env.NEXT_PUBLIC_CHG_URL || "").replace(/\/$/, "") || undefined,
   },
   {
     code: "deallink",
-    name: "Deal Link",
-    tagline: "Wholesaler deal links",
+    name: "REI Flywheel",
+    tagline: "Wholesale deal platform",
     color: "#16A34A",
-    initial: "D",
+    initial: "R",
     devPort: 3001,
     ssoEnabled: true,
     productionUrl: (process.env.NEXT_PUBLIC_DEALLINK_URL || "").replace(/\/$/, "") || undefined,
   },
   {
-    code: "investor",
+    code: "investor-portal",
     name: "Investor Portal",
     tagline: "Dashboard & returns",
     color: "#7C3AED",
@@ -57,7 +57,7 @@ const PRODUCTS: Product[] = [
     productionUrl: (process.env.NEXT_PUBLIC_INVESTOR_URL || "").replace(/\/$/, "") || undefined,
   },
   {
-    code: "contractor",
+    code: "contractor-portal",
     name: "Contractor Portal",
     tagline: "Job tracking & invoices",
     color: "#D97706",
@@ -90,16 +90,6 @@ function resolveUrl(product: Product): string | null {
  * interfere, then sets the location to the target after fetching the session.
  */
 async function openWithSso(baseHref: string): Promise<void> {
-  // Open WITHOUT noopener/noreferrer so the browser returns a live window
-  // reference. We need to set win.location.href after the async session fetch —
-  // noopener makes window.open() return null, which causes a fallback that
-  // navigates the current page instead of opening a new tab.
-  const win = window.open("about:blank", "_blank");
-  if (!win) {
-    // Popup was blocked — last resort: navigate current tab.
-    window.location.href = `${baseHref}/login`;
-    return;
-  }
   try {
     const supabase = getSupabaseBrowserClient();
     const {
@@ -112,12 +102,12 @@ async function openWithSso(baseHref: string): Promise<void> {
         ["token_type", "bearer"],
         ["expires_in", String(session.expires_in ?? 3600)],
       ]);
-      win.location.href = `${baseHref}/login#${params.toString()}`;
+      window.location.href = `${baseHref}/login#${params.toString()}`;
     } else {
-      win.location.href = `${baseHref}/login`;
+      window.location.href = `${baseHref}/login`;
     }
   } catch {
-    win.location.href = `${baseHref}/login`;
+    window.location.href = `${baseHref}/login`;
   }
 }
 
@@ -125,10 +115,12 @@ export default function AppSwitcher({
   currentProduct = "chg",
   isInvestor = false,
   isContractor = false,
+  enabledProducts,
 }: {
   currentProduct?: string;
   isInvestor?: boolean;
   isContractor?: boolean;
+  enabledProducts?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -143,11 +135,17 @@ export default function AppSwitcher({
 
   const roleFlags: Record<RoleFlag, boolean> = { isInvestor, isContractor };
 
-  // Only show products that have no requiredFlag (visible to all) or whose
-  // requiredFlag matches the current user's session flags.
-  const visibleProducts = PRODUCTS.filter(
-    (p) => !p.requiredFlag || roleFlags[p.requiredFlag],
-  );
+  // Visibility:
+  //   - Tiles without a requiredFlag are always shown.
+  //   - When `enabledProducts` is provided (entitlements-driven), a flagged
+  //     tile is shown if its product code is in that list.
+  //   - When `enabledProducts` is not provided, fall back to the legacy
+  //     per-user role-flag check.
+  const visibleProducts = PRODUCTS.filter((p) => {
+    if (!p.requiredFlag) return true;
+    if (enabledProducts) return enabledProducts.includes(p.code);
+    return roleFlags[p.requiredFlag];
+  });
 
   return (
     <div style={{ position: "relative" }} ref={ref}>
@@ -160,7 +158,7 @@ export default function AppSwitcher({
         style={{
           background: "transparent",
           border: "none",
-          color: "rgba(255,255,255,0.65)",
+          color: "#6B6862",
           cursor: "pointer",
           padding: 6,
           borderRadius: 6,
@@ -170,11 +168,11 @@ export default function AppSwitcher({
           transition: "all 0.15s",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.08)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#0A0A0A";
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,0,0,0.06)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.65)";
+          (e.currentTarget as HTMLButtonElement).style.color = "#6B6862";
           (e.currentTarget as HTMLButtonElement).style.background = "transparent";
         }}
       >
@@ -270,8 +268,8 @@ export default function AppSwitcher({
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             fontWeight: 600,
-                            color: "#0C447C",
-                            background: "#E8F0FA",
+                            color: "#143641",
+                            background: "#E8EFF1",
                             padding: "2px 6px",
                             borderRadius: 4,
                           }}
@@ -292,7 +290,7 @@ export default function AppSwitcher({
                             borderRadius: 4,
                           }}
                         >
-                          Coming soon
+                          Activate
                         </span>
                       )}
                     </div>
@@ -321,9 +319,19 @@ export default function AppSwitcher({
                     rel="noopener noreferrer"
                     onClick={(e) => {
                       setOpen(false);
-                      if (product.ssoEnabled) {
+                      if (product.ssoEnabled && (enabledProducts ?? []).includes(product.code)) {
                         e.preventDefault();
                         openWithSso(href!);
+                      } else if (!(enabledProducts ?? []).includes(product.code)) {
+                        e.preventDefault();
+                        const supabase = getSupabaseBrowserClient();
+                        supabase.auth.getSession().then(({ data: { session } }) => {
+                          const email = session?.user?.email;
+                          const signupUrl = email
+                            ? `${href}/signup?email=${encodeURIComponent(email)}`
+                            : `${href}/signup`;
+                          window.open(signupUrl, '_blank');
+                        });
                       }
                     }}
                     style={{
@@ -335,7 +343,7 @@ export default function AppSwitcher({
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = "#f9fafb";
+                      (e.currentTarget as HTMLAnchorElement).style.background = "#F5F4F0";
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLAnchorElement).style.background = "transparent";

@@ -15,8 +15,8 @@
   --grn:#34C759; --grn-dk:#1A6B35; --grn-bg:#EDFAF2; --grn-mid:#2DB052;
   --amb:#FF9F0A; --amb-dk:#7D4A00; --amb-bg:#FFF8EE;
   --red:#FF3B30; --red-dk:#8C1515; --red-bg:#FFF1F0;
-  --blue:#0071E3; --blue-dk:#004499; --blue-bg:#EBF3FF;
-  --navy:#1B3A5C;
+  --blue:#1F4D5C; --blue-dk:#143641; --blue-bg:#E8EFF1;
+  --navy:#1F4D5C;
   --r:8px; --r2:12px; --r3:16px;
   --shadow:0 1px 4px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04);
   --shadow-md:0 4px 16px rgba(0,0,0,0.09),0 2px 6px rgba(0,0,0,0.05);
@@ -28,15 +28,15 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 /* ── NAV BAR ── */
 .nav{height:48px;background:rgba(27,58,92,0.97);backdrop-filter:blur(20px);display:flex;align-items:center;padding:0 20px;flex-shrink:0;border-bottom:0.5px solid rgba(255,255,255,0.08);}
 .nav-brand{color:#fff;font-size:15px;font-weight:700;letter-spacing:-0.02em;margin-right:10px;}
-.nav-brand em{color:#7EB5E6;font-weight:400;font-style:normal;}
+.nav-brand em{color:#A8C4D0;font-weight:400;font-style:normal;}
 .nav-divider{width:0.5px;height:18px;background:rgba(255,255,255,0.18);margin:0 10px;}
 .nav-links{display:flex;height:48px;}
 .nl{height:48px;padding:0 13px;border:none;background:transparent;color:rgba(255,255,255,0.55);font-size:12px;font-family:var(--font);cursor:pointer;border-bottom:2px solid transparent;letter-spacing:-0.01em;}
 .nl:hover{color:#fff;}
-.nl.active{color:#fff;border-bottom-color:#7EB5E6;font-weight:500;}
+.nl.active{color:#fff;border-bottom-color:#A8C4D0;font-weight:500;}
 .nl.dim{opacity:0.3;cursor:default;}
 .nav-r{margin-left:auto;display:flex;align-items:center;}
-.av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#7EB5E6,#4A90D9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;}
+.av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#A8C4D0,#5B8FA8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;}
 
 /* ── DEAL BAR ── */
 .deal-bar{background:var(--surface);border-bottom:0.5px solid var(--b1);padding:9px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
@@ -71,12 +71,12 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .r2{height:36px;background:var(--s3);border-bottom:0.5px solid var(--b1);display:flex;align-items:center;gap:5px;padding:0 6px;flex-shrink:0;}
 .r2-lbl{font-size:9px;font-weight:600;color:var(--t3);letter-spacing:0.07em;text-transform:uppercase;padding:0 10px 0 8px;white-space:nowrap;}
 .tpin{display:flex;align-items:center;height:26px;padding:0 11px;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;border-radius:20px;background:var(--surface);border:0.5px solid var(--b2);font-family:var(--font);gap:0;box-shadow:var(--shadow);transition:all 0.15s;}
-.tpin:hover{color:var(--blue-dk);background:var(--blue-bg);border-color:rgba(0,113,227,0.25);}
-.tpin.active{color:var(--blue-dk);background:var(--blue-bg);border-color:rgba(0,113,227,0.3);font-weight:600;}
+.tpin:hover{color:var(--blue-dk);background:var(--blue-bg);border-color:rgba(31,77,92,0.25);}
+.tpin.active{color:var(--blue-dk);background:var(--blue-bg);border-color:rgba(31,77,92,0.3);font-weight:600;}
 .tpx{width:0;overflow:hidden;height:14px;display:flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;border-radius:50%;border:none;background:transparent;font-family:var(--font);transition:width .15s,margin .15s;}
 .tpin:hover .tpx{width:14px;margin-left:4px;color:var(--red-dk);}
 .tslot{display:flex;align-items:center;gap:4px;height:26px;padding:0 11px;font-size:11px;font-weight:500;color:var(--t3);cursor:pointer;border-radius:20px;background:transparent;border:1px dashed var(--b2);font-family:var(--font);transition:all 0.15s;}
-.tslot:hover{color:var(--blue);border-color:rgba(0,113,227,0.3);background:var(--blue-bg);}
+.tslot:hover{color:var(--blue);border-color:rgba(31,77,92,0.3);background:var(--blue-bg);}
 
 /* ── SCREENS ── */
 .screen{display:none;flex:1;flex-direction:column;overflow:hidden;}
@@ -101,7 +101,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .fg-lbl{font-size:10px;font-weight:500;color:var(--t2);margin-bottom:4px;display:flex;align-items:center;gap:4px;}
 .fg-hint{font-size:9px;color:var(--t3);font-weight:400;}
 .fw{display:flex;align-items:center;border:0.5px solid var(--b2);border-radius:var(--r);background:var(--surface);overflow:hidden;transition:border-color 0.15s,box-shadow 0.15s;}
-.fw:focus-within{border-color:rgba(0,113,227,0.5);box-shadow:0 0 0 3px rgba(0,113,227,0.12);}
+.fw:focus-within{border-color:rgba(31,77,92,0.5);box-shadow:0 0 0 3px rgba(31,77,92,0.12);}
 .fp{padding:0 9px;font-size:11px;color:var(--t3);background:var(--s3);border-right:0.5px solid var(--b1);height:34px;display:flex;align-items:center;flex-shrink:0;}
 .fs{padding:0 9px;font-size:11px;color:var(--t3);background:var(--s3);border-left:0.5px solid var(--b1);height:34px;display:flex;align-items:center;flex-shrink:0;}
 .fw input,.fw select{flex:1;border:none;padding:0 10px;font-size:12px;color:var(--t1);font-family:var(--font);background:transparent;height:34px;outline:none;min-width:0;font-weight:400;}
@@ -109,7 +109,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .rehab-note{font-size:10px;color:var(--t3);margin-top:5px;line-height:1.4;}
 /* Tooltip */
 .tip-wrap{position:relative;display:inline-flex;}
-.tip-icon{width:18px;height:18px;border-radius:50%;background:var(--blue-bg);color:var(--blue-dk);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-style:italic;cursor:help;border:0.5px solid rgba(0,113,227,0.2);}
+.tip-icon{width:18px;height:18px;border-radius:50%;background:var(--blue-bg);color:var(--blue-dk);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-style:italic;cursor:help;border:0.5px solid rgba(31,77,92,0.2);}
 .tip-box{display:none;position:absolute;bottom:calc(100%+8px);left:50%;transform:translateX(-50%);background:rgba(29,29,31,0.92);backdrop-filter:blur(12px);color:#fff;font-size:11px;padding:10px 12px;border-radius:var(--r2);width:230px;line-height:1.5;z-index:9999;pointer-events:none;white-space:normal;}
 .tip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:rgba(29,29,31,0.92);}
 .tip-wrap:hover .tip-box{display:block;}
@@ -197,9 +197,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .unit-tbl td{padding:4px 5px;border-bottom:0.5px solid var(--b1);}
 .unit-tbl tr:last-child td{border-bottom:none;}
 .unit-tbl input,.unit-tbl select{width:100%;border:0.5px solid var(--b2);border-radius:5px;padding:4px 6px;font-size:11px;font-family:var(--font);background:var(--surface);color:var(--t1);height:28px;}
-.unit-tbl input:focus,.unit-tbl select:focus{outline:none;border-color:rgba(0,113,227,0.4);box-shadow:0 0 0 2px rgba(0,113,227,0.1);}
+.unit-tbl input:focus,.unit-tbl select:focus{outline:none;border-color:rgba(31,77,92,0.4);box-shadow:0 0 0 2px rgba(31,77,92,0.1);}
 .unit-tbl .uc{background:var(--s2);font-weight:500;color:var(--t2);text-align:right;}
-.add-unit{margin-top:6px;font-size:10px;font-weight:600;padding:5px 10px;border-radius:20px;background:transparent;color:var(--blue);border:0.5px solid rgba(0,113,227,0.3);cursor:pointer;font-family:var(--font);}
+.add-unit{margin-top:6px;font-size:10px;font-weight:600;padding:5px 10px;border-radius:20px;background:transparent;color:var(--blue);border:0.5px solid rgba(31,77,92,0.3);cursor:pointer;font-family:var(--font);}
 .add-unit:hover{background:var(--blue-bg);}
 .del-u{font-size:10px;color:var(--red-dk);cursor:pointer;background:none;border:none;font-family:var(--font);}
 
@@ -210,7 +210,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .exp-cell:nth-last-child(-n+3){border-bottom:none;}
 .exp-lbl{font-size:9px;font-weight:500;color:var(--t3);margin-bottom:3px;}
 .exp-iw{display:flex;align-items:center;border:0.5px solid var(--b2);border-radius:5px;overflow:hidden;height:28px;}
-.exp-iw:focus-within{border-color:rgba(0,113,227,0.4);}
+.exp-iw:focus-within{border-color:rgba(31,77,92,0.4);}
 .exp-p{padding:0 6px;font-size:10px;color:var(--t3);background:var(--s3);border-right:0.5px solid var(--b1);height:100%;display:flex;align-items:center;flex-shrink:0;}
 .exp-s{padding:0 6px;font-size:10px;color:var(--t3);background:var(--s3);border-left:0.5px solid var(--b1);height:100%;display:flex;align-items:center;flex-shrink:0;}
 .exp-iw input{flex:1;border:none;padding:0 6px;font-size:11px;color:var(--t1);font-family:var(--font);background:transparent;height:100%;outline:none;min-width:0;}
@@ -247,19 +247,19 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .pl-col-count{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--s3);color:var(--t3);}
 .pl-col-body{padding:8px;display:flex;flex-direction:column;gap:8px;}
 .pl-card{background:var(--surface);border-radius:var(--r);border:0.5px solid var(--b1);padding:11px 12px;box-shadow:var(--shadow);cursor:pointer;}
-.pl-card:hover{border-color:rgba(0,113,227,0.3);box-shadow:var(--shadow-md);}
+.pl-card:hover{border-color:rgba(31,77,92,0.3);box-shadow:var(--shadow-md);}
 .pl-card.overdue{border-color:rgba(255,59,48,0.4);border-left:3px solid var(--red);}
 .pl-card-addr{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:5px;letter-spacing:-0.01em;}
 .pl-card-meta{display:flex;align-items:center;gap:5px;margin-bottom:7px;flex-wrap:wrap;}
 .pl-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;}
-.pl-badge-sfr{background:rgba(0,113,227,0.1);color:var(--blue-dk);}
+.pl-badge-sfr{background:rgba(31,77,92,0.1);color:var(--blue-dk);}
 .pl-badge-mf{background:rgba(52,199,89,0.1);color:var(--grn-dk);}
 .pl-badge-flip{background:rgba(255,159,10,0.12);color:var(--amb-dk);}
 .pl-badge-brrrr{background:rgba(155,89,182,0.12);color:#6B2FA0;}
 .pl-card-price{font-size:13px;font-weight:700;color:var(--t1);}
 .pl-card-metric{font-size:10px;color:var(--t3);margin-top:2px;}
 .pl-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:7px;border-top:0.5px solid var(--b1);}
-.pl-avatar{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#7EB5E6,#4A90D9);color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.pl-avatar{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#A8C4D0,#5B8FA8);color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;}
 .pl-days{font-size:9px;color:var(--t3);}
 /* Rehab Manager */
 .rm-tabs{display:flex;background:var(--surface);border-bottom:0.5px solid var(--b1);flex-shrink:0;padding:0 20px;gap:2px;}
@@ -276,7 +276,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .rm-status-pend{background:var(--s3);color:var(--t3);}
 /* Contacts */
 .ct-card{background:var(--surface);border:0.5px solid var(--b1);border-radius:var(--r2);padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:8px;cursor:pointer;}
-.ct-card:hover{border-color:rgba(0,113,227,0.3);}
+.ct-card:hover{border-color:rgba(31,77,92,0.3);}
 .ct-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
 .ct-info{flex:1;}
 .ct-name{font-size:13px;font-weight:600;color:var(--t1);}
@@ -302,9 +302,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .stress-grp-lbl{font-size:11px;font-weight:600;color:var(--t1);}
 .stress-grp-val{font-size:11px;font-weight:600;color:var(--t3);transition:color 0.15s;}
 .stress-slider{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;outline:none;cursor:pointer;transition:background 0s;}
-.stress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2.5px solid var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(0,113,227,0.28);transition:transform 0.1s,box-shadow 0.1s;}
-.stress-slider::-webkit-slider-thumb:hover{transform:scale(1.15);box-shadow:0 3px 12px rgba(0,113,227,0.38);}
-.stress-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:2.5px solid var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(0,113,227,0.28);}
+.stress-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2.5px solid var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(31,77,92,0.28);transition:transform 0.1s,box-shadow 0.1s;}
+.stress-slider::-webkit-slider-thumb:hover{transform:scale(1.15);box-shadow:0 3px 12px rgba(31,77,92,0.38);}
+.stress-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:2.5px solid var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(31,77,92,0.28);}
 .stress-range-sub{display:flex;align-items:center;justify-content:space-between;margin-top:7px;}
 .stress-range-edge{font-size:10px;color:var(--t3);}
 .stress-range-mid{font-size:12px;font-weight:500;color:var(--t1);letter-spacing:-0.01em;background:var(--surface);border:0.5px solid var(--b2);border-radius:20px;padding:2px 11px;box-shadow:0 1px 3px rgba(0,0,0,0.07);white-space:nowrap;}
@@ -375,7 +375,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 .btn-sep{width:0.5px;height:18px;background:var(--b2);}
 .btn-save{font-size:12px;font-weight:600;padding:7px 18px;border-radius:20px;background:var(--grn);color:#fff;border:none;cursor:pointer;font-family:var(--font);box-shadow:0 2px 8px rgba(52,199,89,0.35);}
 .btn-save:hover{background:#2DB052;box-shadow:0 4px 12px rgba(52,199,89,0.4);}
-.btn-ret{font-size:12px;font-weight:600;padding:7px 18px;border-radius:20px;background:var(--blue);color:#fff;border:none;cursor:pointer;font-family:var(--font);box-shadow:0 2px 8px rgba(0,113,227,0.3);}
+.btn-ret{font-size:12px;font-weight:600;padding:7px 18px;border-radius:20px;background:var(--blue);color:#fff;border:none;cursor:pointer;font-family:var(--font);box-shadow:0 2px 8px rgba(31,77,92,0.3);}
 .btn-ret:hover{background:#0062C8;}
 
 /* Placeholder */
@@ -404,8 +404,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
   <span class="db-back">&#8592; Pipeline</span>
   <span class="db-sep">/</span>
   <div class="db-info">
-    <div class="db-name">1847 Oak Ridge Dr &mdash; Tampa</div>
-    <div class="db-sub">Tampa, FL 33602 &nbsp;&middot;&nbsp; SFR &nbsp;&middot;&nbsp; Nicole L. &nbsp;&middot;&nbsp; Identified</div>
+    <div class="db-name">New Analysis</div>
+    <div class="db-sub">Enter property details to begin</div>
   </div>
 </div>
 
@@ -425,7 +425,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     <div class="mm-item" onclick="showPH('commercial')"><div><div>Commercial CRE</div><div class="mm-sub">Office, retail, industrial</div></div><span class="mm-tag mt-go">Open &rarr;</span></div>
   </div>
   <div class="t-sep"></div>
-  <button class="to" onclick="showPH('scenarios')">&#8776; Scenarios</button>
+  <button class="to" id="tab-scenarios" onclick="showPH('scenarios');document.querySelectorAll('.to').forEach(function(b){b.classList.remove('active')});this.classList.add('active');">&#8776; Scenarios</button>
   <button class="to" onclick="showPH('reports')">Reports</button>
 </div>
 
@@ -727,7 +727,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
               <div>
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                   <div style="font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--t1);">Live deal stress tester</div>
-                  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(0,113,227,0.12);color:var(--blue-dk);letter-spacing:0.04em;">LIVE</span>
+                  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(31,77,92,0.12);color:var(--blue-dk);letter-spacing:0.04em;">LIVE</span>
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <span style="font-size:10px;font-weight:600;color:var(--t2);padding:3px 10px;border-radius:20px;border:0.5px solid var(--b2);background:var(--s3);white-space:nowrap;">Drag sliders to test scenarios</span>
@@ -785,12 +785,12 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
           </div>
 
           <div class="card rf">
-            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to 1847 Oak Ridge Dr as you work</div>
+            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to New Analysis as you work</div>
             <div class="rf-btns">
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
-              <button class="btn-save">Save</button>
-              <button class="btn-ret">Return to deal &rarr;</button>
+              <button class="btn-save" onclick="var fb=document.getElementById('floating-save-btn');if(fb){fb.click();}">Save</button>
+              <button class="btn-ret" onclick="if(window._propertyId){window.top.location.href='/property?id='+window._propertyId;}">Return to deal &rarr;</button>
               <button class="btn-ret" style="background:var(--amb);box-shadow:0 2px 8px rgba(255,159,10,0.3);" onclick="pushDealToScenarios()">Continue to scenarios &rarr;</button>
             </div>
           </div>
@@ -1136,7 +1136,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
               <div>
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                   <div style="font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--t1);">Live BRRRR stress tester</div>
-                  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(0,113,227,0.12);color:var(--blue-dk);letter-spacing:0.04em;">LIVE</span>
+                  <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(31,77,92,0.12);color:var(--blue-dk);letter-spacing:0.04em;">LIVE</span>
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <span style="font-size:10px;font-weight:600;color:var(--t2);padding:3px 10px;border-radius:20px;border:0.5px solid var(--b2);background:var(--s3);white-space:nowrap;">Baselines from underwriting inputs above</span>
@@ -1193,12 +1193,12 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
             </div>
 
           <div class="card rf">
-            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to 1847 Oak Ridge Dr as you work</div>
+            <div class="rf-note"><strong>&#10003; Auto-saving to deal record</strong>Results saved to New Analysis as you work</div>
             <div class="rf-btns">
               <button class="btn-print" onclick="window.print()">&#9113; Print</button>
               <div class="btn-sep"></div>
-              <button class="btn-save">Save</button>
-              <button class="btn-ret">Return to deal &rarr;</button>
+              <button class="btn-save" onclick="var fb=document.getElementById('floating-save-btn');if(fb){fb.click();}">Save</button>
+              <button class="btn-ret" onclick="if(window._propertyId){window.top.location.href='/property?id='+window._propertyId;}">Return to deal &rarr;</button>
               <button class="btn-ret" style="background:var(--amb);box-shadow:0 2px 8px rgba(255,159,10,0.3);" onclick="pushDealToScenarios()">Continue to scenarios &rarr;</button>
             </div>
           </div>
@@ -1244,7 +1244,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
           <div style="font-size:12px;color:var(--t2);line-height:1.5;">Same property, different plays. Model up to 3 strategies side by side to find the highest-return path on any deal.</div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
-          <button onclick="pushDealToScenarios()" style="font-size:11px;font-weight:600;padding:7px 14px;border-radius:20px;background:var(--blue-bg);color:var(--blue-dk);border:0.5px solid rgba(0,113,227,0.3);cursor:pointer;font-family:var(--font);">← Pull from calculator</button>
+          <button onclick="pushDealToScenarios()" style="font-size:11px;font-weight:600;padding:7px 14px;border-radius:20px;background:var(--blue-bg);color:var(--blue-dk);border:0.5px solid rgba(31,77,92,0.3);cursor:pointer;font-family:var(--font);">← Pull from calculator</button>
           <button onclick="resetScenarios()" style="font-size:11px;font-weight:600;padding:7px 14px;border-radius:20px;background:var(--s3);color:var(--t2);border:0.5px solid var(--b2);cursor:pointer;font-family:var(--font);">↺ Reset all</button>
         </div>
       </div>
@@ -1468,7 +1468,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
   <div class="mod-hd">
     <div><div class="mod-hd-title">Pipeline</div><div class="mod-hd-sub">Deal tracking · Identified → Offer Submitted → Under Contract → Due Diligence → Closed/Acquired</div></div>
     <div style="display:flex;gap:8px;">
-      <button class="mod-btn mod-btn-secondary" id="pl-btn-board" onclick="setPipelineView('board',this)" style="background:var(--blue-bg);color:var(--blue-dk);border:0.5px solid rgba(0,113,227,0.3);">Board</button>
+      <button class="mod-btn mod-btn-secondary" id="pl-btn-board" onclick="setPipelineView('board',this)" style="background:var(--blue-bg);color:var(--blue-dk);border:0.5px solid rgba(31,77,92,0.3);">Board</button>
       <button class="mod-btn mod-btn-secondary" id="pl-btn-list" onclick="setPipelineView('list',this)">List</button>
       <button class="mod-btn mod-btn-primary" onclick="alert('New deal setup coming in next sprint')">+ New deal</button>
     </div>
@@ -1490,7 +1490,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
         <option value="">All stages</option><option>Identified</option><option>Offer Submitted</option><option>Under Contract</option><option>Due Diligence</option><option>Closed/Acquired</option>
       </select>
       <select id="pl-team-filter" onchange="applyPipelineFilters()" style="font-size:11px;padding:5px 10px;border-radius:20px;border:0.5px solid var(--b2);background:var(--s3);font-family:var(--font);color:var(--t2);">
-        <option value="">All team</option><option>Nicole L.</option><option>Roey G.</option>
+        <option value="">All team</option><option>—</option><option>—</option>
       </select>
     </div>
     <!-- BOARD VIEW -->
@@ -1499,7 +1499,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
         <div class="pl-col">
           <div class="pl-col-hd"><span class="pl-col-lbl">Identified</span><span class="pl-col-count">3</span></div>
           <div class="pl-col-body">
-            <div class="pl-card" onclick="openDeal('underwriting')" data-type="sfr" data-team="NL"><div class="pl-card-addr">1847 Oak Ridge Dr — Tampa</div><div class="pl-card-meta"><span class="pl-badge pl-badge-sfr">SFR</span><span class="pl-badge pl-badge-flip">Flip</span></div><div class="pl-card-price">$195,000</div><div class="pl-card-metric">Est. profit $95k</div><div class="pl-card-footer"><div class="pl-avatar">NL</div><span class="pl-days">Day 3</span></div></div>
+            <div style="padding:32px;text-align:center;color:#AEAEB2;font-size:12px;">No deals yet — add a deal from the Pipeline to begin analysis.</div>
             <div class="pl-card" onclick="openDeal('underwriting')" data-type="sfr" data-team="RG"><div class="pl-card-addr">4210 Sunview Blvd — Orlando</div><div class="pl-card-meta"><span class="pl-badge pl-badge-sfr">SFR</span><span class="pl-badge pl-badge-brrrr">BRRRR</span></div><div class="pl-card-price">$125,000</div><div class="pl-card-metric">Proj. CF +$101/mo</div><div class="pl-card-footer"><div class="pl-avatar">RG</div><span class="pl-days">Day 1</span></div></div>
             <div class="pl-card" onclick="openDeal('underwriting')" data-type="mf" data-team="NL"><div class="pl-card-addr">882 Maple St — Cleveland</div><div class="pl-card-meta"><span class="pl-badge pl-badge-mf">MF</span><span class="pl-badge pl-badge-brrrr">BRRRR</span></div><div class="pl-card-price">$220,000</div><div class="pl-card-metric">6-unit · $3,600 GSI</div><div class="pl-card-footer"><div class="pl-avatar">NL</div><span class="pl-days">Day 5</span></div></div>
           </div>
@@ -1546,7 +1546,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
           <th style="padding:10px 14px;text-align:left;font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--t3);border-bottom:0.5px solid var(--b1);">Days</th>
         </tr></thead>
         <tbody>
-          <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="sfr" data-team="NL"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">1847 Oak Ridge Dr — Tampa</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-flip">Flip</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$195,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--grn-dk);">Est. profit $95k</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar">NL</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">3</td></tr>
+          <div style="padding:32px;text-align:center;color:#AEAEB2;font-size:12px;">No deals yet — add a deal from the Pipeline to begin analysis.</div>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="sfr" data-team="RG"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">4210 Sunview Blvd — Orlando</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-brrrr">BRRRR</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$125,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--grn-dk);">CF +$101/mo</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">1</td></tr>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;" class="pl-list-row" data-type="mf" data-team="NL"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;">882 Maple St — Cleveland</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-mf">MF</span> <span class="pl-badge pl-badge-brrrr">BRRRR</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Identified</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$220,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">6-unit · $3,600 GSI</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar">NL</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t3);">5</td></tr>
           <tr onclick="openDeal('underwriting')" style="cursor:pointer;background:rgba(255,59,48,0.03);" class="pl-list-row" data-type="sfr" data-team="RG"><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-weight:600;font-size:12px;color:var(--red-dk);">⚠ 312 Birch Ave — Akron</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><span class="pl-badge pl-badge-sfr">SFR</span> <span class="pl-badge pl-badge-flip">Flip</span></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--t2);">Offer Submitted</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);text-align:right;font-weight:600;">$87,000</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--red-dk);">Counter pending</td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);"><div class="pl-avatar" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div></td><td style="padding:10px 14px;border-bottom:0.5px solid var(--b1);font-size:11px;color:var(--red-dk);">14</td></tr>
@@ -1565,7 +1565,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 <!-- ══════════════════════════════════════════ -->
 <div class="mod-screen" id="screen-rehab">
   <div class="mod-hd">
-    <div><div class="mod-hd-title">Rehab manager</div><div class="mod-hd-sub">1847 Oak Ridge Dr — Tampa &nbsp;·&nbsp; Budget vs. actual tracking · Scope · Schedule</div></div>
+    <div><div class="mod-hd-title">Rehab manager</div><div class="mod-hd-sub">New Analysis — Tampa &nbsp;·&nbsp; Budget vs. actual tracking · Scope · Schedule</div></div>
     <div style="display:flex;gap:8px;">
       <button class="mod-btn mod-btn-secondary">Export</button>
       <button class="mod-btn mod-btn-primary">+ Add line item</button>
@@ -1629,7 +1629,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div id="rm-schedule" style="display:none;">
       <div class="adm-section">
-        <div class="adm-section-hd">Project timeline — 1847 Oak Ridge Dr</div>
+        <div class="adm-section-hd">Project timeline — New Analysis</div>
         <div style="padding:14px 16px;">
           <div style="display:grid;grid-template-columns:140px 1fr;gap:0;">
             <div style="font-size:10px;font-weight:600;color:var(--t3);padding:7px 0;border-bottom:0.5px solid var(--b1);">Phase</div>
@@ -1656,7 +1656,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 <!-- ══════════════════════════════════════════ -->
 <div class="mod-screen" id="screen-property-record" style="overflow-y:auto;">
   <div class="mod-hd" style="flex-shrink:0;">
-    <div><div class="mod-hd-title">Property record</div><div class="mod-hd-sub">1847 Oak Ridge Dr — Tampa, FL 33602</div></div>
+    <div><div class="mod-hd-title">Property record</div><div class="mod-hd-sub">New Analysis — Tampa, FL 33602</div></div>
     <div style="display:flex;gap:8px;">
       <button class="mod-btn mod-btn-secondary">Edit</button>
       <button class="mod-btn mod-btn-primary">Link to deal</button>
@@ -1666,7 +1666,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div class="adm-section">
         <div class="adm-section-hd">Property details</div>
-        <div class="adm-row"><div><div class="adm-row-lbl">Address</div><div class="adm-row-sub">1847 Oak Ridge Dr, Tampa FL 33602</div></div></div>
+        <div class="adm-row"><div><div class="adm-row-lbl">Address</div><div class="adm-row-sub">New Analysis, Tampa FL 33602</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Property type</div><div class="adm-row-sub">Single family residential</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Beds / Baths</div><div class="adm-row-sub">3 bed / 2 bath</div></div></div>
         <div class="adm-row"><div><div class="adm-row-lbl">Square footage</div><div class="adm-row-sub">1,420 sqft</div></div></div>
@@ -1676,7 +1676,7 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       <div class="adm-section">
         <div class="adm-section-hd">Linked deals</div>
         <div class="adm-row" style="cursor:pointer;" onclick="setModule('underwriting',document.getElementById('nl-underwriting'))">
-          <div><div class="adm-row-lbl">1847 Oak Ridge Dr — Flip analysis</div><div class="adm-row-sub">Underwriting · Identified · Apr 26, 2026</div></div>
+          <div><div class="adm-row-lbl">New Analysis — Flip analysis</div><div class="adm-row-sub">Underwriting · Identified · Apr 26, 2026</div></div>
           <span style="color:var(--blue);font-size:12px;">→</span>
         </div>
         <div class="adm-row" style="color:var(--t3);font-size:12px;">No other linked deals</div>
@@ -1708,8 +1708,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       <button class="pl-filter-tab" onclick="setContactFilter('contractor',this)" data-role="contractor">Contractors</button>
     </div>
     <div id="ct-list">
-      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#7EB5E6,#4A90D9);">NL</div><div class="ct-info"><div class="ct-name">Nicole L.</div><div class="ct-role">Acquisitions Manager · CHG</div></div><div class="ct-contact">office@goldbridgerei.com</div></div>
-      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div><div class="ct-info"><div class="ct-name">Roey G.</div><div class="ct-role">CEO · CHG Software</div></div><div class="ct-contact">(216) 555-0142</div></div>
+      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#A8C4D0,#5B8FA8);">NL</div><div class="ct-info"><div class="ct-name">—</div><div class="ct-role">Acquisitions Manager · CHG</div></div><div class="ct-contact">office@goldbridgerei.com</div></div>
+      <div class="ct-card" data-role="team" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF9F0A,#FF6B00);">RG</div><div class="ct-info"><div class="ct-name">—</div><div class="ct-role">CEO · CHG Software</div></div><div class="ct-contact">(216) 555-0142</div></div>
       <div class="ct-card" data-role="lender" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#34C759,#1A6B35);">JM</div><div class="ct-info"><div class="ct-name">James Martinez</div><div class="ct-role">Hard money lender · First Capital</div></div><div class="ct-contact">james@firstcap.com</div></div>
       <div class="ct-card" data-role="agent" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#FF3B30,#8C1515);">SR</div><div class="ct-info"><div class="ct-name">Sarah Reynolds</div><div class="ct-role">Real estate agent · ReMax</div></div><div class="ct-contact">(813) 555-0198</div></div>
       <div class="ct-card" data-role="contractor" onclick="alert('Contact details — coming next sprint')"><div class="ct-av" style="background:linear-gradient(135deg,#5856D6,#3634A3);">TC</div><div class="ct-info"><div class="ct-name">Tom's Construction LLC</div><div class="ct-role">General contractor</div></div><div class="ct-contact">(216) 555-0277</div></div>
@@ -1766,9 +1766,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div class="adm-section" style="margin-top:16px;">
       <div class="adm-section-hd">Pending orders</div>
-      <div class="adm-row"><div><div class="adm-row-lbl">LVP Flooring — 1,400 sqft · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Home Depot · Ordered May 1 · Est. delivery May 8</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$4,800</div><span class="rm-status rm-status-prog">In transit</span></div></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Kitchen cabinet set · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Home Depot · Ordered Apr 28 · Est. delivery May 12</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$6,200</div><span class="rm-status rm-status-pend">Pending</span></div></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Bathroom fixtures (2) · 1847 Oak Ridge Dr</div><div class="adm-row-sub">Ferguson · Ordered Apr 30 · Est. delivery May 10</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$3,200</div><span class="rm-status rm-status-prog">In transit</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">LVP Flooring — 1,400 sqft · New Analysis</div><div class="adm-row-sub">Home Depot · Ordered May 1 · Est. delivery May 8</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$4,800</div><span class="rm-status rm-status-prog">In transit</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">Kitchen cabinet set · New Analysis</div><div class="adm-row-sub">Home Depot · Ordered Apr 28 · Est. delivery May 12</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$6,200</div><span class="rm-status rm-status-pend">Pending</span></div></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">Bathroom fixtures (2) · New Analysis</div><div class="adm-row-sub">Ferguson · Ordered Apr 30 · Est. delivery May 10</div></div><div style="text-align:right;"><div style="font-size:13px;font-weight:600;">$3,200</div><span class="rm-status rm-status-prog">In transit</span></div></div>
     </div>
   </div>
 </div>
@@ -1799,8 +1799,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     </div>
     <div class="adm-section">
       <div class="adm-section-hd">Team management</div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Nicole L. — office@goldbridgerei.com</div><div class="adm-row-sub">Acquisitions Manager · Admin</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
-      <div class="adm-row"><div><div class="adm-row-lbl">Roey G.</div><div class="adm-row-sub">CEO · Owner</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">— — office@goldbridgerei.com</div><div class="adm-row-sub">Acquisitions Manager · Admin</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
+      <div class="adm-row"><div><div class="adm-row-lbl">—</div><div class="adm-row-sub">CEO · Owner</div></div><span style="font-size:10px;color:var(--blue);">Edit</span></div>
       <div class="adm-row" style="cursor:pointer;"><div style="color:var(--blue);font-size:12px;font-weight:600;">+ Invite team member</div></div>
     </div>
     <div class="adm-section">
@@ -1812,6 +1812,66 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
 </div>
 
 <script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  var propertyId = params.get("propertyId");
+  if (propertyId) window._propertyId = propertyId;
+  const address = params.get("address");
+  const city = params.get("city");
+  const state = params.get("state");
+  const status = params.get("status");
+  if (address) {
+    window.addEventListener("DOMContentLoaded", function() {
+      const nameEl = document.querySelector(".db-name");
+      const subEl = document.querySelector(".db-sub");
+      if (nameEl) nameEl.textContent = address;
+      if (subEl) {
+        const parts = [city, state].filter(Boolean).join(", ");
+        subEl.textContent = parts ? parts + (status ? " · " + status : "") : (status || "Enter property details to begin");
+      }
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    function setVal(id, v) {
+      if (!v) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    var purchase = params.get("purchase");
+    var rehab = params.get("rehab");
+    var arv = params.get("arv");
+    var closing = params.get("closing");
+    var holding = params.get("holding");
+    var strategy = params.get("strategy");
+
+    if (purchase) setVal('ap-price', purchase);
+    if (rehab) setVal('ap-rehab', rehab);
+    if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
+    if (closing) setVal('ap-closing', closing);
+    if (holding) setVal('ap-holding', holding);
+
+    // Switch to the correct strategy tab if specified
+    if (strategy) {
+      var tabMap = { brrrr: 'tab-brrrr', flip: 'tab-flip', wholesale: 'tab-wholesale' };
+      var tabId = tabMap[strategy.toLowerCase()];
+      if (tabId) {
+        var tab = document.getElementById(tabId);
+        if (tab) tab.click();
+      }
+    }
+
+    // Trigger recalculation after a short delay to let the DOM settle
+    setTimeout(function() {
+      try { recalcFlip(); } catch(e) {}
+      try { recalcB(); } catch(e) {}
+      try { recalc(); } catch(e) {}
+    }, 200);
+  });
+})();
 // ─── HELPERS ───
 const $=id=>document.getElementById(id);
 const pD=s=>parseFloat((s||'0').toString().replace(/[^0-9.]/g,''))||0;
@@ -1836,7 +1896,7 @@ function setPipelineView(view,btn){
   document.querySelectorAll('#pl-btn-board,#pl-btn-list').forEach(b=>{
     b.style.background='';b.style.color='';b.style.border='0.5px solid var(--b2)';
   });
-  btn.style.background='var(--blue-bg)';btn.style.color='var(--blue-dk)';btn.style.border='0.5px solid rgba(0,113,227,0.3)';
+  btn.style.background='var(--blue-bg)';btn.style.color='var(--blue-dk)';btn.style.border='0.5px solid rgba(31,77,92,0.3)';
   $('pl-board-view').style.display=view==='board'?'':'none';
   $('pl-list-view').style.display=view==='list'?'':'none';
 }
@@ -1855,7 +1915,7 @@ function applyPipelineFilters(){
     const t=card.dataset.type||'';
     const tm=card.dataset.team||'';
     const typeOk=_plFilter==='all'||((_plFilter==='sfr'&&t==='sfr')||(_plFilter==='mf'&&t==='mf')||_plFilter==='mine');
-    const teamOk=!team||(team==='Nicole L.'&&tm==='NL')||(team==='Roey G.'&&tm==='RG');
+    const teamOk=!team||(team==='—'&&tm==='NL')||(team==='—'&&tm==='RG');
     card.style.display=typeOk&&teamOk?'':'none';
   });
   // Filter list rows
@@ -1863,7 +1923,7 @@ function applyPipelineFilters(){
     const t=row.dataset.type||'';
     const tm=row.dataset.team||'';
     const typeOk=_plFilter==='all'||((_plFilter==='sfr'&&t==='sfr')||(_plFilter==='mf'&&t==='mf')||_plFilter==='mine');
-    const teamOk=!team||(team==='Nicole L.'&&tm==='NL')||(team==='Roey G.'&&tm==='RG');
+    const teamOk=!team||(team==='—'&&tm==='NL')||(team==='—'&&tm==='RG');
     row.style.display=typeOk&&teamOk?'':'none';
   });
 }
@@ -2161,8 +2221,8 @@ function updateWaterfallChart(price,closing,holding,rehab,finCost,profit,cos,arv
   // Build cost rows
   const costLabels=['Purchase','Closing','Holding','Rehab',...(showFin?['Financing']:[]),'Cost of sale'];
   const costVals=[price,closing,holding,rehab,...(showFin?[finCost]:[]),cos];
-  const costBg=['rgba(0,113,227,0.75)','rgba(255,159,10,0.75)','rgba(255,159,10,0.55)','rgba(255,107,43,0.75)',...(showFin?['rgba(155,89,182,0.75)']:[]),'rgba(255,59,48,0.6)'];
-  const costBd=['rgba(0,113,227,0.0)','rgba(255,159,10,0.0)','rgba(255,159,10,0.0)','rgba(255,107,43,0.0)',...(showFin?['rgba(155,89,182,0.0)']:[]),'rgba(255,59,48,0.0)'];
+  const costBg=['rgba(31,77,92,0.75)','rgba(255,159,10,0.75)','rgba(255,159,10,0.55)','rgba(255,107,43,0.75)',...(showFin?['rgba(155,89,182,0.75)']:[]),'rgba(255,59,48,0.6)'];
+  const costBd=['rgba(31,77,92,0.0)','rgba(255,159,10,0.0)','rgba(255,159,10,0.0)','rgba(255,107,43,0.0)',...(showFin?['rgba(155,89,182,0.0)']:[]),'rgba(255,59,48,0.0)'];
   // Spacer then profit
   const isPos=profit>=0;
   const profitBg=isPos?'rgba(52,199,89,0.82)':'rgba(255,59,48,0.82)';
@@ -2230,7 +2290,7 @@ function updateSensitivityChart(arv,allIn,baseCos,cashReq){
     else if(pPct>=10){col='var(--amb-dk)';borderCol='var(--amb)';bgCol='rgba(255,159,10,0.04)';tagCol='var(--amb-dk)';}
     else{col='#8B3A00';borderCol='rgba(255,100,0,0.7)';bgCol='rgba(255,100,0,0.04)';tagCol='#8B3A00';}
     // Base row: always blue accent
-    if(i===1){borderCol='var(--blue)';bgCol='rgba(0,113,227,0.04)';tagCol='var(--blue-dk)';}
+    if(i===1){borderCol='var(--blue)';bgCol='rgba(31,77,92,0.04)';tagCol='var(--blue-dk)';}
     const row=$('ast-'+i+'-row');
     if(row){row.style.borderTopColor=borderCol;row.style.background=bgCol;}
     const tagEl=$('ast-'+i+'-tag');
@@ -2326,7 +2386,7 @@ function updatePieChart(price,closing,holding,rehab,finCost,profit,cos,arv){
   const ctx=$('chart-pie');if(!ctx||arv<=0)return;
   const showFin=finCost>0;
   const slices=[
-    {label:'Purchase',val:price,color:'rgba(0,113,227,0.82)',border:'rgba(0,86,179,0.5)'},
+    {label:'Purchase',val:price,color:'rgba(31,77,92,0.82)',border:'rgba(0,86,179,0.5)'},
     {label:'Rehab',val:rehab,color:'rgba(255,107,43,0.82)',border:'rgba(200,80,20,0.5)'},
     {label:'Closing costs',val:closing,color:'rgba(255,159,10,0.82)',border:'rgba(200,120,0,0.5)'},
     {label:'Holding costs',val:holding,color:'rgba(255,186,60,0.7)',border:'rgba(200,140,10,0.4)'},
@@ -2659,7 +2719,7 @@ function updateCashFlowChart(annualCFs,tied,rentGrowthPct){
       labels,
       datasets:[
         {type:'bar',label:'Annual CF',data:barData,backgroundColor:isPos?'rgba(52,199,89,0.72)':'rgba(255,59,48,0.72)',borderRadius:5,barPercentage:0.55,categoryPercentage:0.7,yAxisID:'y'},
-        {type:'line',label:'Cumulative',data:cumData,borderColor:isPos?'#0071E3':'#FF3B30',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:isPos?'#0071E3':'#FF3B30',tension:0.35,yAxisID:'y2'}
+        {type:'line',label:'Cumulative',data:cumData,borderColor:isPos?'#1F4D5C':'#FF3B30',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:isPos?'#1F4D5C':'#FF3B30',tension:0.35,yAxisID:'y2'}
       ]
     },
     options:{
@@ -3224,6 +3284,124 @@ const _rmoInit=parseInt($('ap-rmo').value);const _smoInit=parseInt($('f-smo').va
 const _initHold=Math.max(1,(isNaN(_rmoInit)?2:_rmoInit)+(isNaN(_smoInit)?1:Math.max(1,_smoInit)));
 $('slider-hold').value=_initHold;
 updateSliderTrack($('slider-hold'),true);
+</script>
+<script>
+(function () {
+  function fmt(n) { return n ? Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }) : null; }
+  function setInput(id, val) { var el = document.getElementById(id); if (el && val !== null) { el.value = val; } }
+  document.addEventListener('DOMContentLoaded', function () {
+    var params = new URLSearchParams(window.location.search);
+    var purchase = fmt(params.get('purchase'));
+    var arv      = fmt(params.get('arv'));
+    var rehab    = fmt(params.get('rehab'));
+    var addr     = params.get('addr') || '';
+    setInput('ap-price', purchase);
+    setInput('ap-rehab', rehab);
+    setInput('f-arv', arv);
+    if (addr) { var nameEl = document.getElementById('calc-name'); if (nameEl) nameEl.textContent = decodeURIComponent(addr); }
+    if (purchase || rehab) { try { recalc(); } catch(e){} }
+    if (arv) { try { recalcFlip(); } catch(e){} }
+    if (purchase || rehab || arv) { try { recalcB(); } catch(e){} }
+
+    var saveBtn = document.createElement('button');
+    saveBtn.id = 'floating-save-btn';
+    saveBtn.textContent = '💾 Save analysis to deal';
+    saveBtn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;background:#b8860b;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+    saveBtn.onmouseenter = function(){ this.style.opacity='0.85'; };
+    saveBtn.onmouseleave = function(){ this.style.opacity='1'; };
+    saveBtn.onclick = function () {
+      var strategy = 'flip';
+      var brrrrBtn = document.getElementById('tab-brrrr');
+      if (brrrrBtn && brrrrBtn.classList.contains('active')) strategy = 'brrrr';
+      function txt(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : null; }
+      function raw(id) { var el = document.getElementById(id); return el ? Number((el.value||'0').replace(/,/g,'')) : 0; }
+
+      // Capture sensitivity rows (bear / base / bull)
+      var sensitivityRows = [];
+      document.querySelectorAll('.sens-row, .scenario-card, [data-scenario]').forEach(function(el) {
+        sensitivityRows.push(el.textContent.replace(/\s+/g,' ').trim().slice(0,120));
+      });
+
+      // Capture all visible result rows from the results section
+      var resultLines = [];
+      document.querySelectorAll('.result-row, .kv-row, .metric-row, .ret-row').forEach(function(el) {
+        resultLines.push(el.textContent.replace(/\s+/g,' ').trim().slice(0,100));
+      });
+
+      var isFlip = !document.getElementById('tab-brrrr') || !document.getElementById('tab-brrrr').classList.contains('active');
+      var strat = isFlip ? 'flip' : 'brrrr';
+
+      var payload = {
+        strategy: strat,
+        savedAt: new Date().toISOString(),
+        property: {
+          address: document.querySelector('.db-name') ? document.querySelector('.db-name').textContent.trim() : '',
+          sub: document.querySelector('.db-sub') ? document.querySelector('.db-sub').textContent.trim() : '',
+        },
+        inputs: {
+          purchase: raw('ap-price'),
+          rehab: raw('ap-rehab') || raw('ap-rehab-b'),
+          arv: raw('f-arv') || raw('b-arv'),
+          closing: raw('ap-closing'),
+          holding: raw('ap-holding'),
+          downPayment: raw('ap-down'),
+          interestRate: raw('ap-rate'),
+          rehabPeriod: (document.getElementById('ap-rehab-months') || {}).value || null,
+        },
+        costs: {
+          allIn: txt('f-all-in') || txt('b-all-in'),
+          cashRequired: txt('f-cash-req') || txt('b-cash-req'),
+          costOfSale: txt('f-cos') || null,
+          totalCapital: txt('f-total-capital') || txt('b-capital-needed'),
+        },
+        results: {
+          profit: txt('f-net') || txt('f-profit') || txt('b-profit-refi'),
+          roiOnCash: txt('f-roi') || txt('b-coc'),
+          roiAnnualized: txt('f-roi-ann') || null,
+          irr: txt('f-irr') || null,
+          dealStrength: document.querySelector('.deal-badge, .strength-badge') ? document.querySelector('.deal-badge, .strength-badge').textContent.trim() : null,
+          monthlyFlow: txt('b-cashflow') || txt('b-monthly-cf'),
+          cocReturn: txt('b-coc'),
+          equityMultiple: txt('f-em') || null,
+          npv: txt('f-npv') || null,
+          tiedCapital: txt('b-tied') || null,
+          cashOut: txt('b-cashout') || null,
+        },
+        sensitivity: {
+          bear: txt('sens-bear-profit') || txt('sc-bear-profit') || null,
+          base: txt('sens-base-profit') || txt('sc-base-profit') || null,
+          bull: txt('sens-bull-profit') || txt('sc-bull-profit') || null,
+        },
+        label: (document.querySelector('.db-name') ? document.querySelector('.db-name').textContent.trim() : 'Analysis') + ' — ' + strat.toUpperCase() + ' — ' + new Date().toLocaleDateString()
+      };
+      if (window._propertyId) {
+        saveBtn.textContent = 'Saving…';
+        fetch('/api/properties/' + window._propertyId + '/underwriting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function(res) {
+          if (res.ok) {
+            saveBtn.textContent = '✓ Saved to property!';
+            saveBtn.style.background = '#1F7A4D';
+          } else {
+            saveBtn.textContent = '✗ Save failed';
+            saveBtn.style.background = '#c81e1e';
+          }
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        }).catch(function() {
+          saveBtn.textContent = '✗ Save failed';
+          saveBtn.style.background = '#c81e1e';
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        });
+      } else {
+        saveBtn.textContent = '⚠ No property selected';
+        setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2000);
+      }
+    };
+    document.body.appendChild(saveBtn);
+  });
+})();
 </script>
 </body>
 </html>

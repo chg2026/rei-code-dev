@@ -1,25 +1,45 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import UnderwritingClient from "./UnderwritingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function UnderwritingPage() {
+export default async function UnderwritingPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const sp = (await searchParams) || {};
+
+  const properties = await prisma.property.findMany({
+    where: { companyId: user.companyId },
+    select: {
+      id: true,
+      address: true,
+      city: true,
+      state: true,
+      status: true,
+      meta: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
-      <iframe
-        src="/underwriting-calc.html"
-        style={{
-          flex: 1,
-          border: "none",
-          width: "100%",
-          height: "100%",
-          display: "block",
-        }}
-        title="Underwriting Calculator"
-      />
-    </div>
+    <UnderwritingClient
+      properties={properties}
+      initialPropertyId={sp.propertyId ?? null}
+      initialInputs={{
+        purchase: sp.purchase ?? null,
+        rehab: sp.rehab ?? null,
+        arv: sp.arv ?? null,
+        closing: sp.closing ?? null,
+        holding: sp.holding ?? null,
+        strategy: sp.strategy ?? null,
+      }}
+    />
   );
 }

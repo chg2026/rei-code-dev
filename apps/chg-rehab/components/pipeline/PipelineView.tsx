@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/pipeline";
+import AddDealButton from "@/app/pipeline/AddDealButton";
 
 export type PipelineDealRow = {
   id: string;
@@ -105,8 +106,8 @@ function TypeBadge({ type }: { type: "sfr" | "mf" | null }) {
   return (
     <span style={{
       fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
-      background: isMf ? "rgba(52,199,89,0.1)" : "rgba(0,113,227,0.1)",
-      color: isMf ? "#1A6B35" : "#004499",
+      background: isMf ? "rgba(52,199,89,0.1)" : "rgba(31,77,92,0.1)",
+      color: isMf ? "#1A6B35" : "#143641",
     }}>
       {isMf ? "MF" : "SFR"}
     </span>
@@ -132,7 +133,7 @@ function Avatar({ initials }: { initials: string }) {
   return (
     <div style={{
       width: 20, height: 20, borderRadius: "50%",
-      background: "linear-gradient(135deg,#7EB5E6,#4A90D9)",
+      background: "linear-gradient(135deg,#A8C4D0,#5B8FA8)",
       color: "#fff", fontSize: 8, fontWeight: 700,
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0,
@@ -216,7 +217,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
   const filtered = filterDeals(activeDeals);
 
   const btnActive: React.CSSProperties = {
-    background: "#EBF3FF", color: "#004499", border: "0.5px solid rgba(0,113,227,0.3)",
+    background: "#E8EFF1", color: "#143641", border: "0.5px solid rgba(31,77,92,0.3)",
   };
   const btnInactive: React.CSSProperties = {
     background: "#F2F2F7", color: "#6E6E73", border: "0.5px solid rgba(0,0,0,0.12)",
@@ -245,10 +246,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
             onClick={() => setView("list")}
             style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", ...(view === "list" ? btnActive : btnInactive) }}
           >List</button>
-          <button
-            style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, background: "#0071E3", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-            onClick={() => alert("New deal setup coming in next sprint")}
-          >+ New deal</button>
+          <AddDealButton />
         </div>
       </div>
 
@@ -258,7 +256,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
         {/* ── Stats row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
           {[
-            { val: activeDeals.filter((d) => d.stage !== STAGES.Closed).length, lbl: "Total active",               color: "#004499" },
+            { val: activeDeals.filter((d) => d.stage !== STAGES.Closed).length, lbl: "Total active",               color: "#143641" },
             { val: underContractCount,                                             lbl: "Under contract",             color: "#7D4A00" },
             { val: closedCount,                                                    lbl: "Closed this quarter",        color: "#1A6B35" },
             { val: overdueCount,                                                   lbl: "Overdue / follow-up needed", color: "#8C1515" },
@@ -282,8 +280,8 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
               style={{
                 fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 20,
                 border: "none", cursor: "pointer", fontFamily: "inherit",
-                background: typeFilter === f ? "#EBF3FF" : "transparent",
-                color: typeFilter === f ? "#004499" : "#6E6E73",
+                background: typeFilter === f ? "#E8EFF1" : "transparent",
+                color: typeFilter === f ? "#143641" : "#6E6E73",
               }}
             >
               {f === "all" ? "All deals" : f === "sfr" ? "SFR" : f === "mf" ? "Multifamily" : "Mine"}

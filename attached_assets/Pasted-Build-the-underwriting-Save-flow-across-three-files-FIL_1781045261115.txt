@@ -1,0 +1,178 @@
+Build the underwriting Save flow across three files.
+
+─────────────────────────────────────────
+FILE 1: Create apps/chg-rehab/app/api/properties/[id]/underwriting/route.ts (new file)
+─────────────────────────────────────────
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
+  if (!property) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+
+  await prisma.propertyFinancialSection.upsert({
+    where: { propertyId_section: { propertyId: id, section: `underwriting_${body.strategy ?? "flip"}_${body.savedAt ?? Date.now()}` } },
+    create: {
+      propertyId: id,
+      section: `underwriting_${body.strategy ?? "flip"}_${body.savedAt ?? Date.now()}`,
+      data: body,
+    },
+    update: {
+      data: body,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
+  if (!property) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const sections = await prisma.propertyFinancialSection.findMany({
+    where: { propertyId: id, section: { startsWith: "underwriting_" } },
+    orderBy: { id: "desc" },
+  });
+
+  return NextResponse.json({ analyses: sections });
+}
+
+─────────────────────────────────────────
+FILE 2: apps/chg-rehab/public/underwriting-calc.html
+─────────────────────────────────────────
+
+Find the existing saveBtn.onclick function inside the IIFE:
+
+    saveBtn.onclick = function () {
+      var strategy = 'flip';
+      var brrrrBtn = document.getElementById('tab-brrrr');
+      if (brrrrBtn && brrrrBtn.classList.contains('active')) strategy = 'brrrr';
+      function raw(id) { var el = document.getElementById(id); return el ? Number((el.value||'0').replace(/,/g,'')) : 0; }
+      var payload = {
+        type: 'chg-calc-save',
+        strategy: strategy,
+        savedAt: new Date().toISOString(),
+        inputs: { purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'), closing: raw('ap-closing'), holding: raw('ap-holding') }
+      };
+      window.parent.postMessage(payload, '*');
+      saveBtn.textContent = '✓ Saved!';
+      saveBtn.style.background = '#1F7A4D';
+      setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2000);
+    };
+
+Replace it with:
+
+    saveBtn.onclick = function () {
+      var strategy = 'flip';
+      var brrrrBtn = document.getElementById('tab-brrrr');
+      if (brrrrBtn && brrrrBtn.classList.contains('active')) strategy = 'brrrr';
+      function raw(id) { var el = document.getElementById(id); return el ? Number((el.value||'0').replace(/,/g,'')) : 0; }
+      var payload = {
+        strategy: strategy,
+        savedAt: new Date().toISOString(),
+        inputs: { purchase: raw('ap-price'), rehab: raw('ap-rehab'), arv: raw('f-arv'), closing: raw('ap-closing'), holding: raw('ap-holding') },
+        results: {
+          profit: raw('f-profit') || raw('b-profit-refi'),
+          roi: document.getElementById('f-roi') ? document.getElementById('f-roi').textContent : null,
+        },
+        label: (document.querySelector('.db-name') ? document.querySelector('.db-name').textContent : 'Analysis') + ' — ' + strategy.toUpperCase() + ' — ' + new Date().toLocaleDateString()
+      };
+      if (window._propertyId) {
+        saveBtn.textContent = 'Saving…';
+        fetch('/api/properties/' + window._propertyId + '/underwriting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function(res) {
+          if (res.ok) {
+            saveBtn.textContent = '✓ Saved to property!';
+            saveBtn.style.background = '#1F7A4D';
+          } else {
+            saveBtn.textContent = '✗ Save failed';
+            saveBtn.style.background = '#c81e1e';
+          }
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        }).catch(function() {
+          saveBtn.textContent = '✗ Save failed';
+          saveBtn.style.background = '#c81e1e';
+          setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2500);
+        });
+      } else {
+        saveBtn.textContent = '⚠ No property selected';
+        setTimeout(function(){ saveBtn.textContent = '💾 Save analysis to deal'; saveBtn.style.background = '#b8860b'; }, 2000);
+      }
+    };
+
+─────────────────────────────────────────
+FILE 3: apps/chg-rehab/app/property/page.tsx
+─────────────────────────────────────────
+
+Add an "Analysis" tab to the property record.
+
+Find the tabs array in the file. It should look something like:
+  const tabs = [ ... ] or a list of { href, label } objects
+
+Add an "Analysis" tab entry pointing to tab=analysis.
+
+Then find where the tab content is rendered (likely a switch or conditional on the tab param). Add a new case for "analysis" that renders an AnalysisTab component.
+
+For the analysis tab content, add this inline (no new file needed):
+
+If the tab === "analysis", fetch and render the saved analyses:
+
+  {tab === "analysis" && (
+    <AnalysisPanel propertyId={selected?.id ?? ""} />
+  )}
+
+And add this server component inline at the bottom of page.tsx (or as close to the bottom as reasonable):
+
+async function AnalysisPanel({ propertyId }: { propertyId: string }) {
+  if (!propertyId) return <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 12 }}>Select a property to view analyses.</div>;
+  const sections = await prisma.propertyFinancialSection.findMany({
+    where: { propertyId, section: { startsWith: "underwriting_" } },
+    orderBy: { id: "desc" },
+  });
+  if (sections.length === 0) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
+        No saved analyses yet. Run an analysis in Underwriting and click "Save analysis to deal."
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 16 }}>
+      {sections.map((s) => {
+        const d = s.data as Record<string, unknown>;
+        const inputs = d.inputs as Record<string, number> | undefined;
+        return (
+          <div key={s.id} style={{ background: "#fff", border: "0.5px solid var(--border-lo)", borderRadius: 8, padding: 16, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{String(d.label ?? s.section)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+              {inputs?.purchase ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Purchase</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.purchase).toLocaleString()}</div></div> : null}
+              {inputs?.rehab ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Rehab</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.rehab).toLocaleString()}</div></div> : null}
+              {inputs?.arv ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ARV</div><div style={{ fontSize: 13, fontWeight: 500 }}>${Number(inputs.arv).toLocaleString()}</div></div> : null}
+              {d.results && (d.results as Record<string, unknown>).roi ? <div><div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>ROI</div><div style={{ fontSize: 13, fontWeight: 500, color: "var(--green)" }}>{String((d.results as Record<string, unknown>).roi)}</div></div> : null}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 8 }}>{String(d.savedAt ?? "").replace("T", " ").slice(0, 16)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+Read the property page.tsx first to understand its exact tab structure before making changes — do not guess the tab format. Make minimal changes to add the Analysis tab correctly.
+
+Do not change anything else.
