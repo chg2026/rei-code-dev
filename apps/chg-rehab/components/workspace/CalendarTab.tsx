@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import s from "./styles.module.css";
+import CreateTaskModal from "./CreateTaskModal";
 
 type Ev = { id: string; title: string; when: string; kind: string; link: string | null };
 
@@ -24,6 +25,7 @@ export default function CalendarTab() {
   const [cursor, setCursor] = useState<{ y: number; m: number } | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createDate, setCreateDate] = useState<string | null>(null);
 
   useEffect(() => {
     const n = new Date();
@@ -106,6 +108,10 @@ export default function CalendarTab() {
                 <div
                   key={i}
                   className={`${s.calCell} ${c.inMonth ? "" : s.muted} ${key === todayKey ? s.today : ""}`}
+                  onClick={c.inMonth ? () => setCreateDate(ymd(c.date)) : undefined}
+                  style={{ cursor: c.inMonth ? "pointer" : "default" }}
+                  onMouseEnter={c.inMonth ? (e) => { e.currentTarget.style.background = "rgba(0,0,0,0.03)"; } : undefined}
+                  onMouseLeave={c.inMonth ? (e) => { e.currentTarget.style.background = ""; } : undefined}
                 >
                   <div>{c.date.getDate()}</div>
                   {dayEvents.length > 0 ? (
@@ -143,6 +149,14 @@ export default function CalendarTab() {
           })}
         </div>
       </div>
+      {createDate && (
+        <CreateTaskModal
+          open
+          initialDueDate={createDate}
+          onCreated={() => { setCreateDate(null); load(); }}
+          onClose={() => setCreateDate(null)}
+        />
+      )}
     </div>
   );
 }

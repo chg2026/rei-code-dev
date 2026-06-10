@@ -8,6 +8,7 @@ export type CreateTaskModalProps = {
   onClose: () => void;
   onCreated?: (taskId: string) => void;
   initialTitle?: string;
+  initialDueDate?: string;
   sourceMessageId?: string | null;
 };
 
@@ -21,12 +22,13 @@ export default function CreateTaskModal({
   onClose,
   onCreated,
   initialTitle = "",
+  initialDueDate,
   sourceMessageId = null,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState(initialTitle);
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("Medium");
-  const [dueDate, setDueDate] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>(initialDueDate ?? "");
   const [linkValue, setLinkValue] = useState<string>("");
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [links, setLinks] = useState<{ deals: LinkItem[]; projects: LinkItem[] }>({ deals: [], projects: [] });
@@ -38,7 +40,7 @@ export default function CreateTaskModal({
     setTitle(initialTitle);
     setAssigneeId("");
     setPriority("Medium");
-    setDueDate("");
+    setDueDate(initialDueDate ?? "");
     setLinkValue("");
     setErr(null);
     Promise.all([
@@ -48,7 +50,7 @@ export default function CreateTaskModal({
       setMentions(m.users ?? []);
       setLinks({ deals: l.deals ?? [], projects: l.projects ?? [] });
     });
-  }, [open, initialTitle]);
+  }, [open, initialTitle, initialDueDate]);
 
   const linkParts = useMemo(() => {
     if (!linkValue) return null;
