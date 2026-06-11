@@ -20,6 +20,7 @@ type TabId = (typeof TABS)[number]["id"];
 export default function CommandCenterPage() {
   const [tab, setTab] = useState<TabId>("todo");
   const [creatingTask, setCreatingTask] = useState(false);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Dismiss the NEW pill once the user lands here.
@@ -69,8 +70,17 @@ export default function CommandCenterPage() {
       {creatingTask && (
         <TaskDetailPanel
           mode="create"
-          onCreated={() => { setCreatingTask(false); onTaskCreated(); }}
+          onCreated={(id) => { setCreatingTask(false); setDetailTaskId(id); onTaskCreated(); }}
           onClose={() => setCreatingTask(false)}
+        />
+      )}
+      {detailTaskId && (
+        <TaskDetailPanel
+          mode="edit"
+          taskId={detailTaskId}
+          onClose={() => setDetailTaskId(null)}
+          onDeleted={() => { setDetailTaskId(null); onTaskCreated(); }}
+          onUpdated={() => onTaskCreated()}
         />
       )}
     </div>

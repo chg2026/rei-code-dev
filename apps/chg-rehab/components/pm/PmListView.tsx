@@ -123,7 +123,7 @@ export default function PmListView({
           defaultStatusId={createStatusId ?? defaultStatus}
           onClose={() => setCreating(false)}
           onUpdated={() => { refresh(); }}
-          onCreated={(id) => { setCreating(false); setTaskDetailId(id); refresh(); }}
+          onCreated={() => { refresh(); }}
         />
       ) : null}
 

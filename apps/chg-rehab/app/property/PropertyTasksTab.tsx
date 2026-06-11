@@ -107,7 +107,7 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
           linkType="property"
           linkId={propertyId}
           linkLabel={propertyLabel}
-          onCreated={() => { setCreating(false); load(); }}
+          onCreated={(id) => { setCreating(false); setDetailTaskId(id); load(); }}
           onClose={() => setCreating(false)}
         />,
         document.body

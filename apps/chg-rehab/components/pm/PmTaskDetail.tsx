@@ -45,7 +45,9 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
   onUpdated: () => void;
   onCreated?: (id: string) => void;
 }) {
-  const isCreate = !taskId;
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(taskId ?? null);
+  useEffect(() => { setActiveTaskId(taskId ?? null); }, [taskId]);
+  const isCreate = !activeTaskId;
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [name, setName] = useState("");
@@ -76,7 +78,10 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
       if (r.ok) {
         const d = await r.json().catch(() => null);
         const id: string | undefined = d?.task?.id ?? d?.id;
-        if (id) onCreated?.(id);
+        if (id) {
+          setActiveTaskId(id);
+          onCreated?.(id);
+        }
       }
     } finally {
       setCreating(false);
@@ -84,15 +89,15 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
   };
 
   const load = useCallback(async () => {
-    if (!taskId) return;
-    const r = await fetch(`/api/pm/tasks/${taskId}`, { cache: "no-store" });
+    if (!activeTaskId) return;
+    const r = await fetch(`/api/pm/tasks/${activeTaskId}`, { cache: "no-store" });
     if (r.ok) {
       const d = await r.json();
       setTask(d.task);
       setName(d.task.name);
       setDescription(d.task.description ?? "");
     }
-  }, [taskId]);
+  }, [activeTaskId]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -103,13 +108,13 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
   }, []);
 
   const patch = useCallback(async (data: Record<string, unknown>) => {
-    await fetch(`/api/pm/tasks/${taskId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+    await fetch(`/api/pm/tasks/${activeTaskId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
     await load();
     onUpdated();
-  }, [taskId, load, onUpdated]);
+  }, [activeTaskId, load, onUpdated]);
 
   const toggleAssignee = async (userId: string, has: boolean) => {
-    await fetch(`/api/pm/tasks/${taskId}/assignees`, {
+    await fetch(`/api/pm/tasks/${activeTaskId}/assignees`, {
       method: has ? "DELETE" : "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ userId }),
@@ -121,7 +126,7 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
   const addComment = async () => {
     const body = comment.trim();
     if (!body) return;
-    await fetch(`/api/pm/tasks/${taskId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) });
+    await fetch(`/api/pm/tasks/${activeTaskId}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) });
     setComment("");
     await load();
   };
@@ -149,7 +154,7 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
 
   const deleteTask = async () => {
     if (!window.confirm("Delete this task?")) return;
-    await fetch(`/api/pm/tasks/${taskId}`, { method: "DELETE" });
+    await fetch(`/api/pm/tasks/${activeTaskId}`, { method: "DELETE" });
     onUpdated();
     onClose();
   };
