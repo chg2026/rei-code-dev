@@ -25,6 +25,7 @@ export default function PmListView({
   const [tasks, setTasks] = useState<PmTaskRow[]>(initialTasks);
   const [view, setView] = useState<"list" | "board">("list");
   const [quickCreate, setQuickCreate] = useState<string | null>(null);
+  const [boardQuickCreate, setBoardQuickCreate] = useState<string | null>(null);
   const [taskDetailId, setTaskDetailId] = useState<string | null>(null);
 
   useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
@@ -40,8 +41,12 @@ export default function PmListView({
   const defaultStatus = statuses.find((s) => s.isDefault)?.id ?? statuses[0]?.id ?? null;
 
   const onAddTask = (statusId: string) => {
-    setView("list");
-    setQuickCreate(statusId);
+    if (view === "board") {
+      // stay in board, just open a quick create there
+      setBoardQuickCreate(statusId);
+    } else {
+      setQuickCreate(statusId);
+    }
   };
 
   return (
@@ -66,7 +71,16 @@ export default function PmListView({
       </div>
 
       {view === "board" ? (
-        <PmBoardView tasks={tasks} statuses={statuses} listId={listId} onAddTask={onAddTask} onOpenTask={setTaskDetailId} />
+        <PmBoardView
+          tasks={tasks}
+          statuses={statuses}
+          listId={listId}
+          onAddTask={onAddTask}
+          onOpenTask={setTaskDetailId}
+          quickCreateStatusId={boardQuickCreate}
+          onQuickCreateDone={() => { setBoardQuickCreate(null); refresh(); }}
+          onQuickCreateCancel={() => setBoardQuickCreate(null)}
+        />
       ) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
           {statuses.map((st) => {
@@ -102,7 +116,7 @@ export default function PmListView({
 
                   {quickCreate === st.id ? (
                     <div style={{ padding: "8px 12px", background: "var(--bg-primary)" }}>
-                      <PmQuickCreate listId={listId} statusId={st.id} defaultStatus={defaultStatus} onCreated={() => { refresh(); }} onCancel={() => setQuickCreate(null)} />
+                      <PmQuickCreate listId={listId} statusId={st.id} defaultStatus={defaultStatus} onCreated={(newId?: string) => { setQuickCreate(null); refresh(); if (newId) setTaskDetailId(newId); }} onCancel={() => setQuickCreate(null)} />
                     </div>
                   ) : groupTasks.length === 0 ? (
                     <div onClick={() => setQuickCreate(st.id)} style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer", background: "var(--bg-primary)" }}>+ Add task</div>

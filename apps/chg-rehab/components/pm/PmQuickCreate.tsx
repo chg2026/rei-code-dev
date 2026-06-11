@@ -12,7 +12,7 @@ export default function PmQuickCreate({
   listId: string;
   statusId?: string | null;
   defaultStatus?: string | null;
-  onCreated: () => void;
+  onCreated: (id?: string) => void;
   onCancel?: () => void;
 }) {
   const [value, setValue] = useState("");
@@ -23,13 +23,18 @@ export default function PmQuickCreate({
     if (!name || busy) return;
     setBusy(true);
     try {
-      await fetch(`/api/pm/lists/${listId}/tasks`, {
+      const r = await fetch(`/api/pm/lists/${listId}/tasks`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name, statusId: statusId ?? defaultStatus ?? undefined }),
       });
+      let newId: string | undefined;
+      if (r.ok) {
+        const d = await r.json().catch(() => null);
+        newId = d?.task?.id ?? d?.id ?? undefined;
+      }
       setValue("");
-      onCreated();
+      onCreated(newId);
     } finally {
       setBusy(false);
     }

@@ -1,0 +1,66 @@
+Two fixes in apps/chg-rehab/components/pm/PmListView.tsx:
+
+--- FIX 1: Don't switch to list view when + Add task is clicked in board ---
+
+Change onAddTask from:
+  const onAddTask = (statusId: string) => {
+    setView("list");
+    setQuickCreate(statusId);
+  };
+
+To:
+  const onAddTask = (statusId: string) => {
+    if (view === "board") {
+      // stay in board, just open a quick create there
+      setBoardQuickCreate(statusId);
+    } else {
+      setQuickCreate(statusId);
+    }
+  };
+
+Add new state: const [boardQuickCreate, setBoardQuickCreate] = useState<string | null>(null);
+
+Pass boardQuickCreate and setBoardQuickCreate to PmBoardView:
+  <PmBoardView
+    tasks={tasks}
+    statuses={statuses}
+    listId={listId}
+    onAddTask={onAddTask}
+    onOpenTask={setTaskDetailId}
+    quickCreateStatusId={boardQuickCreate}
+    onQuickCreateDone={() => { setBoardQuickCreate(null); refresh(); }}
+    onQuickCreateCancel={() => setBoardQuickCreate(null)}
+  />
+
+--- FIX 2: In PmBoardView, show inline quick create inside the column when quickCreateStatusId matches ---
+
+Add the new props to PmBoardView's props type:
+  quickCreateStatusId?: string | null;
+  onQuickCreateDone?: () => void;
+  onQuickCreateCancel?: () => void;
+
+Add import: import PmQuickCreate from "./PmQuickCreate";
+
+In the column render, after the tasks list and before the "+ Add task" button, add:
+  {quickCreateStatusId === st.id && (
+    <div style={{ padding: "4px 8px" }}>
+      <PmQuickCreate
+        listId={listId}
+        statusId={st.id}
+        defaultStatus={st.id}
+        onCreated={(newId?: string) => {
+          onQuickCreateDone?.();
+          if (newId) onOpenTask(newId);
+        }}
+        onCancel={() => onQuickCreateCancel?.()}
+      />
+    </div>
+  )}
+
+--- FIX 3: In PmQuickCreate, pass the new task id back to onCreated ---
+
+Read apps/chg-rehab/components/pm/PmQuickCreate.tsx first. Find where the task is created (the fetch POST call). After creation, call onCreated(newTaskId) passing the task id so the board can open the detail panel.
+
+Also update the onCreated prop type from () => void to (id?: string) => void everywhere PmQuickCreate is used.
+
+Run tsc --noEmit and report errors.
