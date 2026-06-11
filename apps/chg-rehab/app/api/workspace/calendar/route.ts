@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   const end = new Date(Date.UTC(y, m, 1));
   const range = { gte: start, lt: end };
 
-  const [tasks, closedDeals, openDeals, phases, docs, dists, manual] = await Promise.all([
+  const [tasks, closedDeals, openDeals, phases, docs, dists, manual, pmTasks] = await Promise.all([
     prisma.wsTask.findMany({
       where: { companyId: user.companyId, dueDate: range },
       select: { id: true, title: true, dueDate: true, priority: true },
@@ -71,6 +71,23 @@ export async function GET(req: Request) {
     prisma.wsCalendarEvent.findMany({
       where: { companyId: user.companyId, startAt: range },
       select: { id: true, title: true, startAt: true, link: true },
+    }),
+    prisma.pmTask.findMany({
+      where: {
+        companyId: user.companyId,
+        dueDate: range,
+        parentTaskId: null,
+        OR: [
+          { createdById: user.id },
+          { assignees: { some: { userId: user.id } } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        dueDate: true,
+        list: { select: { id: true, space: { select: { id: true } } } },
+      },
     }),
   ]);
 
@@ -119,6 +136,15 @@ export async function GET(req: Request) {
   }
   for (const e of manual) {
     events.push({ id: `cal:${e.id}`, title: e.title, when: e.startAt.toISOString(), kind: "event", link: e.link });
+  }
+  for (const t of pmTasks) {
+    if (t.dueDate) events.push({
+      id: `pm:${t.id}`,
+      title: t.name,
+      when: t.dueDate.toISOString(),
+      kind: "pm-task",
+      link: `/pm/${t.list.space.id}/${t.list.id}`,
+    });
   }
 
   events.sort((a, b) => a.when.localeCompare(b.when));

@@ -9,11 +9,24 @@ type Ev = { id: string; title: string; when: string; kind: string; link: string 
 
 const KIND_LABELS: Record<string, string> = {
   task: "Task due",
+  "pm-task": "PM Task",
   deal: "Pipeline",
   project: "Rehab",
+  milestone: "Milestone",
   doc: "Document",
   distribution: "Distribution",
   event: "Event",
+};
+
+const KIND_COLORS: Record<string, string> = {
+  task: "#6366f1",
+  "pm-task": "#f59e0b",
+  deal: "#10b981",
+  project: "#3b82f6",
+  milestone: "#8b5cf6",
+  doc: "#ef4444",
+  distribution: "#06b6d4",
+  event: "#6b7280",
 };
 
 function ymd(d: Date) {
@@ -116,7 +129,7 @@ export default function CalendarTab() {
                   <div>{c.date.getDate()}</div>
                   {dayEvents.length > 0 ? (
                     <div className={s.calDots}>
-                      {dayEvents.slice(0, 4).map((e) => <span key={e.id} className={s.calDot} title={e.title} />)}
+                      {dayEvents.slice(0, 4).map((e) => <span key={e.id} className={s.calDot} title={e.title} style={{ background: KIND_COLORS[e.kind] ?? "var(--marine)" }} />)}
                       {dayEvents.length > 4 ? <span style={{ fontSize: 9, color: "var(--quill)" }}>+{dayEvents.length - 4}</span> : null}
                     </div>
                   ) : null}
@@ -136,7 +149,7 @@ export default function CalendarTab() {
           ) : upcoming.map((e) => {
             const d = new Date(e.when);
             const content = (
-              <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border-1)" }}>
+              <div style={{ padding: "8px 0 8px 10px", borderBottom: "1px solid var(--border-1)", borderLeft: `3px solid ${KIND_COLORS[e.kind] ?? "var(--marine)"}`, marginBottom: 2 }}>
                 <div style={{ fontSize: 12, color: "var(--quill)" }}>
                   {d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {KIND_LABELS[e.kind] ?? e.kind}
                 </div>
