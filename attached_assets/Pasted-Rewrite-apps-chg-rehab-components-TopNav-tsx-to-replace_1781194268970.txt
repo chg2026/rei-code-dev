@@ -1,0 +1,91 @@
+Rewrite apps/chg-rehab/components/TopNav.tsx to replace the static "/pm" nav item with a dynamic collapsible PM tree. Spec:
+
+1. Add `useState, useEffect` to the React imports.
+
+2. Keep { href: "/pm", label: "Project Manager" } in BASE_SECTIONS Portfolio as a sentinel.
+
+3. Add this component above the TopNav export:
+
+type PmList = { id: string; name: string; color: string | null };
+type PmSpace = { id: string; name: string; color: string | null; lists: PmList[] };
+
+function PmNavTree({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const [spaces, setSpaces] = useState<PmSpace[]>([]);
+  const [openSpaces, setOpenSpaces] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/pm/spaces").then(r => r.json()).then(d => setSpaces(d.spaces ?? []));
+  }, [open]);
+
+  useEffect(() => {
+    if (!spaces.length) return;
+    const active = spaces.find(s => s.lists.some(l => pathname.startsWith(`/pm/${s.id}/${l.id}`)));
+    if (active) { setOpen(true); setOpenSpaces(prev => new Set([...prev, active.id])); }
+  }, [spaces, pathname]);
+
+  const isPmActive = pathname.startsWith("/pm");
+
+  return (
+    <div className="pm-nav-tree">
+      <button className={`nav-item pm-tree-toggle${isPmActive ? " active" : ""}`} onClick={() => setOpen(v => !v)} aria-expanded={open}>
+        <span className="pm-tree-label">Project Manager</span>
+        <span className={`pm-tree-arrow${open ? " open" : ""}`}>›</span>
+      </button>
+      {open && (
+        <div className="pm-tree-spaces">
+          {spaces.length === 0 && <Link href="/pm" className="nav-item pm-tree-empty">+ New Space</Link>}
+          {spaces.map(space => {
+            const spaceOpen = openSpaces.has(space.id);
+            return (
+              <div key={space.id}>
+                <button className="nav-item pm-space-row" onClick={() => setOpenSpaces(prev => { const next = new Set(prev); next.has(space.id) ? next.delete(space.id) : next.add(space.id); return next; })}>
+                  <span className="pm-space-dot" style={{ background: space.color ?? "#6366f1" }} />
+                  <span className="pm-space-name">{space.name}</span>
+                  <span className={`pm-tree-arrow${spaceOpen ? " open" : ""}`}>›</span>
+                </button>
+                {spaceOpen && (
+                  <div className="pm-space-lists">
+                    {space.lists.map(list => {
+                      const href = `/pm/${space.id}/${list.id}`;
+                      return (
+                        <Link key={list.id} href={href} className={`nav-item pm-list-item${pathname.startsWith(href) ? " active" : ""}`}>
+                          <span className="pm-list-dot" style={{ background: list.color ?? "#9ca3af" }} />
+                          {list.name}
+                        </Link>
+                      );
+                    })}
+                    <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list">+ New List</Link>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <Link href="/pm" className="nav-item pm-manage-link">Manage spaces ›</Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+4. In the items.map render block, when item.href === "/pm", return <PmNavTree key="/pm" pathname={pathname} /> instead of a Link.
+
+5. Add to apps/chg-rehab/app/globals.css:
+.pm-nav-tree { width: 100%; }
+.pm-tree-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.pm-tree-label { flex: 1; }
+.pm-tree-arrow { font-size: 18px; color: var(--muted); transition: transform 0.15s; display: inline-block; }
+.pm-tree-arrow.open { transform: rotate(90deg); }
+.pm-tree-spaces { padding-left: 8px; }
+.pm-space-row { width: 100%; display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.pm-space-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pm-space-name { flex: 1; }
+.pm-space-lists { padding-left: 16px; }
+.pm-list-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.pm-list-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pm-add-list { color: var(--muted); font-size: 12px; }
+.pm-manage-link { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.pm-tree-empty { color: var(--muted); font-size: 12px; }
+
+Run tsc --noEmit after. Report errors if any.
