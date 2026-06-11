@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PRIORITIES, type PmStatus } from "./types";
+import TaskAttachments from "@/components/shared/TaskAttachments";
 
 type Member = { id: string; name: string; initials: string; email: string | null };
 type Assignee = { id: string; name: string; initials: string };
@@ -317,6 +318,8 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
                   <button type="button" onClick={addComment} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Send</button>
                 </div>
               </div>
+
+              <TaskAttachments taskId={task.id} apiBase="/api/pm/tasks" />
 
               <div style={{ marginTop: 20 }}>
                 <button type="button" onClick={() => setShowActivity((s) => !s)} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>

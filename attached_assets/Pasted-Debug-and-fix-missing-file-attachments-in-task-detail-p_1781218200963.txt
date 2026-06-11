@@ -1,0 +1,152 @@
+Debug and fix missing file attachments in task detail panels.
+
+Step 1 — diagnose:
+cat apps/chg-rehab/components/shared/TaskAttachments.tsx 2>/dev/null || echo "FILE MISSING"
+grep -n "TaskAttachment\|Attachment\|attach" apps/chg-rehab/components/workspace/TaskDetailPanel.tsx
+grep -n "TaskAttachment\|Attachment\|attach" apps/chg-rehab/components/pm/PmTaskDetail.tsx
+
+Step 2 — check API routes exist:
+ls apps/chg-rehab/app/api/workspace/tasks/[id]/attachments/ 2>/dev/null || echo "WS ATTACHMENTS API MISSING"
+ls apps/chg-rehab/app/api/pm/tasks/[id]/attachments/ 2>/dev/null || echo "PM ATTACHMENTS API MISSING"
+
+Step 3 — check Prisma schema:
+grep -A6 "WsTaskAttachment\|PmTaskAttachment" apps/chg-rehab/prisma/schema.prisma || echo "SCHEMA MISSING"
+
+Step 4 — based on what's missing, do the minimum to make file upload work in BOTH TaskDetailPanel and PmTaskDetail:
+
+If TaskAttachments.tsx is missing, create it at apps/chg-rehab/components/shared/TaskAttachments.tsx:
+
+"use client";
+import { useEffect, useRef, useState } from "react";
+
+interface Attachment { id: string; name: string; mimeType: string; size: number; url: string; }
+
+export default function TaskAttachments({ taskId, apiBase }: { taskId: string; apiBase: string }) {
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const load = () =>
+    fetch(`${apiBase}/${taskId}/attachments`)
+      .then(r => r.json())
+      .then(d => setAttachments(d.attachments ?? []));
+
+  useEffect(() => { if (taskId) load(); }, [taskId]);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !taskId) return;
+    setUploading(true);
+    try {
+      // 1. Get signed upload URL
+      const { uploadUrl, objectPath } = await fetch("/api/upload-url").then(r => r.json());
+      // 2. Upload file directly to Supabase
+      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      // 3. Register attachment
+      await fetch(`${apiBase}/${taskId}/attachments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objectPath, name: file.name, mimeType: file.type, size: file.size }),
+      });
+      await load();
+    } catch (err) { console.error(err); }
+    setUploading(false);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const remove = async (id: string) => {
+    await fetch(`${apiBase}/${taskId}/attachments/${id}`, { method: "DELETE" });
+    setAttachments(a => a.filter(x => x.id !== id));
+  };
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 8 }}>ATTACHMENTS</div>
+      {attachments.map(a => (
+        <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #f0f0f0" }}>
+          <span style={{ fontSize: 18 }}>{a.mimeType?.startsWith("image/") ? "🖼️" : a.mimeType === "application/pdf" ? "📄" : "📎"}</span>
+          <a href={a.url} target="_blank" rel="noreferrer" style={{ flex: 1, fontSize: 13, color: "#1a1a1a", textDecoration: "none" }}>{a.name}</a>
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>{(a.size / 1024).toFixed(0)} KB</span>
+          <button onClick={() => remove(a.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 16 }}>×</button>
+        </div>
+      ))}
+      {attachments.length === 0 && <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>No attachments yet.</div>}
+      <input ref={inputRef} type="file" style={{ display: "none" }} onChange={handleFile} />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        style={{ marginTop: 6, fontSize: 12, color: "#6366f1", background: "none", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+        {uploading ? "Uploading..." : "+ Attach file"}
+      </button>
+    </div>
+  );
+}
+
+Then check if /api/upload-url route exists:
+find apps/chg-rehab/app/api -name "*.ts" | xargs grep -l "upload-url\|uploadUrl\|getUploadUrl" 2>/dev/null
+
+If no upload-url API route exists, create apps/chg-rehab/app/api/upload-url/route.ts:
+import { NextResponse } from "next/server";
+import { getUploadUrl } from "@/lib/objectStorage";
+import { requireAuthNext } from "@/lib/auth";
+export async function GET(req: Request) {
+  const user = await requireAuthNext(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const result = await getUploadUrl();
+  return NextResponse.json(result);
+}
+
+If WsTaskAttachment API routes are missing, create apps/chg-rehab/app/api/workspace/tasks/[id]/attachments/route.ts:
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuthNext } from "@/lib/auth";
+import { getPrivateFile } from "@/lib/objectStorage";
+
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const user = await requireAuthNext(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rows = await prisma.wsTaskAttachment.findMany({ where: { taskId: params.id }, orderBy: { createdAt: "asc" } });
+  const attachments = await Promise.all(rows.map(async r => {
+    try { const f = await getPrivateFile(r.objectPath); return { ...r, url: f.signedUrl }; }
+    catch { return { ...r, url: "" }; }
+  }));
+  return NextResponse.json({ attachments });
+}
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const user = await requireAuthNext(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { objectPath, name, mimeType, size } = await req.json();
+  const att = await prisma.wsTaskAttachment.create({ data: { taskId: params.id, objectPath, name, mimeType, size, uploadedById: user.id } });
+  return NextResponse.json({ attachment: att });
+}
+
+Also create apps/chg-rehab/app/api/workspace/tasks/[id]/attachments/[attachmentId]/route.ts:
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuthNext } from "@/lib/auth";
+export async function DELETE(req: Request, { params }: { params: { id: string; attachmentId: string } }) {
+  const user = await requireAuthNext(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await prisma.wsTaskAttachment.delete({ where: { id: params.attachmentId } });
+  return NextResponse.json({ ok: true });
+}
+
+Do the same for PM tasks: apps/chg-rehab/app/api/pm/tasks/[id]/attachments/route.ts (same pattern, use prisma.pmTaskAttachment).
+
+Now add TaskAttachments to both panels.
+
+In TaskDetailPanel.tsx, add after the Comments section:
+import TaskAttachments from "@/components/shared/TaskAttachments";
+...
+{taskId && <TaskAttachments taskId={taskId} apiBase="/api/workspace/tasks" />}
+
+In PmTaskDetail.tsx, add after the Comments section:
+import TaskAttachments from "@/components/shared/TaskAttachments";
+...
+{task?.id && <TaskAttachments taskId={task.id} apiBase="/api/pm/tasks" />}
+
+Check schema has WsTaskAttachment and PmTaskAttachment models. If missing, add them and run npx prisma db push --accept-data-loss.
+
+Run: npx tsc --noEmit
+Report errors.

@@ -97,6 +97,8 @@ model User {
   wsReminders             WsReminder[]
   wsCalendarEvents        WsCalendarEvent[]
   wsTaskComments          WsTaskComment[]              @relation("WsTaskCommentAuthor")
+  wsTaskAttachments       WsTaskAttachment[]           @relation("WsTaskAttachmentUploader")
+  pmTaskAttachments       PmTaskAttachment[]           @relation("PmTaskAttachmentUploader")
   pmTasksCreated          PmTask[]                     @relation("PmTaskCreator")
   pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
   pmComments              PmComment[]                  @relation("PmComments")
@@ -1541,6 +1543,7 @@ model WsTask {
   assignee      User?           @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
   comments      WsTaskComment[]
+  attachments   WsTaskAttachment[]
 
   @@index([companyId, done, dueDate])
   @@index([companyId, assigneeId, done])
@@ -1556,6 +1559,22 @@ model WsTaskComment {
 
   task   WsTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author User   @relation("WsTaskCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model WsTaskAttachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  uploadedById String
+  name         String
+  objectPath   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  task       WsTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation("WsTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
@@ -1768,10 +1787,27 @@ model PmTask {
   tags         PmTaskTag[]
   comments     PmComment[]
   activity     PmActivity[]
+  attachments  PmTaskAttachment[]
 
   @@index([companyId])
   @@index([listId])
   @@index([parentTaskId])
+}
+
+model PmTaskAttachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  uploadedById String
+  name         String
+  objectPath   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  task       PmTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation("PmTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }
 
 model PmTaskAssignee {

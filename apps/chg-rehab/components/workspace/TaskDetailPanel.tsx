@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import TaskAttachments from "@/components/shared/TaskAttachments";
 
 type Mode = "create" | "edit";
 type TeamMember = { id: string; name: string; initials: string };
@@ -362,6 +363,12 @@ export default function TaskDetailPanel({
             <button type="button" onClick={addComment} className="btn-sm btn-primary" disabled={!comment.trim()}>Send</button>
           </div>
         </div>
+
+        {activeTaskId && (
+          <div style={{ borderTop: "1px solid var(--border-1)", paddingTop: 14 }}>
+            <TaskAttachments taskId={activeTaskId} apiBase="/api/workspace/tasks" />
+          </div>
+        )}
       </div>
     </div>
   );
