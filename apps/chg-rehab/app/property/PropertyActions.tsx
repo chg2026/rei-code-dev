@@ -59,6 +59,44 @@ export function AddPropertyButton() {
   );
 }
 
+export function DeletePropertyButton({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      title="Delete property"
+      disabled={busy}
+      onClick={async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!window.confirm("Delete this property? This cannot be undone.")) return;
+        setBusy(true);
+        const r = await fetch(`/api/properties/${id}`, { method: "DELETE" });
+        if (r.ok) {
+          window.location.href = "/property";
+        } else {
+          setBusy(false);
+        }
+      }}
+      style={{
+        position: "absolute",
+        top: 6,
+        right: 6,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: "var(--text-tertiary)",
+        fontSize: 13,
+        lineHeight: 1,
+        padding: "2px 4px",
+        zIndex: 2,
+      }}
+    >
+      ✕
+    </button>
+  );
+}
+
 export function ChangeToRentalButton({ property }: { property: PropertyLite }) {
   const [open, setOpen] = useState(false);
   const isRehab = (property.status || "").toLowerCase().includes("rehab");

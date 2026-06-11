@@ -91,6 +91,16 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
               <span style={{ flex: 1, fontSize: 14 }}>{t.title}</span>
               {t.dueDate ? <span style={{ fontSize: 12, color: "var(--quill)" }}>{new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span> : null}
               <span style={{ fontSize: 12, color: t.priority === "Urgent" ? "#ef4444" : t.priority === "Low" ? "#10b981" : "#f59e0b" }}>{t.priority}</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Delete this task?")) return;
+                  setTasks(prev => prev.filter(x => x.id !== t.id));
+                  await fetch(`/api/workspace/tasks/${t.id}`, { method: "DELETE" });
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+                title="Delete task"
+              >✕</button>
             </div>
           ))}
           {done.length > 0 && (
@@ -104,6 +114,16 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
                     style={{ width: 16, height: 16, border: "2px solid var(--border-2)", borderRadius: 4, cursor: "pointer", flexShrink: 0, background: "var(--marine)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11 }}
                   >✓</span>
                   <span style={{ flex: 1, fontSize: 14, textDecoration: "line-through" }}>{t.title}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm("Delete this task?")) return;
+                      setTasks(prev => prev.filter(x => x.id !== t.id));
+                      await fetch(`/api/workspace/tasks/${t.id}`, { method: "DELETE" });
+                    }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+                    title="Delete task"
+                  >✕</button>
                 </div>
               ))}
             </>

@@ -351,6 +351,18 @@ export default function DocsClient(props: {
                       >
                         ↓
                       </a>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!window.confirm("Delete this document?")) return;
+                          const r = await fetch(`/api/documents/${d.id}`, { method: "DELETE" });
+                          if (r.ok) refresh();
+                        }}
+                        style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 13 }}
+                      >
+                        Delete
+                      </button>
                     </>
                   )}
                 </div>

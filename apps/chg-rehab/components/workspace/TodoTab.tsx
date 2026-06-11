@@ -133,6 +133,16 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                 <span className={`${s.pill} ${priorityClass(t.priority)}`}>{t.priority}</span>
                 {t.dueDate ? <span className={`${s.pill} ${s.pillGrey}`}>{fmtDate(t.dueDate)}</span> : null}
               </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Delete this task?")) return;
+                  setTasks(prev => prev.filter(x => x.id !== t.id));
+                  await fetch(`/api/workspace/tasks/${t.id}`, { method: "DELETE" });
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+                title="Delete task"
+              >✕</button>
             </div>
           ))}
           {pmTasks.length > 0 ? (
@@ -166,6 +176,16 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                     {t.priority ? <span className={`${s.pill} ${priorityClass(t.priority)}`}>{t.priority}</span> : null}
                     {t.dueDate ? <span className={`${s.pill} ${s.pillGrey}`}>{fmtDate(t.dueDate)}</span> : null}
                   </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm("Delete this task?")) return;
+                      setPmTasks(prev => prev.filter(x => x.id !== t.id));
+                      await fetch(`/api/pm/tasks/${t.id}`, { method: "DELETE" });
+                    }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+                    title="Delete task"
+                  >✕</button>
                 </div>
               ))}
             </>
@@ -187,6 +207,16 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                   <div className={s.rowMain}>
                     <div className={`${s.rowTitle} ${s.done}`}>{t.title}</div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!window.confirm("Delete this task?")) return;
+                      setTasks(prev => prev.filter(x => x.id !== t.id));
+                      await fetch(`/api/workspace/tasks/${t.id}`, { method: "DELETE" });
+                    }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+                    title="Delete task"
+                  >✕</button>
                 </div>
               ))}
             </>

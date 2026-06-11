@@ -1,0 +1,50 @@
+Add delete buttons to 5 UI components. Use a simple inline trash icon button (✕ or 🗑) that confirms with window.confirm before calling DELETE, then removes the item from local state optimistically.
+
+--- 1. apps/chg-rehab/components/workspace/TodoTab.tsx ---
+
+In the open tasks row render, after the rowRight div, add:
+<button
+  type="button"
+  onClick={async () => {
+    if (!window.confirm("Delete this task?")) return;
+    setTasks(prev => prev.filter(x => x.id !== t.id));
+    await fetch(`/api/workspace/tasks/${t.id}`, { method: "DELETE" });
+  }}
+  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 4px", flexShrink: 0 }}
+  title="Delete task"
+>✕</button>
+
+Do the same in the done tasks row.
+
+Also add delete for PM tasks rows (the pmTasks section): call DELETE /api/pm/tasks/[id] and filter from setPmTasks.
+
+--- 2. apps/chg-rehab/components/workspace/RemindersTab.tsx ---
+
+Read the file first. In the reminder row render, add a delete button that calls DELETE /api/workspace/reminders/[id] and removes from local state.
+
+--- 3. apps/chg-rehab/components/workspace/GoalsTab.tsx ---
+
+Read the file first. In the goal row render, add a delete button that calls DELETE /api/workspace/goals/[id] and removes from local state.
+
+--- 4. apps/chg-rehab/app/property/page.tsx ---
+
+In PropertyTasksTab (in PropertyTasksTab.tsx), add a delete button on each task row that calls DELETE /api/workspace/tasks/[id] and removes from local state.
+
+Also add a delete button to the property list panel (the left sidebar listing properties). Add a small ✕ button on each property card that calls DELETE /api/properties/[id], confirms first, then reloads the page with window.location.href = "/property".
+
+--- 5. apps/chg-rehab/app/docs/Client.tsx ---
+
+Next to the existing Preview button, add a Delete button:
+<button
+  type="button"
+  onClick={async () => {
+    if (!window.confirm("Delete this document?")) return;
+    const r = await fetch(`/api/documents/${d.id}`, { method: "DELETE" });
+    if (r.ok) load(); // reload the docs list
+  }}
+  style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 13 }}
+>Delete</button>
+
+Make sure load() or equivalent refresh function is accessible in scope. If the component doesn't have a load function, trigger a state refresh instead.
+
+Run tsc --noEmit and report errors.

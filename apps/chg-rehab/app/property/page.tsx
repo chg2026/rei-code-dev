@@ -14,6 +14,7 @@ import {
   AssetRowActions,
   UploadDocButton,
   DocRowActions,
+  DeletePropertyButton,
 } from "./PropertyActions";
 import PropertySearchInput from "./PropertySearchInput";
 import PropertyTasksTab from "./PropertyTasksTab";
@@ -163,8 +164,8 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
               const isRehab = (p.status || "").toLowerCase().includes("rehab");
               const bg = isRehab ? "background:#E8EFF1;color:#143641;" : "background:#EAF3DE;color:#27500A;";
               return (
+                <div key={p.id} style={{ position: "relative" }}>
                 <Link
-                  key={p.id}
                   href={`/property?id=${p.id}&tab=${tab}${filter !== "all" ? `&filter=${filter}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                   className={`ln-item${active ? " active" : ""}`}
                   style={{
@@ -193,6 +194,8 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
                     </div>
                   )}
                 </Link>
+                  <DeletePropertyButton id={p.id} />
+                </div>
               );
             })}
             {filtered.length > PAGE_SIZE && (

@@ -67,9 +67,27 @@ export default function RemindersTab() {
             </div>
           </div>
         );
-        return r.link ? (
-          <Link key={r.id} href={r.link} style={{ display: "block", textDecoration: "none", color: "inherit" }}>{content}</Link>
-        ) : <div key={r.id}>{content}</div>;
+        return (
+          <div key={r.id} style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {r.link ? (
+                <Link href={r.link} style={{ display: "block", textDecoration: "none", color: "inherit" }}>{content}</Link>
+              ) : content}
+            </div>
+            {r.kind === "manual" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm("Delete this reminder?")) return;
+                  setItems(prev => prev.filter(x => x.id !== r.id));
+                  await fetch(`/api/workspace/reminders/${r.id}`, { method: "DELETE" });
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill)", fontSize: 14, padding: "0 8px", flexShrink: 0 }}
+                title="Delete reminder"
+              >✕</button>
+            )}
+          </div>
+        );
       })}
     </div>
   );
