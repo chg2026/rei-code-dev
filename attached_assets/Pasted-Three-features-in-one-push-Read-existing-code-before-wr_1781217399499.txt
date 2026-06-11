@@ -1,0 +1,94 @@
+Three features in one push. Read existing code before writing anything.
+
+--- FEATURE 1: File attachments in task detail (both WsTask and PmTask) ---
+
+First, check the Prisma schema:
+cat apps/chg-rehab/prisma/schema.prisma | grep -A8 -i "attachment\|WsTaskAttach\|PmTaskAttach"
+
+If WsTaskAttachment doesn't exist, add to schema.prisma:
+  model WsTaskAttachment {
+    id          String   @id @default(cuid())
+    taskId      String
+    name        String
+    objectPath  String
+    mimeType    String
+    size        Int
+    uploadedById String
+    createdAt   DateTime @default(now())
+    task        WsTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    uploadedBy  UserProfile  @relation(fields: [uploadedById], references: [id])
+  }
+And add: attachments WsTaskAttachment[] to WsTask model.
+
+If PmTaskAttachment doesn't exist, add similarly for PmTask.
+
+Run: npx prisma db push --accept-data-loss
+
+Create apps/chg-rehab/app/api/workspace/tasks/[id]/attachments/route.ts:
+  GET: fetch attachments for task, return { attachments: [...] } with signed download URLs via getPrivateFile from lib/objectStorage
+  POST: receives { objectPath, name, mimeType, size } (the client uploads to Supabase directly first via getUploadUrl, then calls this to register)
+  DELETE /api/workspace/tasks/[id]/attachments/[attachmentId]: deletes DB record
+
+Create apps/chg-rehab/app/api/pm/tasks/[id]/attachments/route.ts — same pattern for PmTask.
+
+Create a shared component apps/chg-rehab/components/shared/TaskAttachments.tsx:
+  Props: { taskId: string; apiBase: string; } 
+  (apiBase is "/api/workspace/tasks" or "/api/pm/tasks")
+  
+  UI:
+  - List of existing attachments: file icon + name + size + download link (opens signed URL) + × delete button
+  - "Attach file" button → hidden <input type="file"> → on change:
+      1. Fetch GET /api/upload-url (or the existing getUploadUrl endpoint) to get a signed upload URL
+      2. PUT the file directly to Supabase signed URL
+      3. POST to {apiBase}/{taskId}/attachments with { objectPath, name, mimeType, size }
+      4. Refresh attachment list
+  - Show upload progress as a simple "Uploading..." text state
+  - Supported: all file types; show PDF icon for pdf, image thumbnail for images (img tag with signed URL), file icon for others
+
+Check what upload URL endpoint exists: grep -r "upload-url\|getUploadUrl\|signedUpload" apps/chg-rehab/app/api --include="*.ts" -l
+Use whatever endpoint already exists for getting the signed upload URL.
+
+Add TaskAttachments to both TaskDetailPanel.tsx and PmTaskDetail.tsx — place it between Description and Comments sections.
+
+--- FEATURE 2: Deal tasks tab ---
+
+Read apps/chg-rehab/app/pipeline/page.tsx or wherever the deal detail/record is rendered.
+Find the deal detail view (it likely has tabs: Overview, Documents, etc.)
+
+Check: find apps/chg-rehab/app/pipeline -name "*.tsx" | head -20
+
+Add a "Tasks" tab to the deal detail view:
+- Same pattern as PropertyTasksTab.tsx
+- Create apps/chg-rehab/app/pipeline/DealTasksTab.tsx (client component)
+- Props: { dealId: string; dealAddress: string }
+- Uses TaskDetailPanel in create mode with linkType="deal", linkId={dealId}, linkLabel={dealAddress}
+- Fetches GET /api/workspace/tasks?linkType=deal&linkId={dealId}
+
+Wire the tab into the deal detail page — add "Tasks" to the tab list alongside existing tabs.
+
+Also: in Command Center TodoTab.tsx, the "Assigned out" filter and the task rows already show linkLabel. Make sure deal tasks show "📋 Deal · [address]" badge (same style as property tasks show their badge).
+
+--- FEATURE 3: Subtasks in TaskDetailPanel (WsTask) ---
+
+PmTaskDetail already has subtasks. Add the same to TaskDetailPanel.tsx.
+
+Check schema: cat apps/chg-rehab/prisma/schema.prisma | grep -i "parent\|subtask\|parentId"
+
+If WsTask doesn't have parentTaskId, add it:
+  parentTaskId  String?
+  parentTask    WsTask?  @relation("subtasks", fields: [parentTaskId], references: [id])
+  subtasks      WsTask[] @relation("subtasks")
+Run: npx prisma db push --accept-data-loss
+
+Update GET /api/workspace/tasks/[id] to include subtasks in the response.
+Update PATCH /api/workspace/tasks/[id] — no change needed (subtasks are separate tasks).
+Update POST /api/workspace/tasks to accept optional parentTaskId.
+
+In TaskDetailPanel.tsx add a Subtasks section (below Description, above Attachments):
+- List existing subtasks with checkbox (toggles done) + title + × remove
+- "+ Add subtask" inline input: type title → Enter → POST /api/workspace/tasks with { title, parentTaskId: currentTaskId, linkType, linkId }
+- Completed subtasks shown with strikethrough
+
+Run: npx tsc --noEmit
+Fix all errors.
+Report what changed and paste any remaining type errors.
