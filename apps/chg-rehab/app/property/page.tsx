@@ -16,12 +16,13 @@ import {
   DocRowActions,
 } from "./PropertyActions";
 import PropertySearchInput from "./PropertySearchInput";
+import PropertyTasksTab from "./PropertyTasksTab";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
 type Filter = "all" | "rehab" | "rental" | "acq" | "sold";
-type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants" | "analysis";
+type Tab = "overview" | "history" | "financials" | "assets" | "documents" | "tenants" | "analysis" | "tasks";
 
 type SP = { id?: string; q?: string; filter?: Filter; tab?: Tab };
 
@@ -219,6 +220,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
                 ["documents", "Documents"],
                 ["tenants", "Tenants"],
                 ["analysis", "Analysis"],
+                ["tasks", "Tasks"] as [Tab, string],
               ] as [Tab, string][]
             ).map(([t, label]) => (
               <Link
@@ -248,6 +250,8 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
               <DocumentsTab propertyId={selected.id} companyId={user.companyId} />
             ) : tab === "analysis" ? (
               <AnalysisPanel propertyId={selected.id} />
+            ) : tab === "tasks" ? (
+              <PropertyTasksTab propertyId={selected.id} propertyLabel={selected.address ?? selected.id} />
             ) : (
               <TenantsTab property={selected} companyId={user.companyId} />
             )}

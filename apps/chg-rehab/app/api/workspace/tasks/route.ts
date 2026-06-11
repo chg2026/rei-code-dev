@@ -19,6 +19,10 @@ export async function GET(req: Request) {
     where.createdById = user.id;
     where.assigneeId = { not: user.id };
   }
+  const linkType = url.searchParams.get("linkType");
+  const linkId = url.searchParams.get("linkId");
+  if (linkType) where.linkType = linkType;
+  if (linkId) where.linkId = linkId;
 
   const tasks = await prisma.wsTask.findMany({
     where,
