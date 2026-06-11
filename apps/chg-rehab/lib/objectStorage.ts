@@ -39,7 +39,11 @@ export async function getUploadUrl(): Promise<{ uploadUrl: string; objectPath: s
 /** Look up a private object by objectPath and return something streamFile can use. */
 export async function getPrivateFile(objectPath: string): Promise<SupabaseFileProxy> {
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(objectPath, 3600);
+  // Strip /objects/ prefix that legacy callers add before the Supabase path
+  const supabasePath = objectPath.startsWith("/objects/")
+    ? objectPath.slice("/objects/".length)
+    : objectPath.replace(/^\//, "");
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(supabasePath, 3600);
   if (error || !data?.signedUrl) throw new ObjectNotFoundError();
   return new SupabaseFileProxy(data.signedUrl);
 }

@@ -1,0 +1,84 @@
+Two fixes + one new feature:
+
+--- FIX 1: apps/chg-rehab/lib/objectStorage.ts ---
+
+In getPrivateFile, the objectPath coming in may be "/objects/uploads/uuid" but Supabase expects "uploads/uuid". Add path normalization:
+
+Replace:
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(objectPath, 3600);
+
+With:
+  // Strip /objects/ prefix that legacy callers add before the Supabase path
+  const supabasePath = objectPath.startsWith("/objects/")
+    ? objectPath.slice("/objects/".length)
+    : objectPath.replace(/^\//, "");
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(supabasePath, 3600);
+
+--- FIX 2: Create apps/chg-rehab/app/api/documents/[id]/preview-url/route.ts ---
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { getPrivateFile, ObjectNotFoundError } from "@/lib/objectStorage";
+export const dynamic = "force-dynamic";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await can(user, "documents", "view")))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id } = await params;
+  const doc = await prisma.document.findFirst({ where: { id, companyId: user.companyId } });
+  if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!doc.fileKey) return NextResponse.json({ error: "No file attached" }, { status: 404 });
+  const objectPath = doc.fileKey.startsWith("/objects/") ? doc.fileKey : `/objects/${doc.fileKey.replace(/^\/+/, "")}`;
+  try {
+    const file = await getPrivateFile(objectPath);
+    return NextResponse.json({ url: file.signedUrl, mimeType: doc.mimeType ?? null, name: doc.name });
+  } catch (err) {
+    if (err instanceof ObjectNotFoundError) return NextResponse.json({ error: "File not found" }, { status: 404 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+Note: SupabaseFileProxy has a public signedUrl field — access it directly as file.signedUrl. If TypeScript complains about the type returned by getPrivateFile, cast it: (file as any).signedUrl.
+
+--- FEATURE: Add preview button to apps/chg-rehab/app/docs/Client.tsx ---
+
+1. Add a state for preview: const [preview, setPreview] = useState<{ url: string; mimeType: string | null; name: string } | null>(null);
+
+2. Add a fetchPreview async function:
+async function fetchPreview(docId: string) {
+  const r = await fetch(`/api/documents/${docId}/preview-url`);
+  if (!r.ok) return;
+  const d = await r.json();
+  setPreview(d);
+}
+
+3. Next to every existing download link (href="/api/documents/[id]/download"), add a preview button:
+<button type="button" onClick={() => fetchPreview(d.id)} style={{ marginRight: 8, background: "none", border: "none", cursor: "pointer", color: "var(--marine)", fontSize: 13 }}>Preview</button>
+
+4. At the bottom of the component return, add a preview modal:
+{preview && (
+  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setPreview(null)}>
+    <div style={{ background: "#fff", borderRadius: 8, padding: 16, maxWidth: "90vw", maxHeight: "90vh", overflow: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>{preview.name}</span>
+        <button type="button" onClick={() => setPreview(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--quill)" }}>✕</button>
+      </div>
+      {preview.mimeType?.startsWith("image/") ? (
+        <img src={preview.url} alt={preview.name} style={{ maxWidth: "80vw", maxHeight: "75vh", objectFit: "contain" }} />
+      ) : preview.mimeType === "application/pdf" ? (
+        <iframe src={preview.url} style={{ width: "80vw", height: "75vh", border: "none" }} title={preview.name} />
+      ) : (
+        <div style={{ padding: 32, textAlign: "center", color: "var(--quill)" }}>
+          <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
+          <a href={preview.url} target="_blank" rel="noopener noreferrer" className="btn-sm btn-primary">Download</a>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+Run tsc --noEmit and report errors.

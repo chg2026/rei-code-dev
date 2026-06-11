@@ -88,6 +88,7 @@ export default function DocsClient(props: {
     | { kind: "view"; doc: Doc }
     | { kind: "upload" }
   >(null);
+  const [preview, setPreview] = useState<{ url: string; mimeType: string | null; name: string } | null>(null);
 
   const gate = useBillingGateProps();
 
@@ -110,6 +111,13 @@ export default function DocsClient(props: {
     e.preventDefault();
     pushFilters({ q: search });
   };
+
+  async function fetchPreview(docId: string) {
+    const r = await fetch(`/api/documents/${docId}/preview-url`);
+    if (!r.ok) return;
+    const d = await r.json();
+    setPreview(d);
+  }
 
   const { levelCounts, statusCounts, catCounts } = props.counts;
   const filtered = props.docs;
@@ -328,13 +336,22 @@ export default function DocsClient(props: {
                     </button>
                   )}
                   {d.fileKey && (
-                    <a
-                      href={`/api/documents/${d.id}/download`}
-                      className="cell-dl"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      ↓
-                    </a>
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); fetchPreview(d.id); }}
+                        style={{ marginRight: 8, background: "none", border: "none", cursor: "pointer", color: "var(--marine)", fontSize: 13 }}
+                      >
+                        Preview
+                      </button>
+                      <a
+                        href={`/api/documents/${d.id}/download`}
+                        className="cell-dl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        ↓
+                      </a>
+                    </>
                   )}
                 </div>
               </div>
@@ -345,7 +362,7 @@ export default function DocsClient(props: {
       </div>
 
       {openModal?.kind === "view" && (
-        <DocViewModal doc={openModal.doc} onClose={() => setOpenModal(null)} />
+        <DocViewModal doc={openModal.doc} onClose={() => setOpenModal(null)} onPreview={fetchPreview} />
       )}
       {openModal?.kind === "promote" && (
         <PromoteModal
@@ -370,6 +387,26 @@ export default function DocsClient(props: {
           }}
         />
       )}
+      {preview && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setPreview(null)}>
+          <div style={{ background: "#fff", borderRadius: 8, padding: 16, maxWidth: "90vw", maxHeight: "90vh", overflow: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{preview.name}</span>
+              <button type="button" onClick={() => setPreview(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--quill)" }}>✕</button>
+            </div>
+            {preview.mimeType?.startsWith("image/") ? (
+              <img src={preview.url} alt={preview.name} style={{ maxWidth: "80vw", maxHeight: "75vh", objectFit: "contain" }} />
+            ) : preview.mimeType === "application/pdf" ? (
+              <iframe src={preview.url} style={{ width: "80vw", height: "75vh", border: "none" }} title={preview.name} />
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--quill)" }}>
+                <div style={{ marginBottom: 12 }}>Preview not available for this file type.</div>
+                <a href={preview.url} target="_blank" rel="noopener noreferrer" className="btn-sm btn-primary">Download</a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -391,7 +428,7 @@ function labelForCategory(c: string) {
   }
 }
 
-function DocViewModal(props: { doc: Doc; onClose: () => void }) {
+function DocViewModal(props: { doc: Doc; onClose: () => void; onPreview: (docId: string) => void }) {
   const d = props.doc;
   return (
     <div className="modal-overlay open" onClick={props.onClose}>
@@ -431,14 +468,23 @@ function DocViewModal(props: { doc: Doc; onClose: () => void }) {
         </div>
         <div className="modal-foot">
           {d.fileKey && (
-            <a
-              href={`/api/documents/${d.id}/download`}
-              className="btn-sm btn-primary"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Download
-            </a>
+            <>
+              <button
+                type="button"
+                onClick={() => props.onPreview(d.id)}
+                style={{ marginRight: 8, background: "none", border: "none", cursor: "pointer", color: "var(--marine)", fontSize: 13 }}
+              >
+                Preview
+              </button>
+              <a
+                href={`/api/documents/${d.id}/download`}
+                className="btn-sm btn-primary"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Download
+              </a>
+            </>
           )}
           <button className="btn-sm" onClick={props.onClose}>
             Close
