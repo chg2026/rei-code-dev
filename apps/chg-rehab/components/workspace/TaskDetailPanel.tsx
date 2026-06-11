@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import TaskAttachments from "@/components/shared/TaskAttachments";
+import { MentionInput, renderWithMentions } from "@/components/shared/mentions";
 
 type Mode = "create" | "edit";
 type TeamMember = { id: string; name: string; initials: string };
@@ -8,11 +9,19 @@ type Comment = {
   id: string; body: string; createdAt: string;
   author: { id: string; name: string; initials: string };
 };
+type Subtask = { id: string; title: string; done: boolean; priority: string };
+type ActivityItem = {
+  id: string; action: string; detail: string | null; createdAt: string;
+  user: { id: string; name: string; initials: string };
+};
 type TaskDetail = {
   id: string; title: string; priority: string; dueDate: string | null;
   done: boolean; description: string | null;
   assignee: { id: string; name: string; initials: string } | null;
-  linkLabel: string | null; createdAt: string;
+  linkLabel: string | null; linkType: string | null; linkId: string | null;
+  createdAt: string;
+  subtasks: Subtask[];
+  activity: ActivityItem[];
 };
 
 export default function TaskDetailPanel({
@@ -38,6 +47,7 @@ export default function TaskDetailPanel({
   const [comment, setComment] = useState("");
   const [showMembers, setShowMembers] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
 
   // Create-mode draft fields.
   const [cTitle, setCTitle] = useState("");
@@ -78,6 +88,12 @@ export default function TaskDetailPanel({
     if (mode === "create") titleRef.current?.focus();
   }, [mode]);
 
+  const reloadTask = async () => {
+    if (!activeTaskId) return;
+    const r = await fetch(`/api/workspace/tasks/${activeTaskId}`);
+    if (r.ok) { const d = await r.json(); setTask(d.task ?? null); }
+  };
+
   const save = async (patch: Record<string, unknown>) => {
     if (!activeTaskId || !task) return;
     setSaving(true);
@@ -89,6 +105,38 @@ export default function TaskDetailPanel({
     });
     setSaving(false);
     onUpdated?.();
+    reloadTask();
+  };
+
+  const addSubtask = async () => {
+    const title = subtaskTitle.trim();
+    if (!title || !activeTaskId || !task) return;
+    setSubtaskTitle("");
+    await fetch("/api/workspace/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title,
+        parentTaskId: activeTaskId,
+        linkType: task.linkType ?? null,
+        linkId: task.linkId ?? null,
+      }),
+    });
+    reloadTask();
+  };
+
+  const toggleSubtask = async (s: Subtask) => {
+    await fetch(`/api/workspace/tasks/${s.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ done: !s.done }),
+    });
+    reloadTask();
+  };
+
+  const deleteSubtask = async (s: Subtask) => {
+    await fetch(`/api/workspace/tasks/${s.id}`, { method: "DELETE" });
+    reloadTask();
   };
 
   const setAssignee = (m: TeamMember | null) => {
@@ -140,6 +188,7 @@ export default function TaskDetailPanel({
     if (r.ok) {
       const d = await r.json();
       if (d.comment) setComments(prev => [...prev, d.comment as Comment]);
+      reloadTask();
     }
   };
 
@@ -337,6 +386,33 @@ export default function TaskDetailPanel({
         {saving && <div style={{ fontSize: 12, color: "var(--quill)" }}>Saving…</div>}
 
         <div style={{ borderTop: "1px solid var(--border-1)", paddingTop: 14 }}>
+          <label style={labelStyle}>
+            Subtasks{task.subtasks.length > 0 ? ` (${task.subtasks.filter(s => s.done).length}/${task.subtasks.length})` : ""}
+          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+            {task.subtasks.length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--quill)" }}>No subtasks yet.</div>
+            )}
+            {task.subtasks.map(s => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={s.done} onChange={() => toggleSubtask(s)} />
+                <span style={{ flex: 1, fontSize: 13, textDecoration: s.done ? "line-through" : "none", color: s.done ? "var(--quill)" : "var(--ink)" }}>
+                  {s.title}
+                </span>
+                <button type="button" onClick={() => deleteSubtask(s)} style={chipRemoveBtn} title="Delete subtask">×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input className="input" style={{ flex: 1 }} value={subtaskTitle}
+              onChange={e => setSubtaskTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSubtask(); } }}
+              placeholder="Add a subtask…" />
+            <button type="button" onClick={addSubtask} className="btn-sm btn-primary" disabled={!subtaskTitle.trim()}>Add</button>
+          </div>
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--border-1)", paddingTop: 14 }}>
           <label style={labelStyle}>Comments</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
             {comments.length === 0 && (
@@ -350,16 +426,20 @@ export default function TaskDetailPanel({
                     <strong>{c.author.name}</strong>{" "}
                     <span style={{ color: "var(--quill)" }}>{fmtTime(c.createdAt)}</span>
                   </div>
-                  <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{c.body}</div>
+                  <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{renderWithMentions(c.body)}</div>
                 </div>
               </div>
             ))}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <input className="input" style={{ flex: 1 }} value={comment}
-              onChange={e => setComment(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment(); } }}
-              placeholder="Write a comment…" />
+            <MentionInput
+              className="input"
+              value={comment}
+              onChange={setComment}
+              onSubmit={addComment}
+              members={members}
+              placeholder="Write a comment… use @ to mention"
+            />
             <button type="button" onClick={addComment} className="btn-sm btn-primary" disabled={!comment.trim()}>Send</button>
           </div>
         </div>
@@ -369,6 +449,24 @@ export default function TaskDetailPanel({
             <TaskAttachments taskId={activeTaskId} apiBase="/api/workspace/tasks" />
           </div>
         )}
+
+        <div style={{ borderTop: "1px solid var(--border-1)", paddingTop: 14 }}>
+          <label style={labelStyle}>Activity</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {task.activity.length === 0 && (
+              <div style={{ fontSize: 12, color: "var(--quill)" }}>No activity yet.</div>
+            )}
+            {task.activity.map(a => (
+              <div key={a.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={avatarStyle}>{a.user.initials}</span>
+                <div style={{ flex: 1, fontSize: 12 }}>
+                  <span><strong>{a.user.name}</strong> {activityVerb(a)}</span>{" "}
+                  <span style={{ color: "var(--quill)" }}>{fmtTime(a.createdAt)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -377,6 +475,17 @@ export default function TaskDetailPanel({
 function fmtTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function activityVerb(a: ActivityItem): string {
+  switch (a.action) {
+    case "created": return "created this task";
+    case "completed": return "marked this task complete";
+    case "assigned": return a.detail ? `assigned this to ${a.detail}` : "changed the assignee";
+    case "due_date_set": return a.detail ? `set the due date to ${a.detail}` : "set the due date";
+    case "commented": return a.detail ? `commented: “${a.detail}”` : "added a comment";
+    default: return a.action;
+  }
 }
 
 const panelStyle: React.CSSProperties = {

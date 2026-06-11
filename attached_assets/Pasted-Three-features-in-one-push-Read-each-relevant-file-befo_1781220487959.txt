@@ -1,0 +1,69 @@
+Three features in one push. Read each relevant file before touching it.
+
+--- FEATURE 1: Subtasks in TaskDetailPanel (WsTask) ---
+
+Check if parentTaskId already exists in the Prisma WsTask model:
+grep -A30 "model WsTask" apps/chg-rehab/prisma/schema.prisma
+
+If parentTaskId is missing, add to WsTask:
+  parentTaskId  String?
+  parentTask    WsTask?  @relation("WsSubtasks", fields: [parentTaskId], references: [id])
+  subtasks      WsTask[] @relation("WsSubtasks")
+Then run: npx prisma db push --accept-data-loss
+
+Update GET /api/workspace/tasks/[id]/route.ts to include subtasks:
+  subtasks: { select: { id, title, done, priority } }
+
+In TaskDetailPanel.tsx, add a SUBTASKS section between Description and Comments:
+- Fetch subtasks from task data (already in GET response after above change)
+- List each subtask: checkbox (PATCH done=true/false) + title text + × delete button
+- "+ Add subtask" inline input at bottom: type name → Enter → POST /api/workspace/tasks with { title, parentTaskId: currentTaskId, linkType, linkId }
+- Reload subtask list after add/delete/toggle
+- Style: same compact row style as the attachments list
+
+--- FEATURE 2: @mentions in comments ---
+
+In TaskDetailPanel.tsx comments section:
+- When user types @ in the comment textarea, fetch GET /api/team/members (check this endpoint exists: grep -r "team/members\|team-members" apps/chg-rehab/app/api -l)
+- Show a small dropdown of team members matching what's typed after @
+- On select: insert "@FirstName LastName" into the textarea
+- Store the comment body as-is (plain text with @names) — no complex parsing needed
+- Display: highlight @mentions in rendered comments with a subtle blue color (wrap in <span style="color:#6366f1">@Name</span>)
+
+Do the same in PmTaskDetail.tsx comments section.
+
+--- FEATURE 3: Activity timeline on property records ---
+
+Check what activity data exists:
+grep -r "activity\|ActivityLog\|activityLog\|project_activity" apps/chg-rehab/app/api --include="*.ts" -l | head -10
+grep -A10 "model ActivityLog\|model ProjectActivity" apps/chg-rehab/prisma/schema.prisma | head -30
+
+In the Property Record page (apps/chg-rehab/app/property/page.tsx or its Client component), find the Overview tab.
+
+Add a "Recent Activity" section at the bottom of the Overview tab:
+- Fetch GET /api/properties/[id]/activity (create this route if it doesn't exist)
+- The route should query: task creations/completions on this property (wsTask where linkType=property, linkId=propertyId), document uploads (documents where propertyId=id), and any existing activity log records
+- Show as a vertical timeline: colored dot + action text + timestamp (relative: "2 hours ago")
+- Format: "📋 Task created: [title]", "📄 Document uploaded: [name]", "✅ Task completed: [title]"
+- Limit to 20 most recent events, ordered by date desc
+
+Also add this activity feed to the task detail panel (TaskDetailPanel.tsx) at the very bottom — show the history of changes to this specific task (created, description updated, status changed, comment added). This can be a simple append-only log stored in WsTaskActivity model:
+  model WsTaskActivity {
+    id        String   @id @default(cuid())
+    taskId    String
+    userId    String
+    action    String   // "created", "completed", "commented", "assigned", "due_date_set"
+    detail    String?
+    createdAt DateTime @default(now())
+    task      WsTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user      UserProfile  @relation(fields: [userId], references: [id])
+  }
+Add to WsTask: activity WsTaskActivity[]
+Run: npx prisma db push --accept-data-loss
+
+Log activity in the task creation POST route (action: "created").
+Log activity when a comment is posted (action: "commented", detail: first 50 chars of comment).
+Fetch activity in GET /api/workspace/tasks/[id] and display at bottom of TaskDetailPanel.
+
+Run: npx tsc --noEmit
+Fix all errors. Report what was built and any remaining issues.

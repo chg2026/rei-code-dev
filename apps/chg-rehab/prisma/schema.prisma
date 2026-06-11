@@ -98,6 +98,7 @@ model User {
   wsCalendarEvents        WsCalendarEvent[]
   wsTaskComments          WsTaskComment[]              @relation("WsTaskCommentAuthor")
   wsTaskAttachments       WsTaskAttachment[]           @relation("WsTaskAttachmentUploader")
+  wsTaskActivity          WsTaskActivity[]             @relation("WsTaskActivityUser")
   pmTaskAttachments       PmTaskAttachment[]           @relation("PmTaskAttachmentUploader")
   pmTasksCreated          PmTask[]                     @relation("PmTaskCreator")
   pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
@@ -1544,10 +1545,29 @@ model WsTask {
   sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
   comments      WsTaskComment[]
   attachments   WsTaskAttachment[]
+  parentTaskId  String?
+  parentTask    WsTask?            @relation("WsSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks      WsTask[]           @relation("WsSubtasks")
+  activity      WsTaskActivity[]
 
   @@index([companyId, done, dueDate])
   @@index([companyId, assigneeId, done])
   @@index([companyId, createdById, done])
+  @@index([parentTaskId])
+}
+
+model WsTaskActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  task WsTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User   @relation("WsTaskActivityUser", fields: [userId], references: [id])
+
+  @@index([taskId])
 }
 
 model WsTaskComment {

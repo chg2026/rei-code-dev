@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PRIORITIES, type PmStatus } from "./types";
 import TaskAttachments from "@/components/shared/TaskAttachments";
+import { MentionInput, renderWithMentions } from "@/components/shared/mentions";
 
 type Member = { id: string; name: string; initials: string; email: string | null };
 type Assignee = { id: string; name: string; initials: string };
@@ -308,17 +309,18 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
                     <span style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--marine)", color: "#fff", fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{c.author.initials}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12 }}><strong>{c.author.name}</strong> <span style={{ color: "var(--text-tertiary)" }}>{fmtTime(c.createdAt)}</span></div>
-                      <div style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>{c.body}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-primary)", whiteSpace: "pre-wrap" }}>{renderWithMentions(c.body)}</div>
                     </div>
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                  <input
+                  <MentionInput
                     value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addComment(); }}
-                    placeholder="Write a comment…"
-                    style={{ flex: 1, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", border: "0.5px solid var(--border-lo)", borderRadius: 6, outline: "none" }}
+                    onChange={setComment}
+                    onSubmit={addComment}
+                    members={members}
+                    placeholder="Write a comment… use @ to mention"
+                    style={{ padding: "7px 10px", fontSize: 13, fontFamily: "inherit", border: "0.5px solid var(--border-lo)", borderRadius: 6, outline: "none" }}
                   />
                   <button type="button" onClick={addComment} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Send</button>
                 </div>

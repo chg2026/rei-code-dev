@@ -62,6 +62,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     include: { author: { select: authorSelect } },
   });
 
+  // Per-task activity feed.
+  await prisma.wsTaskActivity.create({
+    data: { taskId: id, userId: user.id, action: "commented", detail: text.slice(0, 50) },
+  }).catch(() => undefined);
+
   return NextResponse.json({
     comment: {
       id: c.id,

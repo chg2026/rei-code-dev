@@ -12,7 +12,8 @@ export async function GET(req: Request) {
   const filter = (url.searchParams.get("filter") || "all") as Filter;
   const includeDone = url.searchParams.get("done") === "1";
 
-  const where: Record<string, unknown> = { companyId: user.companyId };
+  // Top-level lists never include subtasks — they live only inside their parent.
+  const where: Record<string, unknown> = { companyId: user.companyId, parentTaskId: null };
   if (!includeDone) where.done = false;
   if (filter === "mine") where.assigneeId = user.id;
   if (filter === "assigned-out") {
@@ -79,9 +80,20 @@ export async function POST(req: Request) {
     linkId?: string | null;
     linkLabel?: string | null;
     sourceMessageId?: string | null;
+    parentTaskId?: string | null;
   };
   const title = (body.title ?? "").trim();
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
+
+  // Validate parent task (for subtasks) belongs to the same company.
+  let parentTaskId: string | null = null;
+  if (body.parentTaskId) {
+    const parent = await prisma.wsTask.findFirst({
+      where: { id: body.parentTaskId, companyId: user.companyId },
+      select: { id: true },
+    });
+    if (parent) parentTaskId = parent.id;
+  }
 
   // Validate assignee belongs to the same company.
   let assigneeId: string | null = null;
@@ -130,8 +142,14 @@ export async function POST(req: Request) {
       linkId: body.linkId ?? null,
       linkLabel: body.linkLabel ?? null,
       sourceMessageId,
+      parentTaskId,
     },
   });
+
+  // Per-task activity feed.
+  await prisma.wsTaskActivity.create({
+    data: { taskId: task.id, userId: user.id, action: "created" },
+  }).catch(() => undefined);
 
   // Mark source message as converted (already tenant-validated above).
   if (sourceMessageId) {

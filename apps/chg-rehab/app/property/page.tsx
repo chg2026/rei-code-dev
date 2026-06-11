@@ -18,6 +18,7 @@ import {
 } from "./PropertyActions";
 import PropertySearchInput from "./PropertySearchInput";
 import PropertyTasksTab from "./PropertyTasksTab";
+import { getPropertyActivity, timeAgo, type PropertyActivityKind } from "@/lib/propertyActivity";
 
 export const dynamic = "force-dynamic";
 
@@ -274,6 +275,20 @@ function parseInlineStyle(s: string): Record<string, string> {
   return out;
 }
 
+function activityDotColor(kind: PropertyActivityKind): string {
+  if (kind === "task_completed") return "#10b981";
+  if (kind === "task_created") return "#2563eb";
+  if (kind === "document_uploaded") return "#f59e0b";
+  return "#9ca3af";
+}
+
+function activityEmoji(kind: PropertyActivityKind): string {
+  if (kind === "task_completed") return "✅";
+  if (kind === "task_created") return "📋";
+  if (kind === "document_uploaded") return "📄";
+  return "•";
+}
+
 function statusBadgeStyle(status: string): React.CSSProperties {
   const s = status.toLowerCase();
   if (s.includes("rehab")) return { background: "#E8EFF1", color: "#143641" };
@@ -300,6 +315,8 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
     orderBy: { createdAt: "desc" },
     take: 3,
   });
+
+  const recentActivity = await getPropertyActivity(companyId, property.id);
 
   const acquisitionCost = m.purchasePrice ?? null;
   const totalInvested = (m.purchasePrice ?? 0) + (m.closingCosts ?? 0) + (m.rehabSpent ?? 0);
@@ -445,6 +462,36 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
               <DetailRow label="HOA"           value={m.hoa ?? "—"} last />
             </div>
           </div>
+
+          <div className="sec-hd">Recent activity</div>
+          {recentActivity.length === 0 ? (
+            <div style={{ padding: "12px 16px", fontSize: 11, color: "var(--text-tertiary)" }}>
+              No activity yet for this property.
+            </div>
+          ) : (
+            <div style={{ padding: "10px 16px 18px" }}>
+              {recentActivity.map((ev, i) => {
+                const dot = activityDotColor(ev.kind);
+                const last = i === recentActivity.length - 1;
+                return (
+                  <div key={ev.id} style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 14, flexShrink: 0 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: dot, marginTop: 4, flexShrink: 0 }} />
+                      {!last && <span style={{ flex: 1, width: 1, background: "var(--border-lo)", marginTop: 2 }} />}
+                    </div>
+                    <div style={{ paddingBottom: last ? 0 : 12 }}>
+                      <div style={{ fontSize: 11, color: "var(--text-primary)" }}>
+                        {activityEmoji(ev.kind)} {ev.label}
+                      </div>
+                      <div style={{ fontSize: 9, color: "var(--text-tertiary)", marginTop: 1 }}>
+                        {timeAgo(ev.at)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <aside className="body-side">
