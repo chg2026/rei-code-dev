@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import TaskDetailPanel from "@/components/workspace/TaskDetailPanel";
 
 type Task = {
   id: string; title: string; priority: string; dueDate: string | null;
@@ -12,6 +14,8 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
   const [title, setTitle] = useState("");
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -22,6 +26,7 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
   }, [propertyId]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setMounted(true); }, [load]);
 
   const toggleDone = async (t: Task) => {
     setTasks(prev => prev.map(x => x.id === t.id ? { ...x, done: !x.done } : x));
@@ -88,7 +93,7 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
                 onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleDone(t); } }}
                 style={{ width: 16, height: 16, border: "2px solid var(--border-2)", borderRadius: 4, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
               />
-              <span style={{ flex: 1, fontSize: 14 }}>{t.title}</span>
+              <span style={{ flex: 1, fontSize: 14, cursor: "pointer" }} onClick={() => setDetailTaskId(t.id)}>{t.title}</span>
               {t.dueDate ? <span style={{ fontSize: 12, color: "var(--quill)" }}>{new Date(t.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span> : null}
               <span style={{ fontSize: 12, color: t.priority === "Urgent" ? "#ef4444" : t.priority === "Low" ? "#10b981" : "#f59e0b" }}>{t.priority}</span>
               <button
@@ -113,7 +118,7 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
                     onClick={() => toggleDone(t)}
                     style={{ width: 16, height: 16, border: "2px solid var(--border-2)", borderRadius: 4, cursor: "pointer", flexShrink: 0, background: "var(--marine)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11 }}
                   >✓</span>
-                  <span style={{ flex: 1, fontSize: 14, textDecoration: "line-through" }}>{t.title}</span>
+                  <span style={{ flex: 1, fontSize: 14, textDecoration: "line-through", cursor: "pointer" }} onClick={() => setDetailTaskId(t.id)}>{t.title}</span>
                   <button
                     type="button"
                     onClick={async () => {
@@ -129,6 +134,15 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
             </>
           )}
         </>
+      )}
+      {mounted && detailTaskId && createPortal(
+        <TaskDetailPanel
+          taskId={detailTaskId}
+          onClose={() => setDetailTaskId(null)}
+          onDeleted={() => { setDetailTaskId(null); load(); }}
+          onUpdated={() => load()}
+        />,
+        document.body
       )}
     </div>
   );
