@@ -13,6 +13,18 @@ type Task = {
   assignee: { id: string; name: string; initials: string } | null;
 };
 
+type PmTask = {
+  id: string;
+  name: string;
+  priority: string | null;
+  dueDate: string | null;
+  done: boolean;
+  listName: string;
+  spaceName: string;
+  listHref: string;
+  assignees: { id: string; name: string; initials: string }[];
+};
+
 const FILTERS = [
   { id: "all", label: "All" },
   { id: "mine", label: "Mine" },
@@ -34,14 +46,19 @@ function fmtDate(iso: string | null) {
 export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [pmTasks, setPmTasks] = useState<PmTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/workspace/tasks?filter=${filter}&done=1`, { cache: "no-store" });
-      const data = await r.json();
-      setTasks(data.tasks ?? []);
+      const [r1, r2] = await Promise.all([
+        fetch(`/api/workspace/tasks?filter=${filter}&done=1`, { cache: "no-store" }),
+        fetch("/api/pm/tasks", { cache: "no-store" }),
+      ]);
+      const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+      setTasks(d1.tasks ?? []);
+      setPmTasks(d2.tasks ?? []);
     } finally {
       setLoading(false);
     }
@@ -55,6 +72,16 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ done: !t.done }),
+    });
+  };
+
+  const togglePmDone = async (t: PmTask) => {
+    const newDone = !t.done;
+    setPmTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: newDone } : x)));
+    await fetch(`/api/pm/tasks/${t.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doneDate: newDone ? new Date().toISOString() : null }),
     });
   };
 
@@ -77,7 +104,7 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
       </div>
       {loading ? (
         <div className={s.empty}>Loading…</div>
-      ) : open.length === 0 && done.length === 0 ? (
+      ) : open.length === 0 && done.length === 0 && pmTasks.length === 0 ? (
         <div className={s.empty}>No tasks yet. Click <strong>+ New task</strong> to create one.</div>
       ) : (
         <>
@@ -108,6 +135,41 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
               </div>
             </div>
           ))}
+          {pmTasks.length > 0 ? (
+            <>
+              <div style={{ fontSize: 11, color: "var(--stone)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "20px 0 8px" }}>
+                Project Manager Tasks
+              </div>
+              {pmTasks.map((t) => (
+                <div key={t.id} className={s.row} style={t.done ? { opacity: 0.6 } : undefined}>
+                  <span
+                    role="checkbox"
+                    aria-checked={t.done}
+                    tabIndex={0}
+                    className={`${s.checkbox} ${t.done ? s.checked : ""}`}
+                    onClick={() => togglePmDone(t)}
+                    onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); togglePmDone(t); } }}
+                  >{t.done ? "✓" : ""}</span>
+                  <div className={s.rowMain}>
+                    <div className={`${s.rowTitle} ${t.done ? s.done : ""}`}>{t.name}</div>
+                  </div>
+                  <div className={s.rowRight}>
+                    {t.assignees.length > 0 ? (
+                      <span className={s.avatarChip}>
+                        <span className={s.avatar}>{t.assignees[0].initials}</span>
+                        <span style={{ fontSize: 12 }}>{t.assignees[0].name.split(" ")[0]}</span>
+                      </span>
+                    ) : null}
+                    <a href={t.listHref} style={{ textDecoration: "none" }}>
+                      <span className={`${s.pill} ${s.pillGrey}`}>{t.spaceName} · {t.listName}</span>
+                    </a>
+                    {t.priority ? <span className={`${s.pill} ${priorityClass(t.priority)}`}>{t.priority}</span> : null}
+                    {t.dueDate ? <span className={`${s.pill} ${s.pillGrey}`}>{fmtDate(t.dueDate)}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : null}
           {done.length > 0 ? (
             <>
               <div style={{ fontSize: 11, color: "var(--stone)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "20px 0 8px" }}>

@@ -114,6 +114,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
     priority?: string | null;
     dueDate?: string | null;
     startDate?: string | null;
+    doneDate?: string | null;
     taskType?: string;
     timeEstimate?: number | null;
     sprintPoints?: number | null;
@@ -128,6 +129,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ taskId
   if (body.sprintPoints !== undefined) data.sprintPoints = body.sprintPoints;
   if (body.dueDate !== undefined) data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
   if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
+  if (body.doneDate !== undefined) data.doneDate = body.doneDate ? new Date(body.doneDate) : null;
 
   let statusChanged = false;
   if (body.statusId !== undefined) {
