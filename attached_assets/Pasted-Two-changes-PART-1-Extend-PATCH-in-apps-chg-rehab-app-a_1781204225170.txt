@@ -1,0 +1,200 @@
+Two changes:
+
+--- PART 1: Extend PATCH in apps/chg-rehab/app/api/workspace/tasks/[id]/route.ts ---
+
+In the data-building block, after the priority check, add:
+
+if (typeof body.dueDate !== "undefined") data.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+if (typeof body.description === "string") data.description = body.description;
+if (typeof body.assigneeId !== "undefined") {
+  if (body.assigneeId === null) {
+    data.assigneeId = null;
+  } else {
+    const member = await prisma.user.findFirst({ where: { id: body.assigneeId, companyId: user.companyId, active: true } });
+    if (member) data.assigneeId = member.id;
+  }
+}
+
+Update the body type to include the new fields:
+{ done?: boolean; title?: string; priority?: string; dueDate?: string | null; description?: string | null; assigneeId?: string | null }
+
+--- PART 2: Create apps/chg-rehab/components/workspace/TaskDetailPanel.tsx ---
+
+"use client";
+import { useEffect, useState } from "react";
+
+type TeamMember = { id: string; name: string; initials: string };
+type TaskDetail = {
+  id: string; title: string; priority: string; dueDate: string | null;
+  done: boolean; description: string | null;
+  assignee: { id: string; name: string; initials: string } | null;
+  linkLabel: string | null; createdAt: string;
+};
+
+export default function TaskDetailPanel({
+  taskId, onClose, onDeleted, onUpdated,
+}: { taskId: string; onClose: () => void; onDeleted: () => void; onUpdated: () => void }) {
+  const [task, setTask] = useState<TaskDetail | null>(null);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/workspace/tasks/${taskId}`)
+      .then(r => r.json()).then(d => setTask(d.task ?? null));
+    fetch("/api/workspace/members")
+      .then(r => r.json()).then(d => setMembers(d.members ?? []));
+  }, [taskId]);
+
+  const save = async (patch: Record<string, unknown>) => {
+    if (!task) return;
+    setSaving(true);
+    const updated = { ...task, ...patch };
+    setTask(updated as TaskDetail);
+    await fetch(`/api/workspace/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    setSaving(false);
+    onUpdated();
+  };
+
+  const deleteTask = async () => {
+    if (!window.confirm("Delete this task?")) return;
+    await fetch(`/api/workspace/tasks/${taskId}`, { method: "DELETE" });
+    onDeleted();
+  };
+
+  if (!task) return (
+    <div style={panelStyle}>
+      <div style={{ padding: 24, color: "var(--quill)" }}>Loading…</div>
+    </div>
+  );
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border-1)" }}>
+        <span style={{ fontWeight: 600, fontSize: 15 }}>Task detail</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={deleteTask} style={ghostBtn} title="Delete">🗑</button>
+          <button type="button" onClick={onClose} style={ghostBtn}>✕</button>
+        </div>
+      </div>
+      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flex: 1 }}>
+        <div>
+          <label style={labelStyle}>Title</label>
+          <input
+            className="input"
+            style={{ width: "100%" }}
+            value={task.title}
+            onChange={e => setTask({ ...task, title: e.target.value })}
+            onBlur={e => save({ title: e.target.value })}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Priority</label>
+            <select className="input" style={{ width: "100%" }} value={task.priority}
+              onChange={e => { setTask({ ...task, priority: e.target.value }); save({ priority: e.target.value }); }}>
+              <option>Urgent</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Due date</label>
+            <input type="date" className="input" style={{ width: "100%" }}
+              value={task.dueDate ? task.dueDate.slice(0, 10) : ""}
+              onChange={e => { const v = e.target.value || null; setTask({ ...task, dueDate: v }); save({ dueDate: v }); }} />
+          </div>
+        </div>
+        <div>
+          <label style={labelStyle}>Assignee</label>
+          <select className="input" style={{ width: "100%" }}
+            value={task.assignee?.id ?? ""}
+            onChange={e => { save({ assigneeId: e.target.value || null }); }}>
+            <option value="">Unassigned</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Notes</label>
+          <textarea className="input" style={{ width: "100%", minHeight: 100, resize: "vertical" }}
+            value={task.description ?? ""}
+            onChange={e => setTask({ ...task, description: e.target.value })}
+            onBlur={e => save({ description: e.target.value })}
+            placeholder="Add notes…"
+          />
+        </div>
+        {task.linkLabel && (
+          <div style={{ fontSize: 12, color: "var(--quill)" }}>
+            Linked to: <span style={{ color: "var(--ink)" }}>{task.linkLabel}</span>
+          </div>
+        )}
+        {saving && <div style={{ fontSize: 12, color: "var(--quill)" }}>Saving…</div>}
+      </div>
+    </div>
+  );
+}
+
+const panelStyle: React.CSSProperties = {
+  position: "fixed", top: 0, right: 0, width: 380, height: "100vh",
+  background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+  zIndex: 500, display: "flex", flexDirection: "column",
+  borderLeft: "1px solid var(--border-1)",
+};
+const ghostBtn: React.CSSProperties = {
+  background: "none", border: "none", cursor: "pointer",
+  color: "var(--quill)", fontSize: 16, padding: "4px 6px", borderRadius: 4,
+};
+const labelStyle: React.CSSProperties = {
+  display: "block", fontSize: 11, color: "var(--quill)",
+  textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4,
+};
+
+--- PART 3: Add GET handler to apps/chg-rehab/app/api/workspace/tasks/[id]/route.ts ---
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  const task = await prisma.wsTask.findFirst({
+    where: { id, companyId: user.companyId },
+    include: {
+      assignee: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
+    },
+  });
+  if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({
+    task: {
+      id: task.id, title: task.title, priority: task.priority,
+      dueDate: task.dueDate?.toISOString() ?? null, done: task.done,
+      description: task.description ?? null, linkLabel: task.linkLabel ?? null,
+      createdAt: task.createdAt.toISOString(),
+      assignee: task.assignee ? {
+        id: task.assignee.id,
+        name: [task.assignee.firstName, task.assignee.lastName].filter(Boolean).join(" ") || task.assignee.email || "User",
+        initials: (task.assignee.initials || [(task.assignee.firstName ?? "")[0], (task.assignee.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase(),
+      } : null,
+    }
+  });
+}
+
+--- PART 4: Wire TaskDetailPanel into apps/chg-rehab/components/workspace/TodoTab.tsx ---
+
+1. Import TaskDetailPanel
+2. Add state: const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+3. On each task row title, make it clickable: onClick={() => setDetailTaskId(t.id)} with cursor pointer style
+4. At the bottom of the return, render:
+   {detailTaskId && (
+     <TaskDetailPanel
+       taskId={detailTaskId}
+       onClose={() => setDetailTaskId(null)}
+       onDeleted={() => { setDetailTaskId(null); load(); }}
+       onUpdated={() => load()}
+     />
+   )}
+
+Check if /api/workspace/members exists — if not, skip the members fetch in TaskDetailPanel (members array stays empty, assignee dropdown just shows "Unassigned").
+
+Run tsc --noEmit and report errors.

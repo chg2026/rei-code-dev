@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import s from "./styles.module.css";
+import TaskDetailPanel from "./TaskDetailPanel";
 
 type Task = {
   id: string;
@@ -48,6 +49,7 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pmTasks, setPmTasks] = useState<PmTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,7 +121,7 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                 onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleDone(t); } }}
               >{t.done ? "✓" : ""}</span>
               <div className={s.rowMain}>
-                <div className={`${s.rowTitle} ${t.done ? s.done : ""}`}>
+                <div className={`${s.rowTitle} ${t.done ? s.done : ""}`} onClick={() => setDetailTaskId(t.id)} style={{ cursor: "pointer" }}>
                   {t.title}{t.linkLabel ? <span style={{ color: "var(--quill)", fontWeight: 400 }}> · {t.linkLabel}</span> : null}
                 </div>
               </div>
@@ -205,7 +207,7 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                     onClick={() => toggleDone(t)}
                   >✓</span>
                   <div className={s.rowMain}>
-                    <div className={`${s.rowTitle} ${s.done}`}>{t.title}</div>
+                    <div className={`${s.rowTitle} ${s.done}`} onClick={() => setDetailTaskId(t.id)} style={{ cursor: "pointer" }}>{t.title}</div>
                   </div>
                   <button
                     type="button"
@@ -222,6 +224,14 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
             </>
           ) : null}
         </>
+      )}
+      {detailTaskId && (
+        <TaskDetailPanel
+          taskId={detailTaskId}
+          onClose={() => setDetailTaskId(null)}
+          onDeleted={() => { setDetailTaskId(null); load(); }}
+          onUpdated={() => load()}
+        />
       )}
     </div>
   );
