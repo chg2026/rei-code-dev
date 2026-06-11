@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { PRIORITIES, type PmStatus } from "./types";
 
 type Member = { id: string; name: string; initials: string; email: string | null };
@@ -44,6 +45,8 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
   const [subtaskName, setSubtaskName] = useState("");
   const [showActivity, setShowActivity] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/pm/tasks/${taskId}`, { cache: "no-store" });
@@ -108,7 +111,8 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
     onUpdated();
   };
 
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.20)", zIndex: 190 }} />
       <div style={{ position: "fixed", top: 0, right: 0, width: 480, maxWidth: "100vw", height: "100%", background: "var(--bg-primary)", boxShadow: "var(--shadow-md)", zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -255,7 +259,8 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
