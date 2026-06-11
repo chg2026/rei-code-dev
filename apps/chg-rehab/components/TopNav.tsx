@@ -2,113 +2,127 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/session";
-import NotificationBell from "./NotificationBell";
-import BillingNavIndicator from "./BillingNavIndicator";
-import BillingNavBadge from "./BillingNavBadge";
-import AppSwitcher from "./AppSwitcher";
-import WorkspaceNavLinks from "./WorkspaceNavLinks";
+import WorkspaceNewPill from "@/components/WorkspaceNewPill";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 
-// Modules rendered before the WORKSPACE group.
-const CORE_MODULES: { href: string; label: string }[] = [
-  { href: "/pipeline", label: "Pipeline" },
-  { href: "/underwriting", label: "Underwriting" },
-  { href: "/rehab", label: "Rehab Manager" },
-  { href: "/pm", label: "Project Manager" },
-  { href: "/warehouse", label: "Warehouse" },
-  { href: "/property", label: "Property Record" },
-  { href: "/contacts", label: "Contacts" },
-  { href: "/docs", label: "Documents Hub" },
-  { href: "/contractor-portal", label: "Contractor Portal" },
-  { href: "/investor-portal", label: "Investor Portal" },
+type NavItem = { href: string; label: string };
+type NavSection = { label?: string; items: NavItem[] };
+
+const DASHBOARD: NavItem = { href: "/dashboard", label: "Dashboard" };
+
+const BASE_SECTIONS: NavSection[] = [
+  { items: [DASHBOARD] },
+  {
+    label: "My Workspace",
+    items: [
+      { href: "/command-center", label: "Tasks & Calendar" },
+      { href: "/messages", label: "Messages" },
+    ],
+  },
+  {
+    label: "Deals",
+    items: [
+      { href: "/pipeline", label: "Pipeline" },
+      { href: "/underwriting", label: "Underwriting" },
+    ],
+  },
+  {
+    label: "Portfolio",
+    items: [
+      { href: "/property", label: "Property Record" },
+      { href: "/rehab", label: "Rehab Manager" },
+      { href: "/warehouse", label: "Warehouse" },
+      { href: "/finance", label: "Finance" },
+      { href: "/pm", label: "Project Manager" },
+      { href: "/docs", label: "Documents Hub" },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { href: "/contacts", label: "Contacts" },
+      { href: "/contractor-portal", label: "Contractor Portal" },
+      { href: "/investor-portal", label: "Investor Portal" },
+      { href: "/settings/team", label: "Team" },
+    ],
+  },
 ];
 
-export default function TopNav({
-  user,
-  companyName,
-}: {
-  user: SessionUser;
-  companyName?: string | null;
-}) {
+const DashboardIcon = () => (
+  <svg
+    className="nav-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
+export default function TopNav({ user, companyName }: { user: SessionUser; companyName?: string | null }) {
   const pathname = usePathname();
-  // Admin tab(s) render after the WORKSPACE group. Super Admin is only shown
-  // to users with the platform-wide flag, appended after Admin Settings.
-  const adminModules = user.isSuperAdmin
-    ? [
-        { href: "/admin", label: "Admin Settings" },
-        { href: "/super-admin", label: "Super Admin" },
-      ]
-    : [{ href: "/admin", label: "Admin Settings" }];
 
-  const initials =
-    [(user.firstName || "")[0], (user.lastName || "")[0]]
-      .filter(Boolean)
-      .join("")
-      .toUpperCase() || (user.email || "U")[0].toUpperCase();
+  // Admin section is built per-render so the Super Admin tab can be
+  // appended only for users with the platform-wide flag.
+  const adminItems: NavItem[] = [
+    { href: "/billing", label: "Billing" },
+    { href: "/admin", label: "Admin Settings" },
+  ];
+  if (user.isSuperAdmin) {
+    adminItems.push({ href: "/super-admin", label: "Super Admin" });
+  }
+  const sections: NavSection[] = [
+    ...BASE_SECTIONS,
+    { label: "Admin", items: adminItems },
+    { label: "Account", items: [{ href: "/account", label: "Profile Settings" }] },
+  ];
 
-  const fullName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <header className="topbar">
-      <div className="brand" title={companyName ?? undefined}>
-        CHG <span>Rehab</span>
-      </div>
-      <nav className="module-nav">
-        {CORE_MODULES.map((m) => {
-          const active = pathname === m.href || pathname.startsWith(m.href + "/");
-          return (
-            <Link
-              key={m.href}
-              href={m.href}
-              className={active ? "mnav-btn active" : "mnav-btn"}
-            >
-              {m.label}
-            </Link>
-          );
-        })}
-        <WorkspaceNavLinks />
-        {adminModules.map((m) => {
-          const active = pathname === m.href || pathname.startsWith(m.href + "/");
-          return (
-            <Link
-              key={m.href}
-              href={m.href}
-              className={active ? "mnav-btn active" : "mnav-btn"}
-            >
-              {m.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="topbar-right">
-        {user.role === "Admin" ? <BillingNavIndicator /> : <BillingNavBadge />}
-        <NotificationBell />
-        <AppSwitcher
-          currentProduct="chg"
-          isInvestor={user.isInvestor ?? false}
-          isContractor={user.isContractor ?? false}
-        />
-        <Link
-          href="/account"
-          className="user-pill"
-          title={user.email ? `${user.email} — Account settings` : "Account settings"}
-          style={{ textDecoration: "none", color: "inherit" }}
-        >
-          <div className="user-av">{initials}</div>
-          <div>
-            <div className="user-name">{fullName}</div>
-            <div className="user-role">{user.role}</div>
-          </div>
+    <>
+      <aside className="sidebar">
+        <Link href="/" className="brand">
+          <span className="brand-mark" style={{ fontSize: companyName && companyName.length > 12 ? 16 : 26 }}>
+            {companyName || "CHG"}
+          </span>
+          <span className="brand-sub">Rehab Platform</span>
         </Link>
-        <a
-          href="/api/logout"
-          className="mnav-btn"
-          style={{ padding: "0 10px", height: 32, lineHeight: "32px", borderRadius: 4 }}
-          title="Sign out"
-        >
-          Sign out
-        </a>
-      </div>
-    </header>
+
+        {sections.map((section, idx) => (
+          <div className="nav-section" key={section.label ?? `section-${idx}`}>
+            {section.label ? (
+              <div className="nav-label">
+                {section.label}
+                {section.label === "My Workspace" ? <WorkspaceNewPill /> : null}
+              </div>
+            ) : null}
+            {section.items.map((item) => {
+              const active = isActive(item.href);
+              const isDashboard = item.href === DASHBOARD.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={active ? "nav-item active" : "nav-item"}
+                >
+                  {isDashboard ? <DashboardIcon /> : null}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+        <OnboardingChecklist />
+      </aside>
+    </>
   );
 }
