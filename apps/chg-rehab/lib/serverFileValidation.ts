@@ -28,16 +28,11 @@ export async function assertValidStoredUpload(fileKey: string | null | undefined
   if (!fileKey) return;
 
   const file = await getPrivateFile(fileKey);
-  const [metadata] = await file.getMetadata();
+  const head = await fetch(file.signedUrl, { method: "HEAD" });
 
-  const contentType = metadata.contentType as string | undefined;
-  const rawSize = metadata.size;
-  const sizeBytes =
-    typeof rawSize === "string"
-      ? parseInt(rawSize, 10)
-      : typeof rawSize === "number"
-      ? rawSize
-      : null;
+  const contentType = head.headers.get("content-type") ?? undefined;
+  const rawSize = head.headers.get("content-length");
+  const sizeBytes = rawSize != null ? parseInt(rawSize, 10) : null;
 
   if (contentType && !ALLOWED_UPLOAD_MIME_TYPES.has(contentType)) {
     throw new Error(

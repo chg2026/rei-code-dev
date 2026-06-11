@@ -1,3 +1,7 @@
+Rewrite apps/chg-rehab/lib/objectStorage.ts to use Supabase Storage instead of the Replit GCS sidecar. Keep all exported function names and signatures identical so no callers need to change.
+
+Replace the entire file with:
+
 import { randomUUID } from "node:crypto";
 import { getSupabaseAdminClient } from "./supabaseServer";
 
@@ -73,3 +77,14 @@ export function getPublicObjectSearchPaths(): string[] {
 export async function getPublicFile(): Promise<null> {
   return null;
 }
+
+---
+
+Also update apps/chg-rehab/lib/objectStorageWrite.ts — read the file first, then replace the putPrivateObject function to upload via Supabase Storage instead of GCS:
+
+The new putPrivateObject should:
+1. Import getSupabaseAdminClient from ./supabaseServer
+2. Use supabase.storage.from("chg-uploads").upload(objectName, fileBuffer, { contentType, upsert: true })
+3. Return the objectPath in the same format as before
+
+Run tsc --noEmit and report errors.
