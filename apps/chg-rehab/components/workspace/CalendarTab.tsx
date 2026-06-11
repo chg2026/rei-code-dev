@@ -121,16 +121,44 @@ export default function CalendarTab() {
                 <div
                   key={i}
                   className={`${s.calCell} ${c.inMonth ? "" : s.muted} ${key === todayKey ? s.today : ""}`}
-                  onClick={c.inMonth ? () => setCreateDate(ymd(c.date)) : undefined}
-                  style={{ cursor: c.inMonth ? "pointer" : "default" }}
+                  style={{ cursor: "default" }}
                   onMouseEnter={c.inMonth ? (e) => { e.currentTarget.style.background = "rgba(0,0,0,0.03)"; } : undefined}
                   onMouseLeave={c.inMonth ? (e) => { e.currentTarget.style.background = ""; } : undefined}
                 >
                   <div>{c.date.getDate()}</div>
+                  {c.inMonth ? (
+                    <button
+                      type="button"
+                      className={s.calAddBtn}
+                      title="New task"
+                      onClick={(ev) => { ev.stopPropagation(); setCreateDate(ymd(c.date)); }}
+                    >+</button>
+                  ) : null}
                   {dayEvents.length > 0 ? (
                     <div className={s.calDots}>
-                      {dayEvents.slice(0, 4).map((e) => <span key={e.id} className={s.calDot} title={e.title} style={{ background: KIND_COLORS[e.kind] ?? "var(--marine)" }} />)}
-                      {dayEvents.length > 4 ? <span style={{ fontSize: 9, color: "var(--quill)" }}>+{dayEvents.length - 4}</span> : null}
+                      {dayEvents.slice(0, 3).map((e) => {
+                        const label = e.title.length > 22 ? `${e.title.slice(0, 22)}…` : e.title;
+                        const chipStyle = { borderLeft: `3px solid ${KIND_COLORS[e.kind] ?? "#6366f1"}` };
+                        return e.link ? (
+                          <Link
+                            key={e.id}
+                            href={e.link}
+                            className={s.calEventChip}
+                            title={e.title}
+                            style={chipStyle}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >{label}</Link>
+                        ) : (
+                          <span
+                            key={e.id}
+                            className={s.calEventChip}
+                            title={e.title}
+                            style={chipStyle}
+                            onClick={(ev) => ev.stopPropagation()}
+                          >{label}</span>
+                        );
+                      })}
+                      {dayEvents.length > 3 ? <span style={{ fontSize: 9, color: "var(--quill)" }}>+{dayEvents.length - 3} more</span> : null}
                     </div>
                   ) : null}
                 </div>
