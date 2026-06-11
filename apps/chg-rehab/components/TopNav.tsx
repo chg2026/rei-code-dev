@@ -98,14 +98,26 @@ function PmNavTree({ pathname }: { pathname: string }) {
 
   return (
     <div className="pm-nav-tree">
-      <button
-        className={`nav-item pm-tree-toggle${isPmActive ? " active" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <span className="pm-tree-label">Project Manager</span>
-        <span className={`pm-tree-arrow${open ? " open" : ""}`}>›</span>
-      </button>
+      <div className={`nav-item pm-tree-toggle${isPmActive ? " active" : ""}`} style={{ display: "flex", alignItems: "center", padding: 0 }}>
+        <Link
+          href="/pm"
+          className="pm-tree-label"
+          style={{ flex: 1, display: "block", padding: "inherit", color: "inherit", textDecoration: "none" }}
+          onClick={() => setOpen(true)}
+        >
+          Project Manager
+        </Link>
+        <button
+          type="button"
+          className="pm-tree-arrow-btn"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label="Toggle spaces"
+          style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "0 8px" }}
+        >
+          <span className={`pm-tree-arrow${open ? " open" : ""}`}>›</span>
+        </button>
+      </div>
 
       {open && (
         <div className="pm-tree-spaces">

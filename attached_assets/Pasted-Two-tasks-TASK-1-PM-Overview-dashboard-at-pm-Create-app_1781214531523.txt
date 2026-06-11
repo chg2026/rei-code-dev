@@ -1,0 +1,38 @@
+Two tasks:
+
+--- TASK 1: PM Overview dashboard at /pm ---
+
+Create apps/chg-rehab/app/pm/page.tsx as a server component that:
+1. Fetches the current user's company spaces (GET /api/pm/spaces)
+2. Renders a dashboard showing:
+   - Header: "Project Manager" with a "+ New Space" button
+   - A grid of space cards (each showing: space name, color dot, list count, task count)
+   - Below that: a "My Tasks" section showing the 10 most recent PmTasks assigned to or created by the current user, across all spaces (with list/space breadcrumb, status badge, due date)
+3. Each space card links to /pm/[spaceId]/[firstListId] (use the first list in the space)
+4. Style it cleanly using the same design tokens as the rest of the app (no Tailwind, use inline styles matching the existing design: #f9f8f6 background, #1a1a1a text, card with white bg + border radius 12px + box-shadow 0 1px 3px rgba(0,0,0,0.08))
+
+You'll need a server-side data fetch. Use the Prisma client directly (import { prisma } from "@/lib/prisma") and the auth helper to get the current user. Look at how other server pages in this app do it.
+
+Also update apps/chg-rehab/components/TopNav.tsx: make "Project Manager" in the sidebar link to /pm (not just expand the tree). It should do both — navigate to /pm AND expand the sub-tree.
+
+--- TASK 2: Upgrade WsTask detail panel to match PM task richness ---
+
+Read apps/chg-rehab/components/workspace/TaskDetailPanel.tsx in full.
+Read apps/chg-rehab/components/pm/PmTaskDetail.tsx in full.
+
+TaskDetailPanel (WsTask) currently has: Title, Priority, Due Date, Assignee (single), Notes.
+PmTaskDetail (PmTask) has: Status, Priority, Start+Due dates, multiple Assignees, Description, Subtasks, Comments with Send button, Activity log.
+
+Upgrade TaskDetailPanel.tsx to add:
+1. A Description textarea (maps to existing `description` field if it exists in WsTask, or add it via PATCH /api/workspace/tasks/[id] with `description` in body — check the PATCH handler supports it)
+2. A Comments section: 
+   - First check if there's a wsTaskComment table in the Prisma schema (run: npx prisma db pull && cat prisma/schema.prisma | grep -A5 wsTaskComment)
+   - If it exists: build the comments UI fetching GET /api/workspace/tasks/[id]/comments and POST to create
+   - If it doesn't exist: add a raw SQL migration to create it, run it via prisma db execute, then build the API routes and UI
+3. A Delete button in the header (call DELETE /api/workspace/tasks/[id], which already exists, then call onClose and reload)
+4. Change single Assignee dropdown to show current assignee + an "+ Add assignee" button that opens a user picker (fetch /api/team/members for the list)
+
+Also add a delete button (trash icon) to the header of PmTaskDetail.tsx — call DELETE /api/pm/tasks/[id], then call onClose() and trigger refresh.
+
+Run: npx tsc --noEmit
+Report all errors.

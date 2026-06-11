@@ -111,6 +111,13 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
     onUpdated();
   };
 
+  const deleteTask = async () => {
+    if (!window.confirm("Delete this task?")) return;
+    await fetch(`/api/pm/tasks/${taskId}`, { method: "DELETE" });
+    onUpdated();
+    onClose();
+  };
+
   if (!mounted) return null;
   return createPortal(
     <>
@@ -123,6 +130,7 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "0.5px solid var(--border-lo)" }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--marine-ink)", background: "var(--marine-soft)", padding: "2px 8px", borderRadius: 4, textTransform: "capitalize" }}>{task.taskType}</span>
               <span style={{ flex: 1 }} />
+              <button type="button" onClick={deleteTask} aria-label="Delete task" title="Delete task" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", lineHeight: 1, padding: "2px 4px" }}>🗑</button>
               <button type="button" onClick={onClose} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-tertiary)", lineHeight: 1 }}>×</button>
             </div>
 

@@ -96,6 +96,7 @@ model User {
   wsGoals                 WsGoal[]
   wsReminders             WsReminder[]
   wsCalendarEvents        WsCalendarEvent[]
+  wsTaskComments          WsTaskComment[]              @relation("WsTaskCommentAuthor")
   pmTasksCreated          PmTask[]                     @relation("PmTaskCreator")
   pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
   pmComments              PmComment[]                  @relation("PmComments")
@@ -1535,14 +1536,28 @@ model WsTask {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
 
-  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy     User       @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  assignee      User?      @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  sourceMessage WsMessage? @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User            @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee      User?           @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  comments      WsTaskComment[]
 
   @@index([companyId, done, dueDate])
   @@index([companyId, assigneeId, done])
   @@index([companyId, createdById, done])
+}
+
+model WsTaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  task   WsTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User   @relation("WsTaskCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }
 
 model WsChannel {
