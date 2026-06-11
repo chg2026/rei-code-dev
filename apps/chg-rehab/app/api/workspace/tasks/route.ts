@@ -74,6 +74,7 @@ export async function POST(req: Request) {
     assigneeId?: string | null;
     dueDate?: string | null;
     priority?: string;
+    description?: string | null;
     linkType?: string | null;
     linkId?: string | null;
     linkLabel?: string | null;
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
       assigneeId,
       title,
       priority,
+      description: body.description ?? null,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       linkType: body.linkType ?? null,
       linkId: body.linkId ?? null,

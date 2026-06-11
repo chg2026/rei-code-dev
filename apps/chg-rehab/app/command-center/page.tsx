@@ -6,7 +6,7 @@ import TodoTab from "@/components/workspace/TodoTab";
 import CalendarTab from "@/components/workspace/CalendarTab";
 import GoalsTab from "@/components/workspace/GoalsTab";
 import RemindersTab from "@/components/workspace/RemindersTab";
-import CreateTaskModal from "@/components/workspace/CreateTaskModal";
+import TaskDetailPanel from "@/components/workspace/TaskDetailPanel";
 
 const TABS = [
   { id: "todo", label: "To-do list" },
@@ -19,7 +19,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function CommandCenterPage() {
   const [tab, setTab] = useState<TabId>("todo");
-  const [modalOpen, setModalOpen] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Dismiss the NEW pill once the user lands here.
@@ -45,7 +45,7 @@ export default function CommandCenterPage() {
           <div className={s.subtitle}>Your daily operations hub: tasks, calendar, goals, reminders.</div>
         </div>
         <div className={s.actions}>
-          <button type="button" className={s.btn} onClick={() => setModalOpen(true)}>+ New task</button>
+          <button type="button" className={s.btn} onClick={() => setCreatingTask(true)}>+ New task</button>
         </div>
       </div>
       <div className={s.tabs}>
@@ -66,7 +66,13 @@ export default function CommandCenterPage() {
         {tab === "goals" ? <GoalsTab /> : null}
         {tab === "reminders" ? <RemindersTab /> : null}
       </div>
-      <CreateTaskModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={onTaskCreated} />
+      {creatingTask && (
+        <TaskDetailPanel
+          mode="create"
+          onCreated={() => { setCreatingTask(false); onTaskCreated(); }}
+          onClose={() => setCreatingTask(false)}
+        />
+      )}
     </div>
   );
 }

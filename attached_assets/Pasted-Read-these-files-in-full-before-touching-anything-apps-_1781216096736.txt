@@ -1,0 +1,109 @@
+Read these files in full before touching anything:
+- apps/chg-rehab/components/workspace/TaskDetailPanel.tsx
+- apps/chg-rehab/components/workspace/TodoTab.tsx
+- apps/chg-rehab/app/property/PropertyTasksTab.tsx
+- apps/chg-rehab/components/pm/PmTaskDetail.tsx
+- apps/chg-rehab/components/pm/PmListView.tsx
+
+Then make these changes:
+
+--- CHANGE 1: TaskDetailPanel — add "create mode" ---
+
+TaskDetailPanel currently requires an existing taskId and loads its data. Add a create mode:
+
+New props interface:
+  mode: "create" | "edit"
+  // create mode props:
+  linkType?: string      // "property" | "deal" | null
+  linkId?: string
+  linkLabel?: string
+  defaultStatus?: string
+  // edit mode props (existing):
+  taskId?: string
+
+In create mode:
+- Show the same panel layout but with empty/default values
+- Title field is a focused input at the top
+- Priority defaults to "Medium", Status to "To Do" (if applicable)
+- A "Create task" button at the bottom (instead of auto-save)
+- On submit: POST to /api/workspace/tasks with { title, priority, dueDate, assigneeId, linkType, linkId, description }
+- After successful create: call onCreated(newTaskId) prop, then switch to edit mode with the new ID
+
+In edit mode (existing behavior):
+- Load task by taskId, auto-save on blur
+
+Also add to the panel:
+- A "Description" textarea section (above Notes if Notes exists, or replace Notes with Description)
+- A simple Comments section: fetch GET /api/workspace/tasks/[id]/comments, show list of comments, textarea + Send button that POSTs to same endpoint
+  - First check if this API route exists. If not, create it: apps/chg-rehab/app/api/workspace/tasks/[id]/comments/route.ts
+  - Check prisma schema for wsTaskComment table. Run: cat apps/chg-rehab/prisma/schema.prisma | grep -i comment
+  - If no wsTaskComment model exists, add it to schema.prisma:
+      model WsTaskComment {
+        id        String   @id @default(cuid())
+        taskId    String
+        userId    String
+        body      String
+        createdAt DateTime @default(now())
+        task      WsTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+        user      UserProfile @relation(fields: [userId], references: [id])
+      }
+    And add comments WsTaskComment[] to WsTask model.
+    Then run: npx prisma db push --accept-data-loss
+- A Delete button (trash icon) in the panel header — calls DELETE /api/workspace/tasks/[id], then onClose()
+
+--- CHANGE 2: Property tasks — replace basic input with rich panel ---
+
+In apps/chg-rehab/app/property/PropertyTasksTab.tsx:
+
+Remove the current inline title-input + Add/Cancel flow.
+
+Replace "+ New task" button behavior: 
+  onClick={() => setCreating(true)}
+  
+When creating=true, render:
+  <TaskDetailPanel
+    mode="create"
+    linkType="property"
+    linkId={propertyId}
+    linkLabel={propertyAddress}
+    onCreated={(newId) => { setCreating(false); refresh(); }}
+    onClose={() => setCreating(false)}
+  />
+
+--- CHANGE 3: Command Center — replace modal with rich panel ---
+
+In apps/chg-rehab/components/workspace/TodoTab.tsx:
+
+Replace the "+ New task" modal with:
+  onClick={() => setCreatingTask(true)}
+  
+When creatingTask=true, render:
+  <TaskDetailPanel
+    mode="create"
+    onCreated={(newId) => { setCreatingTask(false); refresh(); }}
+    onClose={() => setCreatingTask(false)}
+  />
+
+--- CHANGE 4: PM "+ Add task" — open PmTaskDetail in create mode ---
+
+In apps/chg-rehab/components/pm/PmTaskDetail.tsx, add create mode support:
+  When taskId is null/undefined:
+  - Show empty panel with Title input focused
+  - Status defaults to the passed defaultStatusId
+  - On submit: POST to /api/pm/tasks with { name, listId, statusId, ... }
+  - After create: call onCreated(newId), switch to edit mode
+
+In apps/chg-rehab/components/pm/PmListView.tsx:
+  Change both onAddTask (list view) and the board + Add task handler to:
+  - Set creatingForStatus = statusId (new state)
+  - Render <PmTaskDetail taskId={null} listId={listId} defaultStatusId={creatingForStatus} onCreated={(id) => { setCreatingForStatus(null); setTaskDetailId(id); refresh(); }} onClose={() => setCreatingForStatus(null)} />
+  
+  Remove the PmQuickCreate inline input entirely — the rich panel replaces it.
+
+--- CHANGE 5: "+ New Task" button at top of PM ---
+
+The "+ New Task" button in PmListView header should open PmTaskDetail in create mode with no pre-set status.
+
+Run: npx tsc --noEmit
+Fix all type errors.
+Report what you changed and any errors.

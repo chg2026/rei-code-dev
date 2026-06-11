@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PRIORITIES, type PmStatus } from "./types";
 
@@ -36,7 +36,15 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: string; onClose: () => void; onUpdated: () => void }) {
+export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose, onUpdated, onCreated }: {
+  taskId?: string | null;
+  listId?: string;
+  defaultStatusId?: string | null;
+  onClose: () => void;
+  onUpdated: () => void;
+  onCreated?: (id: string) => void;
+}) {
+  const isCreate = !taskId;
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [name, setName] = useState("");
@@ -48,7 +56,34 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Create-mode state.
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const newNameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (isCreate && mounted) newNameRef.current?.focus(); }, [isCreate, mounted]);
+
+  const createTask = async () => {
+    const n = newName.trim();
+    if (!n || !listId || creating) return;
+    setCreating(true);
+    try {
+      const r = await fetch(`/api/pm/lists/${listId}/tasks`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: n, statusId: defaultStatusId ?? undefined }),
+      });
+      if (r.ok) {
+        const d = await r.json().catch(() => null);
+        const id: string | undefined = d?.task?.id ?? d?.id;
+        if (id) onCreated?.(id);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const load = useCallback(async () => {
+    if (!taskId) return;
     const r = await fetch(`/api/pm/tasks/${taskId}`, { cache: "no-store" });
     if (r.ok) {
       const d = await r.json();
@@ -119,6 +154,40 @@ export default function PmTaskDetail({ taskId, onClose, onUpdated }: { taskId: s
   };
 
   if (!mounted) return null;
+
+  if (isCreate) {
+    return createPortal(
+      <>
+        <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.20)", zIndex: 190 }} />
+        <div style={{ position: "fixed", top: 0, right: 0, width: 480, maxWidth: "100vw", height: "100%", background: "var(--bg-primary)", boxShadow: "var(--shadow-md)", zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", borderBottom: "0.5px solid var(--border-lo)" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>New task</span>
+            <span style={{ flex: 1 }} />
+            <button type="button" onClick={onClose} aria-label="Close" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-tertiary)", lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            <Label>Task name</Label>
+            <input
+              ref={newNameRef}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") createTask(); if (e.key === "Escape") onClose(); }}
+              placeholder="What needs to be done?"
+              style={{ width: "100%", fontSize: 19, fontWeight: 600, fontFamily: "inherit", color: "var(--text-primary)", border: "none", outline: "none", marginBottom: 16, background: "transparent" }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: "0.5px solid var(--border-lo)" }}>
+            <button type="button" onClick={onClose} style={{ padding: "7px 14px", fontSize: 13, background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "0.5px solid var(--border-lo)", borderRadius: 6, cursor: "pointer" }}>Cancel</button>
+            <button type="button" onClick={createTask} disabled={!newName.trim() || creating} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", opacity: !newName.trim() || creating ? 0.6 : 1 }}>
+              {creating ? "Creating…" : "Create task"}
+            </button>
+          </div>
+        </div>
+      </>,
+      document.body
+    );
+  }
+
   return createPortal(
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.20)", zIndex: 190 }} />

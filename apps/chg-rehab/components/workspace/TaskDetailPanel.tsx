@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+type Mode = "create" | "edit";
 type TeamMember = { id: string; name: string; initials: string };
 type Comment = {
   id: string; body: string; createdAt: string;
@@ -14,8 +15,22 @@ type TaskDetail = {
 };
 
 export default function TaskDetailPanel({
-  taskId, onClose, onDeleted, onUpdated,
-}: { taskId: string; onClose: () => void; onDeleted: () => void; onUpdated: () => void }) {
+  mode: modeProp, taskId, linkType, linkId, linkLabel, defaultStatus,
+  onClose, onDeleted, onUpdated, onCreated,
+}: {
+  mode?: Mode;
+  taskId?: string;
+  linkType?: string | null;
+  linkId?: string;
+  linkLabel?: string | null;
+  defaultStatus?: string;
+  onClose: () => void;
+  onDeleted?: () => void;
+  onUpdated?: () => void;
+  onCreated?: (newId: string) => void;
+}) {
+  const [mode, setMode] = useState<Mode>(modeProp ?? (taskId ? "edit" : "create"));
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(taskId ?? null);
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -23,27 +38,56 @@ export default function TaskDetailPanel({
   const [showMembers, setShowMembers] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Create-mode draft fields.
+  const [cTitle, setCTitle] = useState("");
+  const [cPriority, setCPriority] = useState("Medium");
+  const [cDue, setCDue] = useState("");
+  const [cDescription, setCDescription] = useState("");
+  const [cAssignee, setCAssignee] = useState<TeamMember | null>(null);
+  const [creating, setCreating] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync local mode/active task when the controlling props change while
+  // the panel stays mounted (e.g. selecting a different task in a list).
   useEffect(() => {
-    fetch(`/api/workspace/tasks/${taskId}`)
-      .then(r => r.json()).then(d => setTask(d.task ?? null));
+    setActiveTaskId(taskId ?? null);
+    setMode(modeProp ?? (taskId ? "edit" : "create"));
+  }, [taskId, modeProp]);
+
+  // Load team members for the assignee picker (both modes).
+  useEffect(() => {
     fetch("/api/workspace/mentions")
-      .then(r => r.json()).then(d => setMembers(d.users ?? []));
-    fetch(`/api/workspace/tasks/${taskId}/comments`)
+      .then(r => (r.ok ? r.json() : { users: [] }))
+      .then(d => setMembers(d.users ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  // Load the task + comments in edit mode.
+  useEffect(() => {
+    if (mode !== "edit" || !activeTaskId) return;
+    fetch(`/api/workspace/tasks/${activeTaskId}`)
+      .then(r => r.json()).then(d => setTask(d.task ?? null));
+    fetch(`/api/workspace/tasks/${activeTaskId}/comments`)
       .then(r => (r.ok ? r.json() : { comments: [] }))
       .then(d => setComments(d.comments ?? []));
-  }, [taskId]);
+  }, [mode, activeTaskId]);
+
+  // Focus the title in create mode.
+  useEffect(() => {
+    if (mode === "create") titleRef.current?.focus();
+  }, [mode]);
 
   const save = async (patch: Record<string, unknown>) => {
-    if (!task) return;
+    if (!activeTaskId || !task) return;
     setSaving(true);
     setTask(prev => (prev ? ({ ...prev, ...patch } as TaskDetail) : prev));
-    await fetch(`/api/workspace/tasks/${taskId}`, {
+    await fetch(`/api/workspace/tasks/${activeTaskId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(patch),
     });
     setSaving(false);
-    onUpdated();
+    onUpdated?.();
   };
 
   const setAssignee = (m: TeamMember | null) => {
@@ -53,11 +97,41 @@ export default function TaskDetailPanel({
     save({ assigneeId: m?.id ?? null });
   };
 
+  const submitCreate = async () => {
+    const title = cTitle.trim();
+    if (!title || creating) return;
+    setCreating(true);
+    const r = await fetch("/api/workspace/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title,
+        priority: cPriority,
+        dueDate: cDue || null,
+        assigneeId: cAssignee?.id ?? null,
+        linkType: linkType ?? null,
+        linkId: linkId ?? null,
+        linkLabel: linkLabel ?? null,
+        description: cDescription || null,
+      }),
+    });
+    setCreating(false);
+    if (r.ok) {
+      const d = await r.json().catch(() => null);
+      const id: string | undefined = d?.id;
+      if (id) {
+        setActiveTaskId(id);
+        setMode("edit");
+        onCreated?.(id);
+      }
+    }
+  };
+
   const addComment = async () => {
     const text = comment.trim();
-    if (!text) return;
+    if (!text || !activeTaskId) return;
     setComment("");
-    const r = await fetch(`/api/workspace/tasks/${taskId}/comments`, {
+    const r = await fetch(`/api/workspace/tasks/${activeTaskId}/comments`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ body: text }),
@@ -69,12 +143,106 @@ export default function TaskDetailPanel({
   };
 
   const deleteTask = async () => {
+    if (!activeTaskId) return;
     if (!window.confirm("Delete this task?")) return;
-    await fetch(`/api/workspace/tasks/${taskId}`, { method: "DELETE" });
-    onDeleted();
+    await fetch(`/api/workspace/tasks/${activeTaskId}`, { method: "DELETE" });
+    onDeleted?.();
     onClose();
   };
 
+  // ---- Create mode -------------------------------------------------------
+  if (mode === "create") {
+    return (
+      <div style={panelStyle}>
+        <div style={headerStyle}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>New task</span>
+          <button type="button" onClick={onClose} style={ghostBtn} title="Close">✕</button>
+        </div>
+        <div style={bodyStyle}>
+          <div>
+            <label style={labelStyle}>Title</label>
+            <input
+              ref={titleRef}
+              className="input"
+              style={{ width: "100%" }}
+              value={cTitle}
+              onChange={e => setCTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitCreate(); } }}
+              placeholder="Task title…"
+            />
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Priority</label>
+              <select className="input" style={{ width: "100%" }} value={cPriority}
+                onChange={e => setCPriority(e.target.value)}>
+                <option>Urgent</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Due date</label>
+              <input type="date" className="input" style={{ width: "100%" }}
+                value={cDue} onChange={e => setCDue(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Assignee</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              {cAssignee ? (
+                <span style={chipStyle}>
+                  <span style={avatarStyle}>{cAssignee.initials}</span>
+                  {cAssignee.name}
+                  <button type="button" onClick={() => setCAssignee(null)} style={chipRemoveBtn} title="Remove assignee">×</button>
+                </span>
+              ) : (
+                <span style={{ fontSize: 13, color: "var(--quill)" }}>Unassigned</span>
+              )}
+              <button type="button" onClick={() => setShowMembers(s => !s)} style={addBtn}>
+                + {cAssignee ? "Change" : "Add assignee"}
+              </button>
+            </div>
+            {showMembers && (
+              <div style={pickerStyle}>
+                {members.length === 0 && (
+                  <div style={{ padding: 10, fontSize: 12, color: "var(--quill)" }}>No team members.</div>
+                )}
+                {members.map(m => (
+                  <button key={m.id} type="button" onClick={() => { setCAssignee(m); setShowMembers(false); }} style={pickerRow}>
+                    <span style={avatarStyle}>{m.initials}</span>
+                    <span style={{ flex: 1, textAlign: "left" }}>{m.name}</span>
+                    {cAssignee?.id === m.id ? <span style={{ color: "var(--marine, #2563eb)" }}>✓</span> : null}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea className="input" style={{ width: "100%", minHeight: 100, resize: "vertical" }}
+              value={cDescription}
+              onChange={e => setCDescription(e.target.value)}
+              placeholder="Add a description…"
+            />
+          </div>
+          {linkLabel && (
+            <div style={{ fontSize: 12, color: "var(--quill)" }}>
+              Linking to: <span style={{ color: "var(--ink)" }}>{linkLabel}</span>
+            </div>
+          )}
+        </div>
+        <div style={footStyle}>
+          <button type="button" className="btn-sm" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-sm btn-primary" onClick={submitCreate} disabled={!cTitle.trim() || creating}>
+            {creating ? "Creating…" : "Create task"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Edit mode ---------------------------------------------------------
   if (!task) return (
     <div style={panelStyle}>
       <div style={{ padding: 24, color: "var(--quill)" }}>Loading…</div>
@@ -83,14 +251,16 @@ export default function TaskDetailPanel({
 
   return (
     <div style={panelStyle}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border-1)" }}>
+      <div style={headerStyle}>
         <span style={{ fontWeight: 600, fontSize: 15 }}>Task detail</span>
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={deleteTask} style={ghostBtn} title="Delete task">🗑</button>
+          {onDeleted && (
+            <button type="button" onClick={deleteTask} style={ghostBtn} title="Delete task">🗑</button>
+          )}
           <button type="button" onClick={onClose} style={ghostBtn} title="Close">✕</button>
         </div>
       </div>
-      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flex: 1 }}>
+      <div style={bodyStyle}>
         <div>
           <label style={labelStyle}>Title</label>
           <input
@@ -207,6 +377,18 @@ const panelStyle: React.CSSProperties = {
   background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
   zIndex: 500, display: "flex", flexDirection: "column",
   borderLeft: "1px solid var(--border-1)",
+};
+const headerStyle: React.CSSProperties = {
+  display: "flex", justifyContent: "space-between", alignItems: "center",
+  padding: "16px 20px", borderBottom: "1px solid var(--border-1)",
+};
+const bodyStyle: React.CSSProperties = {
+  padding: 20, display: "flex", flexDirection: "column", gap: 16,
+  overflowY: "auto", flex: 1,
+};
+const footStyle: React.CSSProperties = {
+  display: "flex", justifyContent: "flex-end", gap: 8,
+  padding: "12px 20px", borderTop: "1px solid var(--border-1)",
 };
 const ghostBtn: React.CSSProperties = {
   background: "none", border: "none", cursor: "pointer",

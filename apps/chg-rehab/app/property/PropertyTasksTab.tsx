@@ -11,9 +11,7 @@ type Task = {
 export default function PropertyTasksTab({ propertyId, propertyLabel }: { propertyId: string; propertyLabel: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -37,20 +35,6 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
     });
   };
 
-  const createTask = async () => {
-    if (!title.trim()) return;
-    setAdding(true);
-    await fetch("/api/workspace/tasks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: title.trim(), linkType: "property", linkId: propertyId, linkLabel: propertyLabel }),
-    });
-    setTitle("");
-    setShowForm(false);
-    setAdding(false);
-    load();
-  };
-
   const open = tasks.filter(t => !t.done);
   const done = tasks.filter(t => t.done);
 
@@ -58,26 +42,8 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
     <div style={{ padding: "24px 0", maxWidth: 680 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>Tasks <span style={{ color: "var(--quill)", fontWeight: 400, fontSize: 13 }}>({open.length} open)</span></div>
-        <button className="btn-sm btn-primary" onClick={() => setShowForm(v => !v)}>+ New task</button>
+        <button className="btn-sm btn-primary" onClick={() => setCreating(true)}>+ New task</button>
       </div>
-
-      {showForm && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <input
-            autoFocus
-            className="input"
-            placeholder="Task title…"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") createTask(); if (e.key === "Escape") setShowForm(false); }}
-            style={{ flex: 1 }}
-          />
-          <button className="btn-sm btn-primary" onClick={createTask} disabled={adding}>
-            {adding ? "Saving…" : "Add"}
-          </button>
-          <button className="btn-sm" onClick={() => setShowForm(false)}>Cancel</button>
-        </div>
-      )}
 
       {loading ? (
         <div style={{ color: "var(--quill)", fontSize: 14 }}>Loading…</div>
@@ -135,8 +101,20 @@ export default function PropertyTasksTab({ propertyId, propertyLabel }: { proper
           )}
         </>
       )}
+      {mounted && creating && createPortal(
+        <TaskDetailPanel
+          mode="create"
+          linkType="property"
+          linkId={propertyId}
+          linkLabel={propertyLabel}
+          onCreated={() => { setCreating(false); load(); }}
+          onClose={() => setCreating(false)}
+        />,
+        document.body
+      )}
       {mounted && detailTaskId && createPortal(
         <TaskDetailPanel
+          mode="edit"
           taskId={detailTaskId}
           onClose={() => setDetailTaskId(null)}
           onDeleted={() => { setDetailTaskId(null); load(); }}

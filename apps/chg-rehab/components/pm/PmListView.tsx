@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import PmQuickCreate from "./PmQuickCreate";
 import PmTaskDetail from "./PmTaskDetail";
 import PmBoardView from "./PmBoardView";
 import { PRIORITY_COLORS, type PmStatus, type PmTaskRow } from "./types";
@@ -24,8 +23,8 @@ export default function PmListView({
 }) {
   const [tasks, setTasks] = useState<PmTaskRow[]>(initialTasks);
   const [view, setView] = useState<"list" | "board">("list");
-  const [quickCreate, setQuickCreate] = useState<string | null>(null);
-  const [boardQuickCreate, setBoardQuickCreate] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createStatusId, setCreateStatusId] = useState<string | null>(null);
   const [taskDetailId, setTaskDetailId] = useState<string | null>(null);
 
   useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
@@ -41,12 +40,8 @@ export default function PmListView({
   const defaultStatus = statuses.find((s) => s.isDefault)?.id ?? statuses[0]?.id ?? null;
 
   const onAddTask = (statusId: string) => {
-    if (view === "board") {
-      // stay in board, just open a quick create there
-      setBoardQuickCreate(statusId);
-    } else {
-      setQuickCreate(statusId);
-    }
+    setCreateStatusId(statusId || null);
+    setCreating(true);
   };
 
   return (
@@ -64,7 +59,7 @@ export default function PmListView({
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => onAddTask(defaultStatus ?? "")} style={{ padding: "6px 12px", fontSize: 12, fontFamily: "inherit", background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>+ New Task</button>
+        <button type="button" onClick={() => { setCreateStatusId(null); setCreating(true); }} style={{ padding: "6px 12px", fontSize: 12, fontFamily: "inherit", background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>+ New Task</button>
         <span style={{ flex: 1 }} />
         <button type="button" disabled style={btnMuted}>Filter</button>
         <button type="button" disabled style={btnMuted}>Group by Status</button>
@@ -77,9 +72,6 @@ export default function PmListView({
           listId={listId}
           onAddTask={onAddTask}
           onOpenTask={setTaskDetailId}
-          quickCreateStatusId={boardQuickCreate}
-          onQuickCreateDone={() => { setBoardQuickCreate(null); refresh(); }}
-          onQuickCreateCancel={() => setBoardQuickCreate(null)}
         />
       ) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
@@ -91,7 +83,7 @@ export default function PmListView({
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: st.color }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{st.name}</span>
                   <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{groupTasks.length}</span>
-                  <button type="button" onClick={() => setQuickCreate(st.id)} style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "none", cursor: "pointer", marginLeft: 4 }}>+ Add task</button>
+                  <button type="button" onClick={() => onAddTask(st.id)} style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "none", cursor: "pointer", marginLeft: 4 }}>+ Add task</button>
                 </div>
 
                 <div style={{ border: "0.5px solid var(--border-lo)", borderRadius: 8, overflow: "hidden" }}>
@@ -114,12 +106,8 @@ export default function PmListView({
                     </div>
                   ))}
 
-                  {quickCreate === st.id ? (
-                    <div style={{ padding: "8px 12px", background: "var(--bg-primary)" }}>
-                      <PmQuickCreate listId={listId} statusId={st.id} defaultStatus={defaultStatus} onCreated={(newId?: string) => { setQuickCreate(null); refresh(); if (newId) setTaskDetailId(newId); }} onCancel={() => setQuickCreate(null)} />
-                    </div>
-                  ) : groupTasks.length === 0 ? (
-                    <div onClick={() => setQuickCreate(st.id)} style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer", background: "var(--bg-primary)" }}>+ Add task</div>
+                  {groupTasks.length === 0 ? (
+                    <div onClick={() => onAddTask(st.id)} style={{ padding: "9px 12px", fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer", background: "var(--bg-primary)" }}>+ Add task</div>
                   ) : null}
                 </div>
               </div>
@@ -127,6 +115,17 @@ export default function PmListView({
           })}
         </div>
       )}
+
+      {creating ? (
+        <PmTaskDetail
+          taskId={null}
+          listId={listId}
+          defaultStatusId={createStatusId ?? defaultStatus}
+          onClose={() => setCreating(false)}
+          onUpdated={() => { refresh(); }}
+          onCreated={(id) => { setCreating(false); setTaskDetailId(id); refresh(); }}
+        />
+      ) : null}
 
       {taskDetailId ? (
         <PmTaskDetail

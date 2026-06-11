@@ -1,6 +1,5 @@
 "use client";
 
-import PmQuickCreate from "./PmQuickCreate";
 import { PRIORITY_COLORS, type PmStatus, type PmTaskRow } from "./types";
 
 function fmtDate(iso: string | null) {
@@ -11,21 +10,14 @@ function fmtDate(iso: string | null) {
 export default function PmBoardView({
   tasks,
   statuses,
-  listId,
   onAddTask,
   onOpenTask,
-  quickCreateStatusId,
-  onQuickCreateDone,
-  onQuickCreateCancel,
 }: {
   tasks: PmTaskRow[];
   statuses: PmStatus[];
   listId: string;
   onAddTask: (statusId: string) => void;
   onOpenTask: (taskId: string) => void;
-  quickCreateStatusId?: string | null;
-  onQuickCreateDone?: () => void;
-  onQuickCreateCancel?: () => void;
 }) {
   return (
     <div style={{ flex: 1, overflowX: "auto", overflowY: "hidden", display: "flex", alignItems: "flex-start", padding: 8 }}>
@@ -58,20 +50,6 @@ export default function PmBoardView({
                   </div>
                 </div>
               ))}
-              {quickCreateStatusId === st.id && (
-                <div style={{ padding: "4px 8px" }}>
-                  <PmQuickCreate
-                    listId={listId}
-                    statusId={st.id}
-                    defaultStatus={st.id}
-                    onCreated={(newId?: string) => {
-                      onQuickCreateDone?.();
-                      if (newId) onOpenTask(newId);
-                    }}
-                    onCancel={() => onQuickCreateCancel?.()}
-                  />
-                </div>
-              )}
               <button type="button" onClick={() => onAddTask(st.id)} style={{ textAlign: "left", padding: "6px 8px", fontSize: 12, color: "var(--text-tertiary)", background: "transparent", border: "none", cursor: "pointer", borderRadius: 6 }}>+ Add task</button>
             </div>
           </div>
