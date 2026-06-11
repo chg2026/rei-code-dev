@@ -753,3 +753,19 @@ body {
 .login-tab.active{background:#FEFCF9;color:#1C1A17;box-shadow:0 1px 2px rgba(28,26,23,0.06);}
 .login-success{background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:13px;padding:14px 14px;border-radius:8px;margin-bottom:12px;line-height:1.5;}
 .login-success-icon{width:48px;height:48px;border-radius:50%;background:#10B981;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:24px;}
+
+.pm-nav-tree { width: 100%; }
+.pm-tree-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.pm-tree-label { flex: 1; }
+.pm-tree-arrow { font-size: 18px; color: var(--muted); transition: transform 0.15s; display: inline-block; }
+.pm-tree-arrow.open { transform: rotate(90deg); }
+.pm-tree-spaces { padding-left: 8px; }
+.pm-space-row { width: 100%; display: flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.pm-space-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pm-space-name { flex: 1; }
+.pm-space-lists { padding-left: 16px; }
+.pm-list-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.pm-list-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.pm-add-list { color: var(--muted); font-size: 12px; }
+.pm-manage-link { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.pm-tree-empty { color: var(--muted); font-size: 12px; }

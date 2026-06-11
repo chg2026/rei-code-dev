@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import type { SessionUser } from "@/lib/session";
 import WorkspaceNewPill from "@/components/WorkspaceNewPill";
 import OnboardingChecklist from "@/components/OnboardingChecklist";
@@ -66,6 +67,109 @@ const DashboardIcon = () => (
   </svg>
 );
 
+type PmList = { id: string; name: string; color: string | null };
+type PmSpace = { id: string; name: string; color: string | null; lists: PmList[] };
+
+function PmNavTree({ pathname }: { pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const [spaces, setSpaces] = useState<PmSpace[]>([]);
+  const [openSpaces, setOpenSpaces] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/pm/spaces")
+      .then((r) => r.json())
+      .then((d) => setSpaces(d.spaces ?? []));
+  }, [open]);
+
+  // auto-open the space whose list is active
+  useEffect(() => {
+    if (!spaces.length) return;
+    const active = spaces.find((s) =>
+      s.lists.some((l) => pathname.startsWith(`/pm/${s.id}/${l.id}`))
+    );
+    if (active) {
+      setOpen(true);
+      setOpenSpaces((prev) => new Set([...prev, active.id]));
+    }
+  }, [spaces, pathname]);
+
+  const isPmActive = pathname.startsWith("/pm");
+
+  return (
+    <div className="pm-nav-tree">
+      <button
+        className={`nav-item pm-tree-toggle${isPmActive ? " active" : ""}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="pm-tree-label">Project Manager</span>
+        <span className={`pm-tree-arrow${open ? " open" : ""}`}>›</span>
+      </button>
+
+      {open && (
+        <div className="pm-tree-spaces">
+          {spaces.length === 0 && (
+            <Link href="/pm" className="nav-item pm-tree-empty">
+              + New Space
+            </Link>
+          )}
+          {spaces.map((space) => {
+            const spaceOpen = openSpaces.has(space.id);
+            return (
+              <div key={space.id}>
+                <button
+                  className="nav-item pm-space-row"
+                  onClick={() =>
+                    setOpenSpaces((prev) => {
+                      const next = new Set(prev);
+                      next.has(space.id) ? next.delete(space.id) : next.add(space.id);
+                      return next;
+                    })
+                  }
+                >
+                  <span
+                    className="pm-space-dot"
+                    style={{ background: space.color ?? "#6366f1" }}
+                  />
+                  <span className="pm-space-name">{space.name}</span>
+                  <span className={`pm-tree-arrow${spaceOpen ? " open" : ""}`}>›</span>
+                </button>
+                {spaceOpen && (
+                  <div className="pm-space-lists">
+                    {space.lists.map((list) => {
+                      const href = `/pm/${space.id}/${list.id}`;
+                      return (
+                        <Link
+                          key={list.id}
+                          href={href}
+                          className={`nav-item pm-list-item${pathname.startsWith(href) ? " active" : ""}`}
+                        >
+                          <span
+                            className="pm-list-dot"
+                            style={{ background: list.color ?? "#9ca3af" }}
+                          />
+                          {list.name}
+                        </Link>
+                      );
+                    })}
+                    <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list">
+                      + New List
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <Link href="/pm" className="nav-item pm-manage-link">
+            Manage spaces ›
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TopNav({ user, companyName }: { user: SessionUser; companyName?: string | null }) {
   const pathname = usePathname();
 
@@ -106,6 +210,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
               </div>
             ) : null}
             {section.items.map((item) => {
+              if (item.href === "/pm") return <PmNavTree key="/pm" pathname={pathname} />;
               const active = isActive(item.href);
               const isDashboard = item.href === DASHBOARD.href;
               return (
