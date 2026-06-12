@@ -3,8 +3,9 @@ import { formatET } from "@/lib/datetime";
 import type { FullProject } from "@/lib/rehab/queries";
 import { parseProjectMeta } from "@/lib/rehab/types";
 import PmLedToggle from "./PmLedToggle";
+import DeleteProjectButton from "./DeleteProjectButton";
 
-export default function ProjectBar({ project }: { project: FullProject }) {
+export default function ProjectBar({ project, canDelete = false }: { project: FullProject; canDelete?: boolean }) {
   const meta = parseProjectMeta(project.meta);
   const mode = meta.mode || "Internally Managed";
   const statusLabel = meta.statusLabel || "In Progress";
@@ -40,6 +41,9 @@ export default function ProjectBar({ project }: { project: FullProject }) {
         </span>
         <PmLedToggle projectCode={project.code} pmLed={meta.pmLed} />
         <span className="proj-ts">{formatET(new Date(last))}</span>
+        {canDelete && (
+          <DeleteProjectButton projectCode={project.code} projectName={project.name} />
+        )}
       </div>
     </div>
   );

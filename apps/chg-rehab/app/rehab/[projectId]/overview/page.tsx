@@ -6,6 +6,7 @@ import { formatET } from "@/lib/datetime";
 import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
+import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
 import { prisma } from "@/lib/prisma";
 import {
   PhaseStatus,
@@ -98,7 +99,7 @@ export default async function OverviewPage({
 
   // KPI computations
   const totalPhases = project.phases.length;
-  const completedPhases = project.phases.filter((p) => p.status === PhaseStatus.Complete).length;
+  const completedPhases = project.phases.filter((p) => p.status === PhaseStatus.Done).length;
   const rehabPct = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
   const budgetPct = budget > 0 ? Math.round((totalSpent / budget) * 100) : 0;
   const budgetRemaining = budget - totalSpent;
@@ -160,19 +161,10 @@ export default async function OverviewPage({
             draw.status === DrawStatus.Pending ? "pending" : draw.status.toLowerCase()
           }`
         : p.drawNote || "—";
-    const stClass =
-      p.status === PhaseStatus.Complete
-        ? "st-done"
-        : p.status === PhaseStatus.Active
-        ? "st-act"
-        : "st-wait";
-    const stLabel =
-      p.status === PhaseStatus.Complete
-        ? "Complete"
-        : p.status === PhaseStatus.Active
-        ? "In progress"
-        : "Not started";
-    return { p, drawLabel, stClass, stLabel };
+    const incompleteChecklist =
+      p.checklistItems.length > 0 &&
+      p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
+    return { p, drawLabel, incompleteChecklist };
   });
 
   const team = project.assignments;
@@ -293,21 +285,26 @@ export default async function OverviewPage({
           </Link>
         </div>
         <div className="phase-tbl">
-          {phaseRows.map(({ p, drawLabel, stClass, stLabel }) => (
+          {phaseRows.map(({ p, drawLabel, incompleteChecklist }) => (
             <Link
               key={p.id}
               href={`/rehab/${code}/checklist?phase=${p.number}`}
-              className={`ph-row ph-row-6 ${p.status === PhaseStatus.Active ? "cur" : ""}`}
+              className={`ph-row ph-row-6 ${p.status === PhaseStatus.InProgress ? "cur" : ""}`}
               style={{ textDecoration: "none", color: "inherit" }}
             >
               <div>
                 <div className="ph-name">{p.name}</div>
                 <div className="ph-date">
                   Phase {p.number} · {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
-                  {p.status === PhaseStatus.Active ? " — Active" : ""}
+                  {p.status === PhaseStatus.InProgress ? " — In progress" : ""}
                 </div>
               </div>
-              <span className={`st-badge ${stClass}`}>{stLabel}</span>
+              <PhaseStatusSelect
+                phaseId={p.id}
+                projectId={code}
+                currentStatus={p.status}
+                incompleteChecklist={incompleteChecklist}
+              />
               <div className="ph-amt">{fmt$(Number(p.budget ?? 0))}</div>
               <div className="ph-draw">{drawLabel}</div>
             </Link>

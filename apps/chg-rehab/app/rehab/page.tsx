@@ -103,7 +103,7 @@ export default async function RehabIndex({
           <div style={{ flex: 1, overflowY: "auto" }}>
             {visible.map((proj) => {
               const col = STATUS_COLORS[proj.status] ?? STATUS_COLORS.Planning;
-              const phaseDone = proj.phases.filter((p) => p.status === "Complete").length;
+              const phaseDone = proj.phases.filter((p) => p.status === "Done").length;
               const phaseTotal = proj.phases.length;
               const budget = fmtMoney(proj.budget ? Number(proj.budget) : null);
               return (
@@ -191,7 +191,7 @@ export default async function RehabIndex({
                 Active Rehabs ({activeProjects.length})
               </div>
               {activeProjects.map(p => {
-                const done = p.phases.filter(ph => ph.status === "Complete").length;
+                const done = p.phases.filter(ph => ph.status === "Done").length;
                 const total = p.phases.length;
                 const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                 return (

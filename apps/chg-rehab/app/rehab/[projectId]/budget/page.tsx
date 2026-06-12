@@ -5,6 +5,7 @@ import { can } from "@/lib/permissions";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import DocUploadButton from "@/components/rehab/DocUploadButton";
+import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
 import { DrawStatus, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -114,8 +115,8 @@ export default async function BudgetPage({
               </div>
               {lineRows.map(({ phase: p, li, isCO }) => {
                 const est = Number(li.totalCost ?? 0);
-                const phaseDone = p.status === PhaseStatus.Complete;
-                const phaseActive = p.status === PhaseStatus.Active;
+                const phaseDone = p.status === PhaseStatus.Done;
+                const phaseActive = p.status === PhaseStatus.InProgress;
                 const actVal = phaseDone || isCO ? est : null;
                 const variance = actVal !== null ? actVal - est : 0;
                 const tagCls = phaseDone ? "tag-paid" : phaseActive ? "tag-pend" : "";
@@ -298,12 +299,13 @@ function PhaseView({ project }: { project: Awaited<ReturnType<typeof loadProject
     <>
       <div
         className="data-hd"
-        style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 92px" }}
+        style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 130px 92px" }}
       >
         <span className="col-label">Phase</span>
         <span className="col-label" style={{ textAlign: "right" }}>Budget</span>
         <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
         <span className="col-label" style={{ textAlign: "right" }}>Variance</span>
+        <span className="col-label">Status</span>
         <span className="col-label">Draw status</span>
       </div>
       {project.phases.map((p) => {
@@ -323,19 +325,30 @@ function PhaseView({ project }: { project: Awaited<ReturnType<typeof loadProject
         const varCol = p.status === PhaseStatus.NotStarted
           ? <span style={{ color: "var(--text-tertiary)" }}>—</span>
           : <span style={{ color: v > 0 ? "var(--amber)" : "var(--green)" }}>{v > 0 ? `+${fmt$(v)}` : v < 0 ? `${fmt$(v)}` : "$0"}</span>;
+        const incompleteChecklist =
+          p.checklistItems.length > 0 &&
+          p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
         return (
           <div
             className="data-row"
-            style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 92px" }}
+            style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 130px 92px" }}
             key={p.id}
           >
             <div>
               <div className="cell-name">{p.name}</div>
-              <div className="cell-meta">Phase {p.number}{p.status === PhaseStatus.Active ? " — active" : ""}</div>
+              <div className="cell-meta">Phase {p.number}{p.status === PhaseStatus.InProgress ? " — active" : ""}</div>
             </div>
             <div style={{ textAlign: "right", fontSize: 11 }}>{fmt$(b)}</div>
             <div style={{ textAlign: "right", fontSize: 11 }}>{actCol}</div>
             <div style={{ textAlign: "right", fontSize: 10 }}>{varCol}</div>
+            <div>
+              <PhaseStatusSelect
+                phaseId={p.id}
+                projectId={project.code}
+                currentStatus={p.status}
+                incompleteChecklist={incompleteChecklist}
+              />
+            </div>
             <span className={`cell-tag ${tagCls}`}>{tagLabel}</span>
           </div>
         );

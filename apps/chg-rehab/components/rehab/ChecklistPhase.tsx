@@ -9,9 +9,10 @@ import {
   BILLING_BLOCKED_MESSAGE,
   notifyBillingBlocked,
 } from "@/lib/billing-blocked-client";
+import type { PhaseStatus } from "@prisma/client";
+import { phaseStatusLabel } from "./PhaseStatusSelect";
 
 type ChecklistItemStatus = "Pending" | "Done" | "NA" | "Flagged";
-type PhaseStatusLabel = "NotStarted" | "Active" | "Complete" | "OnHold";
 type DrawStatusLabel = "Pending" | "Approved" | "Paid" | "Rejected";
 
 type Item = {
@@ -27,7 +28,7 @@ type Phase = {
   name: string;
   startLabel: string;
   endLabel: string;
-  status: PhaseStatusLabel;
+  status: PhaseStatus;
 };
 
 type Draw = {
@@ -73,9 +74,9 @@ export default function ChecklistPhase({
   const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
   const isReleased = !!draw && (draw.status === "Approved" || draw.status === "Paid");
-  const phStCls = phase.status === "Complete" ? "st-done" : phase.status === "Active" ? "st-act" : "st-wait";
-  const phStLabel = phase.status === "Complete" ? "Complete" : phase.status === "Active" ? "In progress" : "Not started";
-  const pnCls = phase.status === "Complete" ? "pn-g" : phase.status === "Active" ? "pn-b" : "pn-gr";
+  const phStCls = phase.status === "Done" ? "st-done" : phase.status === "InProgress" ? "st-act" : "st-wait";
+  const phStLabel = phaseStatusLabel(phase.status);
+  const pnCls = phase.status === "Done" ? "pn-g" : phase.status === "InProgress" ? "pn-b" : "pn-gr";
 
   const drawChipBg = isReleased
     ? { background: "var(--green-bg)", color: "var(--green-txt)" }
@@ -209,14 +210,14 @@ export default function ChecklistPhase({
             setOpen((v) => !v);
           }
         }}
-        style={phase.status === "Active" ? { background: "#fff" } : undefined}
+        style={phase.status === "InProgress" ? { background: "#fff" } : undefined}
       >
         <div className={`pnum ${pnCls}`}>{phase.number}</div>
         <div className="ph-name-wrap">
           <div style={{ fontSize: 11, fontWeight: 500 }}>{phase.name}</div>
           <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
             Phase {phase.number} · {phase.startLabel} – {phase.endLabel}
-            {phase.status === "Active" ? " — In progress" : ""}
+            {phase.status === "InProgress" ? " — In progress" : ""}
           </div>
         </div>
         <span className={`st-badge ${phStCls}`} style={{ fontSize: 9, flexShrink: 0 }}>{phStLabel}</span>

@@ -5,6 +5,7 @@ import { formatET } from "@/lib/datetime";
 import { ChecklistStatus, PhaseStatus } from "@prisma/client";
 import { parseProjectMeta } from "@/lib/rehab/types";
 import ScheduleViewToggle from "@/components/rehab/ScheduleViewToggle";
+import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
 import GanttChart, { type GanttPhase } from "@/components/rehab/GanttChart";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export default async function SchedulePage({
   const totalDays = Math.round(totalMs / 86_400_000) + 1;
   const elapsed = Math.max(0, Math.min(totalDays, Math.round((Date.now() - start.getTime()) / 86_400_000)));
   const remaining = Math.max(0, totalDays - elapsed);
-  const active = project.phases.find((p) => p.status === PhaseStatus.Active);
+  const active = project.phases.find((p) => p.status === PhaseStatus.InProgress);
 
   // Serialized phase data for the interactive (client) Gantt. Dependency-aware
   // scheduling, critical path, arrows, progress fill and zoom are computed there.
@@ -141,14 +142,11 @@ export default async function SchedulePage({
               const ps = phaseStart(p);
               const pe = phaseEnd(p);
               const days = phaseDays(p);
-              const stCls =
-                p.status === PhaseStatus.Complete ? "st-done" : p.status === PhaseStatus.Active ? "st-act" : "st-wait";
-              const stLabel =
-                p.status === PhaseStatus.Complete ? "Complete" : p.status === PhaseStatus.Active ? "In progress" : "Pending";
               const done = p.checklistItems.filter(
                 (i) => i.status === ChecklistStatus.Done || i.status === ChecklistStatus.NA
               ).length;
               const totalItems = p.checklistItems.length;
+              const incompleteChecklist = totalItems > 0 && done < totalItems;
               return (
                 <div
                   className="data-row"
@@ -166,14 +164,21 @@ export default async function SchedulePage({
                   <div style={{ fontSize: 11 }}>{formatET(ps, false)}</div>
                   <div style={{ fontSize: 11 }}>{formatET(pe, false)}</div>
                   <div style={{ fontSize: 11, textAlign: "right" }}>{days}</div>
-                  <span className={`st-badge ${stCls}`} style={{ fontSize: 9 }}>{stLabel}</span>
+                  <div>
+                    <PhaseStatusSelect
+                      phaseId={p.id}
+                      projectId={project.code}
+                      currentStatus={p.status}
+                      incompleteChecklist={incompleteChecklist}
+                    />
+                  </div>
                   <div style={{ textAlign: "right", fontSize: 11, fontWeight: 500 }}>{fmt$(Number(p.budget ?? 0))}</div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <GanttChart phases={ganttPhases} />
+          <GanttChart phases={ganttPhases} projectId={project.code} />
         )}
       </div>
     </div>

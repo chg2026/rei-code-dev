@@ -18,12 +18,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
   if (!property) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const existing = await prisma.project.findFirst({
-    where: { companyId: user.companyId, propertyId: property.id, status: { not: ProjectStatus.Complete } },
-  });
-  if (existing) {
-    return NextResponse.json({ error: "Property already has an active project" }, { status: 400 });
-  }
+  // A property can host multiple rehab projects (e.g. a second renovation
+  // cycle), so we no longer block when an active project already exists.
 
   const body = await req.json().catch(() => ({}));
   const name = (body.name as string | undefined)?.trim() || `${property.address} — Rehab project`;

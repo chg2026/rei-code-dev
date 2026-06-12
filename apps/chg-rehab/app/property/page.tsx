@@ -300,15 +300,18 @@ function statusBadgeStyle(status: string): React.CSSProperties {
 // ── Overview ──────────────────────────────────────────────────────────
 async function OverviewTab({ property, companyId }: { property: NonNullable<Awaited<ReturnType<typeof prisma.property.findFirst>>>; companyId: string }) {
   const m = (property.meta || {}) as PropertyMeta;
-  // Fetch project and settings in parallel (activity needs project.id for its OR clause).
-  const [project, setting] = await Promise.all([
-    prisma.project.findFirst({
+  // Fetch projects and settings in parallel (activity needs project.id for its OR clause).
+  const [projects, setting] = await Promise.all([
+    prisma.project.findMany({
       where: { companyId, propertyId: property.id },
       orderBy: { createdAt: "desc" },
       include: { phases: true },
     }),
     prisma.companySetting.findUnique({ where: { companyId } }),
   ]);
+  // Most-recent project drives the headline "Active project" card; the rest are listed below.
+  const project = projects[0] ?? null;
+  const otherProjects = projects.slice(1);
 
   const activity = await prisma.activityLogEntry.findMany({
     where: { companyId, OR: [{ entityId: property.id }, { entityId: project?.id || "_none_" }] },
@@ -321,7 +324,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
   const acquisitionCost = m.purchasePrice ?? null;
   const totalInvested = (m.purchasePrice ?? 0) + (m.closingCosts ?? 0) + (m.rehabSpent ?? 0);
   const profit = (m.arv ?? 0) - totalInvested;
-  const activePhase = project?.phases.find((p) => p.status === "Active");
+  const activePhase = project?.phases.find((p) => p.status === "InProgress");
   const settingMeta = (setting?.meta as Record<string, unknown> | null) ?? {};
   const defaultProjectMode = (settingMeta.defaultProjectMode as string | undefined) ?? null;
 
@@ -444,6 +447,47 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                   </span>
                 </div>
               </div>
+            </>
+          )}
+
+          {project && (
+            <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-lo)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {projects.length === 1
+                  ? "Need a separate scope? You can run more than one project on this property."
+                  : `${projects.length} projects on this property.`}
+              </div>
+              <StartRehabButton
+                label="Start another project"
+                seed={{
+                  propertyId: property.id,
+                  address: property.address,
+                  purchasePrice: m.purchasePrice ?? null,
+                  acquisitionDate: acquiredISO,
+                  defaultMode: defaultProjectMode,
+                }}
+              />
+            </div>
+          )}
+
+          {otherProjects.length > 0 && (
+            <>
+              <div className="sec-hd">Other projects</div>
+              {otherProjects.map((op) => (
+                <Link
+                  key={op.id}
+                  href={`/rehab?project=${op.code}`}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "0.5px solid var(--border-lo)", textDecoration: "none", color: "inherit" }}
+                >
+                  <div>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Project {op.code}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, marginTop: 2 }}>{op.name}</div>
+                  </div>
+                  <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 3, background: "var(--blue-bg)", color: "var(--blue-txt)" }}>
+                    {op.status === "Active" ? "In progress" : op.status}
+                  </span>
+                </Link>
+              ))}
             </>
           )}
 
@@ -767,9 +811,9 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
           <FinSection
             title={`Rehab costs — ${project?.code}`}
             rows={phases.map((p) => ({
-              lbl: `Phase ${p.number} — ${p.name}${p.status === "Active" ? " (projected)" : p.status === "NotStarted" ? " (budgeted)" : ""}`,
+              lbl: `Phase ${p.number} — ${p.name}${p.status === "InProgress" ? " (projected)" : p.status === "NotStarted" ? " (budgeted)" : ""}`,
               val: formatMoney(p.actual ? Number(p.actual) : Number(p.budget || 0)),
-              valColor: p.status === "Active" ? "#BA7517" : p.status === "NotStarted" ? "var(--text-tertiary)" : undefined,
+              valColor: p.status === "InProgress" ? "#BA7517" : p.status === "NotStarted" ? "var(--text-tertiary)" : undefined,
             }))}
             total={{ lbl: "Total rehab (projected)", val: formatMoney(totalRehabProjected), color: "#BA7517" }}
           />

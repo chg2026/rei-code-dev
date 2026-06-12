@@ -6,6 +6,7 @@ import { PhaseStatus } from "@prisma/client";
 import { can } from "@/lib/permissions";
 import { parseProjectMeta } from "@/lib/rehab/types";
 import SowPhase from "@/components/rehab/SowPhase";
+import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
 import SowActions from "@/components/rehab/SowActions";
 import SowPhaseDetails from "@/components/rehab/SowPhaseDetails";
 import SowTemplatePicker from "@/components/rehab/SowTemplatePicker";
@@ -98,17 +99,18 @@ export default async function SowPage({
             const days = p.startDate && p.endDate
               ? Math.max(1, Math.round((p.endDate.getTime() - p.startDate.getTime()) / 86_400_000) + 1)
               : 0;
-            const stClass =
-              p.status === PhaseStatus.Complete ? "st-done" : p.status === PhaseStatus.Active ? "st-act" : "st-wait";
             const stLabel =
-              p.status === PhaseStatus.Complete ? "Complete" : p.status === PhaseStatus.Active ? "Active" : "Not started";
+              p.status === PhaseStatus.Done ? "Complete" : p.status === PhaseStatus.InProgress ? "Active" : "Not started";
             const pnClass =
-              p.status === PhaseStatus.Complete ? "pn-g" : p.status === PhaseStatus.Active ? "pn-b" : "pn-gr";
+              p.status === PhaseStatus.Done ? "pn-g" : p.status === PhaseStatus.InProgress ? "pn-b" : "pn-gr";
+            const incompleteChecklist =
+              p.checklistItems.length > 0 &&
+              p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
             return (
               <SowPhase
                 key={p.id}
                 anchorId={`sow-phase-${p.number}`}
-                defaultOpen={p.status === PhaseStatus.Active || idx === 0}
+                defaultOpen={p.status === PhaseStatus.InProgress || idx === 0}
                 forceOpen={!Number.isNaN(focusPhase) && focusPhase === p.number}
                 header={
                   <>
@@ -126,7 +128,12 @@ export default async function SowPage({
                     <span style={{ fontSize: 11, fontWeight: 500, textAlign: "right" }}>
                       {fmt$(Number(p.budget ?? 0))}
                     </span>
-                    <span className={`st-badge ${stClass}`} style={{ fontSize: 9 }}>{stLabel}</span>
+                    <PhaseStatusSelect
+                      phaseId={p.id}
+                      projectId={project.code}
+                      currentStatus={p.status}
+                      incompleteChecklist={incompleteChecklist}
+                    />
                   </>
                 }
               >
@@ -153,8 +160,8 @@ export default async function SowPage({
                     </div>
                     {section.lineItems.map((li) => {
                       const est = Number(li.totalCost ?? 0);
-                      const phaseDone = p.status === PhaseStatus.Complete;
-                      const phaseActive = p.status === PhaseStatus.Active;
+                      const phaseDone = p.status === PhaseStatus.Done;
+                      const phaseActive = p.status === PhaseStatus.InProgress;
                       const isCO = /\(CO\)|CO\)/.test(li.description);
                       const actClass = isCO && phaseActive ? "li-act-a" : phaseDone ? "li-act-g" : "li-est";
                       const actVal = phaseDone || isCO ? `$${est.toLocaleString()}` : "—";

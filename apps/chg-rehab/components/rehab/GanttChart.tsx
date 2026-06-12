@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PhaseStatus } from "@prisma/client";
+import PhaseStatusSelect from "./PhaseStatusSelect";
 
 const DAY = 86_400_000;
 
@@ -33,24 +35,60 @@ const COLORS = {
   pend: "#D3D1C7",
   critical: "#C0392B",
   shifted: "#F59E0B",
+  stuck: "#E07A6B",
+  review: "#B69BE6",
+  inspect: "#5FBFAE",
+  materials: "#E8C36A",
+  delayed: "#D98445",
+  hold: "#9AA3B0",
+  canceled: "#BBB8B0",
   arrow: "#9A968A",
   arrowDelay: "#C0392B",
 };
 
 function statusColor(status: string): string {
-  if (status === "Complete") return COLORS.done;
-  if (status === "Active") return COLORS.act;
-  return COLORS.pend;
+  switch (status) {
+    case "Done":
+      return COLORS.done;
+    case "InProgress":
+      return COLORS.act;
+    case "Stuck":
+      return COLORS.stuck;
+    case "ReadyForReview":
+      return COLORS.review;
+    case "PendingInspection":
+      return COLORS.inspect;
+    case "WaitingOnMaterials":
+      return COLORS.materials;
+    case "Delayed":
+      return COLORS.delayed;
+    case "OnHold":
+      return COLORS.hold;
+    case "Canceled":
+      return COLORS.canceled;
+    default:
+      return COLORS.pend; // NotStarted + unknown
+  }
 }
 
+// Statuses that represent in-flight work and should reflect checklist progress.
+const ACTIVE_STATUSES = new Set([
+  "InProgress",
+  "Stuck",
+  "ReadyForReview",
+  "PendingInspection",
+  "WaitingOnMaterials",
+  "Delayed",
+]);
+
 function progressFor(p: GanttPhase): number {
-  if (p.status === "Complete") return 100;
-  if (p.status === "Active") {
+  if (p.status === "Done") return 100;
+  if (ACTIVE_STATUSES.has(p.status)) {
     return p.checklistTotal > 0
       ? Math.round((p.checklistDone / p.checklistTotal) * 100)
       : 50;
   }
-  return 0;
+  return 0; // NotStarted, OnHold, Canceled
 }
 
 function fmtMD(ms: number | null): string {
@@ -66,10 +104,27 @@ type Computed = {
   shifted: boolean;
 };
 
-export default function GanttChart({ phases }: { phases: GanttPhase[] }) {
+export default function GanttChart({
+  phases,
+  projectId,
+}: {
+  phases: GanttPhase[];
+  projectId: string;
+}) {
   const [zoom, setZoom] = useState<Zoom>("month");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [avail, setAvail] = useState(900);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function enterBar(n: number) {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHovered(n);
+  }
+  function leaveBar() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHovered(null), 160);
+  }
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -266,8 +321,12 @@ export default function GanttChart({ phases }: { phases: GanttPhase[] }) {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginLeft: "auto" }}>
           <LegendItem color={COLORS.critical} label="Critical path" />
           <LegendItem color={COLORS.act} label="In progress" />
-          <LegendItem color={COLORS.done} label="Complete" />
-          <LegendItem color={COLORS.pend} label="Pending" />
+          <LegendItem color={COLORS.done} label="Done" />
+          <LegendItem color={COLORS.stuck} label="Stuck" />
+          <LegendItem color={COLORS.delayed} label="Delayed" />
+          <LegendItem color={COLORS.materials} label="Waiting" />
+          <LegendItem color={COLORS.hold} label="On hold" />
+          <LegendItem color={COLORS.pend} label="Not started" />
           <LegendItem color={COLORS.shifted} label="Shifted" />
         </div>
       </div>
@@ -412,50 +471,91 @@ export default function GanttChart({ phases }: { phases: GanttPhase[] }) {
               const width = Math.max(4, ((end - c.start) / DAY) * pxPerDay);
               const base = isCrit ? COLORS.critical : statusColor(p.status);
               const progress = progressFor(p);
+              const incompleteChecklist =
+                p.checklistTotal > 0 && p.checklistDone < p.checklistTotal;
               return (
-                <div
-                  key={p.id}
-                  style={{
-                    position: "absolute",
-                    top: idx * ROW_H + BAR_TOP,
-                    left,
-                    width,
-                    height: BAR_H,
-                    background: base,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    zIndex: 2,
-                  }}
-                  title={`${p.name} · ${fmtMD(c.start)}–${fmtMD(c.end)} · ${progress}%${
-                    isCrit ? " · critical path" : ""
-                  }${c.shifted ? " · shifted" : ""}`}
-                >
-                  {/* ENHANCEMENT 4 — progress fill (lighter shade from left) */}
-                  {progress > 0 && (
+                <div key={p.id} style={{ display: "contents" }}>
+                  <div
+                    onMouseEnter={() => enterBar(p.number)}
+                    onMouseLeave={leaveBar}
+                    style={{
+                      position: "absolute",
+                      top: idx * ROW_H + BAR_TOP,
+                      left,
+                      width,
+                      height: BAR_H,
+                      background: base,
+                      borderRadius: 3,
+                      overflow: "hidden",
+                      zIndex: 2,
+                      cursor: "pointer",
+                    }}
+                    title={`${p.name} · ${fmtMD(c.start)}–${fmtMD(c.end)} · ${progress}%${
+                      isCrit ? " · critical path" : ""
+                    }${c.shifted ? " · shifted" : ""}`}
+                  >
+                    {/* ENHANCEMENT 4 — progress fill (lighter shade from left) */}
+                    {progress > 0 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: `${progress}%`,
+                          background: "rgba(255,255,255,0.55)",
+                        }}
+                      />
+                    )}
+                    {c.shifted && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 2,
+                          top: 0,
+                          bottom: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          fontSize: 9,
+                          color: COLORS.shifted,
+                          fontWeight: 700,
+                        }}
+                      >
+                        ⚠
+                      </div>
+                    )}
+                  </div>
+                  {hovered === p.number && (
                     <div
+                      onMouseEnter={() => enterBar(p.number)}
+                      onMouseLeave={leaveBar}
                       style={{
                         position: "absolute",
-                        inset: 0,
-                        width: `${progress}%`,
-                        background: "rgba(255,255,255,0.55)",
-                      }}
-                    />
-                  )}
-                  {c.shifted && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        right: 2,
-                        top: 0,
-                        bottom: 0,
+                        top: idx * ROW_H + ROW_H - 4,
+                        left: Math.max(0, Math.min(left, trackW - 196)),
+                        zIndex: 5,
+                        background: "var(--bg-surface, #fff)",
+                        border: "0.5px solid var(--border-mid)",
+                        borderRadius: 6,
+                        boxShadow: "0 4px 16px rgba(0,0,0,0.14)",
+                        padding: 8,
                         display: "flex",
-                        alignItems: "center",
-                        fontSize: 9,
-                        color: COLORS.shifted,
-                        fontWeight: 700,
+                        flexDirection: "column",
+                        gap: 6,
+                        minWidth: 188,
                       }}
                     >
-                      ⚠
+                      <div style={{ fontSize: 11, fontWeight: 600 }}>
+                        {p.number}. {p.name}
+                      </div>
+                      <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
+                        {fmtMD(c.start)} – {fmtMD(c.end)} · {progress}%
+                        {isCrit ? " · critical" : ""}
+                      </div>
+                      <PhaseStatusSelect
+                        phaseId={p.id}
+                        projectId={projectId}
+                        currentStatus={p.status as PhaseStatus}
+                        incompleteChecklist={incompleteChecklist}
+                      />
                     </div>
                   )}
                 </div>

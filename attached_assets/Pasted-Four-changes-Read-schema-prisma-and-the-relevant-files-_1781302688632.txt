@@ -1,0 +1,84 @@
+Four changes. Read schema.prisma and the relevant files before touching anything.
+
+CHANGE 1 — Expanded phase statuses
+
+STEP A — Schema (raw SQL + prisma generate):
+Run migration at apps/chg-rehab/scripts/migrate-phase-status.ts:
+
+-- Drop old enum and recreate with full status set
+ALTER TYPE "PhaseStatus" RENAME TO "PhaseStatus_old";
+CREATE TYPE "PhaseStatus" AS ENUM (
+  'NotStarted',
+  'InProgress',
+  'Stuck',
+  'ReadyForReview',
+  'PendingInspection',
+  'WaitingOnMaterials',
+  'Delayed',
+  'OnHold',
+  'Done',
+  'Canceled'
+);
+ALTER TABLE "Phase" ALTER COLUMN status TYPE "PhaseStatus" USING status::text::"PhaseStatus";
+DROP TYPE "PhaseStatus_old";
+
+Update schema.prisma PhaseStatus enum to match. Run: npx prisma generate
+
+STEP B — Shared PhaseStatusSelect component
+Create apps/chg-rehab/components/rehab/PhaseStatusSelect.tsx
+
+A compact dropdown that shows the current status as a colored badge. On click opens a dropdown with all statuses. Each status has a color:
+- NotStarted = gray
+- InProgress = blue  
+- Stuck = red
+- ReadyForReview = purple
+- PendingInspection = orange
+- WaitingOnMaterials = yellow
+- Delayed = red-orange
+- OnHold = gray-blue
+- Done = green
+- Canceled = dark gray strikethrough
+
+Props: { phaseId: string; projectId: string; currentStatus: PhaseStatus; onUpdate: (newStatus: PhaseStatus) => void }
+
+On status change: PATCH /api/rehab/[projectId]/phases/[phaseId] with { status }
+
+If new status is 'Done': check if all checklist items for this phase are complete. If not, show a browser confirm() dialog: "This phase has incomplete checklist items. Mark as Done anyway?" — only proceed if user confirms.
+
+STEP C — Wire PhaseStatusSelect into:
+1. apps/chg-rehab/components/rehab/SowPhase.tsx — replace any existing status display in the phase row header
+2. apps/chg-rehab/app/rehab/[projectId]/schedule/page.tsx — add status badge + dropdown on each phase row in the list view, and on hover of Gantt bars
+3. apps/chg-rehab/app/rehab/[projectId]/budget/page.tsx — add status column to the phase budget table
+4. apps/chg-rehab/app/rehab/[projectId]/overview/page.tsx — add status dropdown to each row in the phase progress tracker table
+
+---
+
+CHANGE 2 — Delete project
+
+In apps/chg-rehab/app/rehab/[projectId]/overview/page.tsx (or the layout), add a "Delete Project" button — place it in the ProjectBar or a settings/kebab menu in the top right of the project detail pane.
+
+On click: show confirm dialog "Delete project [code]? This cannot be undone." On confirm: DELETE /api/rehab/[projectId]
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/route.ts if it doesn't exist:
+- DELETE: auth-guard, verify project belongs to company, delete project (cascade will handle phases, draws, invoices, change orders, etc.), redirect response to /rehab
+
+---
+
+CHANGE 3 — Multiple projects per property
+
+Read the current constraint. The property likely shows "Start rehab project" only if no project exists, and blocks creating a second one.
+
+Fix:
+1. Remove any unique constraint on (propertyId) in the Project table if it exists:
+   Run SQL: ALTER TABLE "Project" DROP CONSTRAINT IF EXISTS "Project_propertyId_key";
+   Update schema.prisma to remove @unique from propertyId if present. Run: npx prisma generate
+
+2. In the property overview page (apps/chg-rehab/app/property/[...]/page.tsx or similar), find where it shows the single "Active Project" section. Change it to show ALL projects for this property in a list. Each project shows: code, name, status, budget, start date, "Open in Rehab Manager →" link.
+
+3. The "Start rehab project" / "Start new project" button should always be available (no longer hidden when a project exists).
+
+4. In AddProjectModal.tsx — if opened from a property page, pre-fill the propertyId. Allow creating multiple projects for same property without error.
+
+---
+
+Run npx tsc --noEmit. Fix errors. Report what changed.

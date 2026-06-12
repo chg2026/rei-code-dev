@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
-import { Prisma } from "@prisma/client";
+import { Prisma, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +79,14 @@ export async function PATCH(
   }
 
   const data: Prisma.PhaseUpdateInput = {};
+
+  if ("status" in body) {
+    const s = body.status;
+    if (typeof s !== "string" || !(Object.values(PhaseStatus) as string[]).includes(s)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    data.status = s as PhaseStatus;
+  }
 
   if ("description" in body) {
     data.description =

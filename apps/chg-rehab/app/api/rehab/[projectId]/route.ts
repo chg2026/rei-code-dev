@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 async function resolveProject(projectIdOrCode: string, companyId: string) {
   return prisma.project.findFirst({
     where: { companyId, OR: [{ id: projectIdOrCode }, { code: projectIdOrCode }] },
-    select: { id: true, meta: true },
+    select: { id: true, code: true, meta: true },
   });
 }
 
@@ -62,4 +63,38 @@ export async function PATCH(
 
   await prisma.project.update({ where: { id: project.id }, data: { meta } });
   return NextResponse.json({ ok: true, actualEndDate });
+}
+
+/**
+ * Delete a project (and, via cascading FKs, all of its phases, draws, SOW
+ * sections, addenda, assignments, invoices, and change orders). Optional
+ * relations (documents, warehouse allocations) are detached, not deleted.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await can(user, "rehab", "edit"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const { projectId } = await params;
+  const project = await resolveProject(decodeURIComponent(projectId), user.companyId);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.project.delete({ where: { id: project.id } });
+
+  await prisma.activityLogEntry.create({
+    data: {
+      companyId: user.companyId,
+      actorId: user.id,
+      action: "project.deleted",
+      entity: "Project",
+      entityId: project.id,
+      message: `Rehab project ${project.code} deleted`,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
 }

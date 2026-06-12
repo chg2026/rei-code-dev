@@ -392,7 +392,7 @@ async function main() {
     items: Array<{ label: string; status: ChecklistStatus; req?: string }>;
   }> = [
     {
-      number: 1, name: "Demolition", status: PhaseStatus.Complete,
+      number: 1, name: "Demolition", status: PhaseStatus.Done,
       budget: "3200", actual: "3200", startDate: "2026-03-01", endDate: "2026-03-10",
       drawNote: "Draw #1 paid",
       items: [
@@ -402,7 +402,7 @@ async function main() {
       ],
     },
     {
-      number: 2, name: "Framing & rough-in", status: PhaseStatus.Complete,
+      number: 2, name: "Framing & rough-in", status: PhaseStatus.Done,
       budget: "4800", actual: "4800", startDate: "2026-03-11", endDate: "2026-03-25",
       drawNote: "Draw #2 paid",
       items: [
@@ -413,7 +413,7 @@ async function main() {
       ],
     },
     {
-      number: 3, name: "Plumbing & electrical", status: PhaseStatus.Complete,
+      number: 3, name: "Plumbing & electrical", status: PhaseStatus.Done,
       budget: "6400", actual: "6400", startDate: "2026-03-26", endDate: "2026-04-10",
       drawNote: "Draw #3 paid",
       items: [
@@ -424,7 +424,7 @@ async function main() {
       ],
     },
     {
-      number: 4, name: "Drywall hang & mud", status: PhaseStatus.Complete,
+      number: 4, name: "Drywall hang & mud", status: PhaseStatus.Done,
       budget: "4000", actual: "4000", startDate: "2026-04-11", endDate: "2026-04-22",
       drawNote: "Draw #4 paid",
       items: [
@@ -435,7 +435,7 @@ async function main() {
       ],
     },
     {
-      number: 5, name: "Flooring", status: PhaseStatus.Active,
+      number: 5, name: "Flooring", status: PhaseStatus.InProgress,
       budget: "8000", actual: "9760", startDate: "2026-04-23", endDate: "2026-05-01",
       drawNote: "Draw #5 pending",
       items: [

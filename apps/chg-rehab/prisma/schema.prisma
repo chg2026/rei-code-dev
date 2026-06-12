@@ -684,9 +684,15 @@ enum ProjectStatus {
 
 enum PhaseStatus {
   NotStarted
-  Active
-  Complete
+  InProgress
+  Stuck
+  ReadyForReview
+  PendingInspection
+  WaitingOnMaterials
+  Delayed
   OnHold
+  Done
+  Canceled
 }
 
 enum ChecklistStatus {

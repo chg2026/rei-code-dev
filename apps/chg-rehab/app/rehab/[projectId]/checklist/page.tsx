@@ -52,9 +52,9 @@ export default async function ChecklistPage({
           <div id="cl-phases">
             {project.phases.map((p) => {
               const gate = computeGate(p, p.checklistItems, p.draws[0] ?? null);
-              const isActive = p.status === PhaseStatus.Active;
+              const isActive = p.status === PhaseStatus.InProgress;
               const isFocused = focusPhase === p.number;
-              const defaultOpen = isFocused || (focusPhase == null && (isActive || p.status === PhaseStatus.Complete && p.number === 4));
+              const defaultOpen = isFocused || (focusPhase == null && (isActive || p.status === PhaseStatus.Done && p.number === 4));
               const draw = p.draws[0] ?? null;
               return (
                 <ChecklistPhase

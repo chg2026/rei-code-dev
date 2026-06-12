@@ -3,18 +3,26 @@ import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { billingAwareErrorMessage } from "@/lib/billing-blocked-client";
 
-type Property = { id: string; code: string; address: string; city: string | null; state: string | null };
+export type Property = { id: string; code: string; address: string; city: string | null; state: string | null };
 
-export default function AddProjectModal({ onClose }: { onClose: () => void }) {
+export default function AddProjectModal({
+  onClose,
+  initialProperty = null,
+}: {
+  onClose: () => void;
+  initialProperty?: Property | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialProperty?.address ?? "");
   const [properties, setProperties] = useState<Property[]>([]);
-  const [selected, setSelected] = useState<Property | null>(null);
+  const [selected, setSelected] = useState<Property | null>(initialProperty);
   const [dropOpen, setDropOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(
+    initialProperty ? `${initialProperty.address} — Rehab project` : ""
+  );
   const [budget, setBudget] = useState("");
   const dropRef = useRef<HTMLDivElement>(null);
 

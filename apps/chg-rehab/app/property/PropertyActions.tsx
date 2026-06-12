@@ -112,7 +112,7 @@ export function ChangeToRentalButton({ property }: { property: PropertyLite }) {
   );
 }
 
-export function StartRehabButton({ seed }: { seed: StartRehabSeed }) {
+export function StartRehabButton({ seed, label }: { seed: StartRehabSeed; label?: string }) {
   const [open, setOpen] = useState(false);
   const gate = useBillingGateProps();
   return (
@@ -125,7 +125,7 @@ export function StartRehabButton({ seed }: { seed: StartRehabSeed }) {
         style={gate.style}
         aria-disabled={gate.disabled || undefined}
       >
-        Start rehab project →
+        {label ?? "Start rehab project →"}
       </button>
       {open && <StartRehabModal seed={seed} onClose={() => setOpen(false)} />}
     </>

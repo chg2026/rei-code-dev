@@ -3,6 +3,7 @@ import Link from "next/link";
 import ProjectBar from "@/components/rehab/ProjectBar";
 import TabNav from "@/components/rehab/TabNav";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { prisma } from "@/lib/prisma";
 
@@ -24,6 +25,7 @@ export default async function RehabProjectLayout({
   const code = decodeURIComponent(projectId);
   const project = await loadProjectByCode(user.companyId, code);
   if (!project) notFound();
+  const canDelete = await can(user, "rehab", "edit");
   const allProjects = await prisma.project.findMany({
     where: { companyId: user.companyId },
     include: {
@@ -79,7 +81,7 @@ export default async function RehabProjectLayout({
 
       {/* RIGHT: project detail */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
-        <ProjectBar project={project} />
+        <ProjectBar project={project} canDelete={canDelete} />
         <TabNav projectCode={project.code} />
         {children}
       </div>
