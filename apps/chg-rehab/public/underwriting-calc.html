@@ -1841,6 +1841,30 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
+
+    // ─── State persistence (survives iframe remount / re-navigation) ───
+    // Keyed per property so one property's inputs never bleed into another's.
+    var storageKey = 'uw-calc-state:' + (propertyId || 'default');
+
+    function calcFields() {
+      var nodes = document.querySelectorAll('#screen-calc input, #screen-calc select, #screen-calc textarea');
+      return Array.prototype.filter.call(nodes, function(el) {
+        if (!el.id) return false;
+        var t = (el.type || '').toLowerCase();
+        if (t === 'range' || t === 'button' || t === 'submit' || t === 'checkbox' || t === 'radio') return false;
+        if (el.readOnly || el.disabled) return false;
+        return true;
+      });
+    }
+
+    function activeStrategy() {
+      var br = document.getElementById('tab-brrrr');
+      if (br && br.classList.contains('active')) return 'brrrr';
+      var wh = document.getElementById('tab-wholesale');
+      if (wh && wh.classList.contains('active')) return 'wholesale';
+      return 'flip';
+    }
+
     var purchase = params.get("purchase");
     var rehab = params.get("rehab");
     var arv = params.get("arv");
@@ -1848,27 +1872,96 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     var holding = params.get("holding");
     var strategy = params.get("strategy");
 
-    if (purchase) setVal('ap-price', purchase);
-    if (rehab) setVal('ap-rehab', rehab);
-    if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
-    if (closing) setVal('ap-closing', closing);
-    if (holding) setVal('ap-holding', holding);
+    // Signature of the analysis the current URL is asking to load. Persisted
+    // alongside the values so we can tell a remount/reload of the *same* view
+    // (restore edits) apart from an explicit open of a *different* saved
+    // analysis via deep-link params (seed from the params instead).
+    var seedSig = JSON.stringify({
+      purchase: purchase || '', rehab: rehab || '', arv: arv || '',
+      closing: closing || '', holding: holding || '', strategy: strategy || ''
+    });
+    var hasCoreParams = !!(purchase || rehab || arv || closing || holding || strategy);
 
-    // Switch to the correct strategy tab if specified
-    if (strategy) {
-      var tabMap = { brrrr: 'tab-brrrr', flip: 'tab-flip', wholesale: 'tab-wholesale' };
-      var tabId = tabMap[strategy.toLowerCase()];
-      if (tabId) {
-        var tab = document.getElementById(tabId);
-        if (tab) tab.click();
-      }
+    function persistState() {
+      try {
+        var data = {};
+        calcFields().forEach(function(el) { data[el.id] = el.value; });
+        data.__strategy = activeStrategy();
+        data.__seed = seedSig;
+        sessionStorage.setItem(storageKey, JSON.stringify(data));
+      } catch (e) {}
     }
+
+    function readStored() {
+      var raw;
+      try { raw = sessionStorage.getItem(storageKey); } catch (e) { return null; }
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch (e) { return null; }
+    }
+
+    function applyStored(data) {
+      Object.keys(data).forEach(function(id) {
+        if (id === '__strategy' || id === '__seed') return;
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.value = data[id];
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+
+    function seedFromParams() {
+      if (purchase) setVal('ap-price', purchase);
+      if (rehab) setVal('ap-rehab', rehab);
+      if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
+      if (closing) setVal('ap-closing', closing);
+      if (holding) setVal('ap-holding', holding);
+    }
+
+    function clickStrategyTab(strat) {
+      if (!strat) return;
+      var tabMap = { brrrr: 'tab-brrrr', flip: 'tab-flip', wholesale: 'tab-wholesale' };
+      var tabId = tabMap[strat.toLowerCase()];
+      if (!tabId) return;
+      var tab = document.getElementById(tabId);
+      if (tab) tab.click();
+    }
+
+    // Precedence:
+    //  - Explicit deep-link to a *different* saved analysis (core params present
+    //    and don't match the stored seed) wins: seed from URL params so
+    //    "Open full report" always loads the analysis the user clicked.
+    //  - Otherwise (no core params, or same analysis being remounted/reloaded)
+    //    restore the user's session edits so navigation never loses work.
+    var stored = readStored();
+    var useStored = stored && (!hasCoreParams || stored.__seed === seedSig);
+
+    if (useStored) {
+      applyStored(stored);
+      clickStrategyTab(stored.__strategy || strategy);
+    } else {
+      seedFromParams();
+      clickStrategyTab(strategy);
+    }
+
+    // Persist every change (debounced) so the latest state always survives a remount.
+    var saveTimer = null;
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(persistState, 250);
+    }
+    document.addEventListener('input', scheduleSave);
+    document.addEventListener('change', scheduleSave);
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.closest && e.target.closest('.tf')) scheduleSave();
+    });
 
     // Trigger recalculation after a short delay to let the DOM settle
     setTimeout(function() {
       try { recalcFlip(); } catch(e) {}
       try { recalcB(); } catch(e) {}
       try { recalc(); } catch(e) {}
+      persistState();
     }, 200);
   });
 })();
