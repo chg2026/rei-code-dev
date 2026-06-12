@@ -1,0 +1,70 @@
+Two independent features in one push.
+
+--- FEATURE 1: In-app notifications ---
+
+Check existing bell icon / notification infrastructure:
+grep -r "notification\|Notification\|inbox\|Inbox" apps/chg-rehab/components apps/chg-rehab/app/api --include="*.ts" --include="*.tsx" -l | head -10
+grep -A10 "model Notification\|model UserNotification" apps/chg-rehab/prisma/schema.prisma | head -20
+
+If no Notification model exists, add to schema.prisma:
+  model Notification {
+    id        String   @id @default(cuid())
+    userId    String
+    type      String   // "task_assigned" | "task_mentioned" | "task_due" | "comment_added" | "task_completed"
+    title     String
+    body      String
+    linkHref  String?  // where to navigate when clicked
+    read      Boolean  @default(false)
+    createdAt DateTime @default(now())
+    user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  }
+Add to UserProfile: notifications Notification[]
+Run: npx prisma db push --accept-data-loss
+
+Create server-side helper apps/chg-rehab/lib/notify.ts:
+  export async function createNotification(userId: string, type: string, title: string, body: string, linkHref?: string) {
+    await prisma.notification.create({ data: { userId, type, title, body, linkHref } });
+  }
+
+Wire notifications into existing actions:
+1. In POST /api/workspace/tasks: if assigneeId is set and != current user, call createNotification(assigneeId, "task_assigned", "New task assigned", `"${title}" was assigned to you`, `/command-center`)
+2. In POST /api/workspace/tasks/[id]/comments: for each @mention found in body (regex /@(\w+\s\w+)/g, match against team members), call createNotification(mentionedUserId, "task_mentioned", "You were mentioned", body.slice(0,80), linkHref)
+3. In POST /api/pm/tasks (if it exists): same assignee notification
+4. In PATCH /api/workspace/tasks/[id] when done=true: notify task creator if different from completer
+
+Create API routes:
+GET /api/notifications → returns { notifications, unreadCount } for current user, limit 30, ordered by createdAt desc
+PATCH /api/notifications/[id]/read → marks one as read
+PATCH /api/notifications/read-all → marks all as read for current user
+
+Build the notification bell UI in TopNav.tsx:
+- Find the bell icon (🔔 or existing bell component) in apps/chg-rehab/components/TopNav.tsx
+- Poll GET /api/notifications every 30 seconds (useEffect with setInterval)
+- Show unread count badge on bell (red dot with number, hide if 0)
+- On bell click: show dropdown panel (position: fixed, right-aligned) showing:
+  - Header: "Notifications" + "Mark all read" button
+  - List of notifications: icon by type + title + body (truncated) + relative time + unread dot
+  - Each row: clicking marks as read AND navigates to linkHref
+  - "No notifications" empty state
+- Close dropdown on outside click (useEffect with document.addEventListener)
+- Style: white bg, border-radius 12px, box-shadow 0 8px 24px rgba(0,0,0,0.12), width 360px, max-height 480px, overflow-y auto
+
+--- FEATURE 2: Underwriting — "Open full report" resets calculator ---
+
+Read apps/chg-rehab/app and find the underwriting page:
+find apps/chg-rehab/app -name "*.tsx" | xargs grep -l "underwriting\|Underwriting\|open full report\|Open full report" 2>/dev/null | head -5
+
+Read the underwriting component in full.
+
+The bug: clicking "Open full report" resets the calculator state. This is likely because:
+a) The full report is rendered in the same component and mounting it re-initializes state, OR
+b) Navigation away from the page loses unsaved calculator inputs
+
+Fix approach:
+- If (a): wrap the full report in a conditional render that doesn't unmount the calculator — use CSS display:none/block instead of conditional JSX to hide/show sections
+- If (b): save calculator inputs to localStorage on every change (useEffect watching all input values), restore from localStorage on mount
+
+Read the code first and apply whichever fix is appropriate. Do not guess — read before writing.
+
+Run: npx tsc --noEmit
+Fix all errors. Report what changed.
