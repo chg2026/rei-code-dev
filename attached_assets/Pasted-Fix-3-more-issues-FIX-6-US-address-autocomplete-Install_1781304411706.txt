@@ -1,0 +1,45 @@
+Fix 3 more issues.
+
+FIX 6 — US address autocomplete
+Install: npm install use-places-autocomplete @types/google.maps --workspace=apps/chg-rehab
+
+Read apps/chg-rehab/components/AddPropertyModal.tsx (the property creation form with Address field).
+
+Add Google Places autocomplete to the Address field:
+- Load the Google Maps Places script dynamically using the env var NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+- When user types in the Address field, show a dropdown of US-only address suggestions (componentRestrictions: { country: 'us' })
+- On select: auto-fill Address, City, State, ZIP fields from the place result address_components
+- If NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set, fall back to a plain text input (no autocomplete) — do not break the form
+
+Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY= to apps/chg-rehab/.env.example
+
+FIX 7 — Documents tab: preview uploaded files
+Read apps/chg-rehab/app/rehab/[projectId]/documents/page.tsx in full.
+
+Add a preview panel. When user clicks a document row:
+- Fetch the signed download URL for the document (GET signed URL from Supabase storage)
+- Open a right-side preview panel (createPortal, fixed, right-0, top-0, h-full, w-[480px], z-50)
+- Panel shows: document name, upload date, category, uploader
+- Preview area:
+  - PDF: render in an <iframe src={signedUrl} /> 
+  - Images (jpg/png/gif/webp): render <img src={signedUrl} />
+  - Other file types: show a download button instead of preview
+- Close button (X) at top right of panel
+
+FIX 8 — Rehab tasks show in property record + Command Center
+Read apps/chg-rehab/app/api/rehab/[projectId]/tasks/route.ts if it exists, or search for where rehab tasks are created.
+
+The issue: tasks created inside the Rehab Manager are stored in a separate model and not linked to WsTask, so they don't appear in the property Tasks tab or Command Center.
+
+Fix: when a task is created in the Rehab Manager, also create a corresponding WsTask record with:
+- title = task title
+- linkType = 'property'
+- linkId = project.propertyId
+- linkLabel = property address
+- Any other required WsTask fields
+
+If tasks are already WsTask records but just not filtered correctly in the property tab or command center, find the filter and add the missing condition.
+
+Read apps/chg-rehab/app/property/PropertyTasksTab.tsx and the Command Center task query to understand how they filter tasks — make sure rehab project tasks satisfy those filters.
+
+Run npx tsc --noEmit. Fix errors. Report what changed.

@@ -1,0 +1,61 @@
+Fix 5 issues. Read all relevant files before changing anything.
+
+FIX 1 — Rename "Phase" → "Job Type" throughout the UI
+Do a UI-only rename — do NOT change DB column names or Prisma model names.
+In every component and page under apps/chg-rehab/ that displays the word "Phase" or "phase" to the user, replace it with "Job Type" or "job type". This includes: labels, headings, table column headers, empty states, button text, tooltips. Do not rename TypeScript variable names, API route paths, or DB field names — only user-facing strings.
+
+FIX 2 — Invoice supports multiple job types
+Currently Invoice has a single phaseId. Change it to support multiple job types.
+
+Schema (raw SQL + prisma generate):
+Run migration at apps/chg-rehab/scripts/migrate-invoice-jobtypes.ts:
+
+CREATE TABLE "InvoiceJobType" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "invoiceId" TEXT NOT NULL REFERENCES "Invoice"(id) ON DELETE CASCADE,
+  "phaseId" TEXT NOT NULL,
+  amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  notes TEXT
+);
+ALTER TABLE "Invoice" DROP COLUMN IF EXISTS "phaseId";
+
+Add to schema.prisma:
+model InvoiceJobType {
+  id        String  @id @default(cuid())
+  invoiceId String
+  phaseId   String
+  amount    Decimal @db.Decimal(14, 2)
+  notes     String?
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+Remove phaseId from Invoice model. Add "jobTypes InvoiceJobType[]" to Invoice model.
+Run: npx prisma generate
+
+Update invoice API routes (GET, POST, PATCH) to include/accept jobTypes array: [{ phaseId, amount, notes }].
+On POST/PATCH: delete existing InvoiceJobType records for this invoice and recreate from the array.
+
+Update invoice form UI (the detail panel in the Invoices tab):
+- Remove single "Phase" select
+- Add "Job Types" section: a list where each row has: Job Type select (dropdown of project phases) + Amount ($) input + optional Notes + remove button
+- "+ Add Job Type" button adds a new row
+- Show running total of job type amounts vs invoice total amount
+- If totals don't match, show amber warning "Job type amounts ($X) don't match invoice total ($Y)"
+
+FIX 3 — Invoice updates budget actual spend
+When an invoice is created, updated, or deleted, the budget actual spend for each affected job type should update.
+
+In the invoice POST/PATCH/DELETE API handlers, after saving:
+- For each InvoiceJobType, if the invoice status is 'Paid': sum all paid invoice job type amounts for that phaseId and update Phase.actual to that sum (prisma.phase.update)
+- Recalculate on every invoice status change
+
+Also update the Budget & Costs page to pull actual spend from Invoice data rather than draws, or show both.
+
+FIX 4 — Material spend shows exact decimals (no rounding)
+In apps/chg-rehab/app/rehab/[projectId]/overview/page.tsx:
+Find where Labor Spend and Material Spend KPI values are formatted. Replace any Math.round() or toFixed(0) with proper currency formatting that preserves cents: use toLocaleString('en-US', { style: 'currency', currency: 'USD' }) or a formatCurrency helper that shows 2 decimal places.
+
+FIX 5 — Budget & Costs job type rows are not clickable/expandable
+Read apps/chg-rehab/app/rehab/[projectId]/budget/page.tsx in full.
+Find the job type rows — they should expand to show invoice/receipt log per job type. Fix the click handler so rows toggle open/closed. The expanded content should show: list of invoices assigned to this job type, each row showing vendor, date, amount, status badge.
+
+Run npx tsc --noEmit. Fix errors. Report what changed.
