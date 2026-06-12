@@ -26,6 +26,7 @@ export type ProjectMeta = {
   penaltyStatus: "Active" | "Paused" | "Resolved";
   penaltyAccrued: number;
   originalEndDate: string | null;
+  actualEndDate: string | null;
 };
 
 export const DEFAULT_PROJECT_META: ProjectMeta = {
@@ -37,6 +38,7 @@ export const DEFAULT_PROJECT_META: ProjectMeta = {
   penaltyStatus: "Active",
   penaltyAccrued: 0,
   originalEndDate: null,
+  actualEndDate: null,
 };
 
 export function parseProjectMeta(raw: Prisma.JsonValue | null | undefined): ProjectMeta {
@@ -54,6 +56,7 @@ export function parseProjectMeta(raw: Prisma.JsonValue | null | undefined): Proj
         : "Active",
     penaltyAccrued: typeof r.penaltyAccrued === "number" ? r.penaltyAccrued : 0,
     originalEndDate: typeof r.originalEndDate === "string" ? r.originalEndDate : null,
+    actualEndDate: typeof r.actualEndDate === "string" ? r.actualEndDate : null,
   };
 }
 

@@ -1,261 +1,112 @@
-"use client";
-
-import { useState } from "react";
+import Link from "next/link";
 
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-type KpiKey =
-  | "budget"
-  | "spent"
-  | "projected"
-  | "timeline"
-  | "penalty"
-  | "changeOrders"
-  | null;
-
 type Props = {
+  code: string;
+  rehabPct: number;
   budget: number;
-  signedAt: string;
+  budgetPct: number;
   totalSpent: number;
-  paidDrawsCount: number;
-  projectedFinal: number;
-  overage: number;
-  timelineDays: number;
-  elapsedDays: number;
-  endLabel: string;
-  addendumDays: number;
-  penaltyAccrued: number;
-  penaltyStatus: "Active" | "Paused" | "Resolved";
-  penaltyPerDiem: number;
-  pendingDrawsCount: number;
-  pendingBalance: number;
+  daysRemaining: number | null;
+  daysDelayed: number;
+  laborSpend: number;
+  materialSpend: number;
+  outstandingCount: number;
+  outstandingAmount: number;
   pendingChangeOrders: number;
 };
 
-export default function OverviewKpis(props: Props) {
-  const [open, setOpen] = useState<KpiKey>(null);
+/**
+ * Eight read-only KPI tiles for the Rehab Overview tab, in a responsive grid
+ * (4 across on desktop, 2 on mobile — see `.ov-kpis` in globals.css). The only
+ * interactive tile is "Pending change orders", which links to that tab.
+ */
+export default function OverviewKpis(p: Props) {
+  const budgetColor =
+    p.budgetPct > 100 ? "var(--danger)" : p.budgetPct >= 80 ? "var(--amber)" : "var(--green)";
+  const remainingColor =
+    p.daysRemaining !== null && p.daysRemaining < 0 ? "var(--danger)" : "inherit";
+  const delayedColor = p.daysDelayed > 0 ? "var(--danger)" : "inherit";
 
   return (
-    <>
-      <div className="kpi-strip">
-        <KpiCard onClick={() => setOpen("budget")}>
-          <div className="kpi-label">Approved budget</div>
-          <div className="kpi-val">{fmt$(props.budget)}</div>
-          <div className="kpi-sub">Signed {props.signedAt}</div>
-        </KpiCard>
-        <KpiCard onClick={() => setOpen("spent")}>
-          <div className="kpi-label">Total spent</div>
-          <div className="kpi-val">{fmt$(props.totalSpent)}</div>
-          <div className="kpi-sub">{props.paidDrawsCount} draws paid</div>
-        </KpiCard>
-        <KpiCard onClick={() => setOpen("projected")}>
-          <div className="kpi-label">Projected final</div>
-          <div className={`kpi-val ${props.overage > 0 ? "amber" : ""}`}>
-            {fmt$(props.projectedFinal)}
-          </div>
-          {props.overage !== 0 && (
-            <div
-              className="kpi-badge"
-              style={
-                props.overage > 0
-                  ? { background: "var(--amber-bg)", color: "var(--amber-txt)" }
-                  : { background: "var(--green-bg)", color: "var(--green-txt)" }
-              }
-            >
-              {props.overage > 0
-                ? `+${fmt$(props.overage)} over budget`
-                : `${fmt$(props.overage)} under budget`}
-            </div>
-          )}
-        </KpiCard>
-        <KpiCard onClick={() => setOpen("timeline")}>
-          <div className="kpi-label">Timeline</div>
-          <div className="kpi-val">{props.timelineDays} days</div>
-          <div className="kpi-sub">{props.endLabel}</div>
-          {props.addendumDays > 0 && (
-            <div
-              className="kpi-badge"
-              style={{ background: "var(--blue-bg)", color: "var(--blue-txt)" }}
-            >
-              +{props.addendumDays} day addendum
-            </div>
-          )}
-        </KpiCard>
-        <KpiCard onClick={() => setOpen("penalty")}>
-          <div className="kpi-label">Penalty accrued</div>
-          <div className="kpi-val">${props.penaltyAccrued.toLocaleString()}</div>
+    <div className="ov-kpis">
+      <div className="ov-kpi">
+        <div className="kpi-label">Rehab % complete</div>
+        <div className="kpi-val">{p.rehabPct}%</div>
+        <div className="ov-bar">
           <div
-            className="kpi-badge"
-            style={
-              props.penaltyStatus === "Paused"
-                ? { background: "var(--green-bg)", color: "var(--green-txt)" }
-                : { background: "var(--amber-bg)", color: "var(--amber-txt)" }
-            }
-          >
-            {props.penaltyStatus === "Paused" ? "Paused — exception" : props.penaltyStatus}
-          </div>
-        </KpiCard>
-        <KpiCard onClick={() => setOpen("changeOrders")}>
-          <div className="kpi-label">Pending change orders</div>
-          <div className={`kpi-val ${props.pendingChangeOrders > 0 ? "amber" : ""}`}>
-            {props.pendingChangeOrders}
-          </div>
-          <div className="kpi-sub">
-            {props.pendingChangeOrders === 0 ? "None awaiting review" : "Awaiting review"}
-          </div>
-        </KpiCard>
+            className="ov-bar-fill"
+            style={{
+              width: `${Math.min(100, Math.max(0, p.rehabPct))}%`,
+              background: "var(--green)",
+            }}
+          />
+        </div>
       </div>
 
-      {open && <Modal onClose={() => setOpen(null)}>{renderDetail(open, props)}</Modal>}
-    </>
-  );
-}
+      <div className="ov-kpi">
+        <div className="kpi-label">Budget % used</div>
+        <div className="kpi-val" style={{ color: budgetColor }}>
+          {p.budgetPct}%
+        </div>
+        <div className="kpi-sub">
+          {fmt$(p.totalSpent)} of {fmt$(p.budget)}
+        </div>
+      </div>
 
-function KpiCard({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="kpi-card"
-      style={{
-        textAlign: "left",
-        cursor: "pointer",
-        font: "inherit",
-        color: "inherit",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+      <div className="ov-kpi">
+        <div className="kpi-label">Days remaining</div>
+        <div className="kpi-val" style={{ color: remainingColor }}>
+          {p.daysRemaining === null ? "—" : p.daysRemaining}
+        </div>
+        <div className="kpi-sub">
+          {p.daysRemaining === null
+            ? "No target date"
+            : p.daysRemaining < 0
+            ? "Past target"
+            : "Until target"}
+        </div>
+      </div>
 
-function Modal({
-  children,
-  onClose,
-}: {
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="kpi-modal-backdrop" onClick={onClose}>
-      <div
-        className="kpi-modal"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          className="kpi-modal-close"
+      <div className="ov-kpi">
+        <div className="kpi-label">Days delayed</div>
+        <div className="kpi-val" style={{ color: delayedColor }}>
+          {p.daysDelayed}
+        </div>
+        <div className="kpi-sub">{p.daysDelayed > 0 ? "Behind target" : "On schedule"}</div>
+      </div>
+
+      <div className="ov-kpi">
+        <div className="kpi-label">Labor spend</div>
+        <div className="kpi-val">{fmt$(p.laborSpend)}</div>
+        <div className="kpi-sub">Invoiced labor · paid</div>
+      </div>
+
+      <div className="ov-kpi">
+        <div className="kpi-label">Material spend</div>
+        <div className="kpi-val">{fmt$(p.materialSpend)}</div>
+        <div className="kpi-sub">Invoiced materials · paid</div>
+      </div>
+
+      <div className="ov-kpi">
+        <div className="kpi-label">Outstanding invoices</div>
+        <div className="kpi-val">{p.outstandingCount}</div>
+        <div className="kpi-sub">{fmt$(p.outstandingAmount)} unpaid / pending</div>
+      </div>
+
+      <Link href={`/rehab/${p.code}/change-orders`} className="ov-kpi link">
+        <div className="kpi-label">Pending change orders</div>
+        <div
+          className="kpi-val"
+          style={{ color: p.pendingChangeOrders > 0 ? "var(--amber)" : "inherit" }}
         >
-          ✕
-        </button>
-        {children}
-      </div>
+          {p.pendingChangeOrders}
+        </div>
+        <div className="kpi-sub">
+          {p.pendingChangeOrders === 0 ? "None awaiting review" : "Review →"}
+        </div>
+      </Link>
     </div>
   );
-}
-
-function renderDetail(key: NonNullable<KpiKey>, p: Props) {
-  switch (key) {
-    case "budget":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Approved budget</h3>
-          <div className="kpi-modal-big">{fmt$(p.budget)}</div>
-          <ul className="kpi-modal-list">
-            <li>Signed {p.signedAt}</li>
-            <li>Phase budgets sum to projected {fmt$(p.projectedFinal)}.</li>
-            <li>
-              {p.overage > 0
-                ? `Currently ${fmt$(p.overage)} over approved — change order recommended.`
-                : `${fmt$(-p.overage)} under approved.`}
-            </li>
-          </ul>
-        </>
-      );
-    case "spent":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Total spent (released draws)</h3>
-          <div className="kpi-modal-big">{fmt$(p.totalSpent)}</div>
-          <ul className="kpi-modal-list">
-            <li>{p.paidDrawsCount} draw{p.paidDrawsCount === 1 ? "" : "s"} released so far.</li>
-            <li>{p.pendingDrawsCount} draw{p.pendingDrawsCount === 1 ? "" : "s"} pending — {fmt$(p.pendingBalance)} held.</li>
-            <li>Remaining against approved budget: {fmt$(Math.max(0, p.budget - p.totalSpent))}.</li>
-          </ul>
-        </>
-      );
-    case "projected":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Projected final</h3>
-          <div className="kpi-modal-big">{fmt$(p.projectedFinal)}</div>
-          <ul className="kpi-modal-list">
-            <li>Sum of phase actuals (or budget if not started).</li>
-            <li>
-              Variance vs approved:{" "}
-              {p.overage > 0
-                ? `+${fmt$(p.overage)} over`
-                : p.overage < 0
-                ? `${fmt$(-p.overage)} under`
-                : "$0"}
-            </li>
-            <li>Open the Budget tab for per-line detail.</li>
-          </ul>
-        </>
-      );
-    case "timeline":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Timeline</h3>
-          <div className="kpi-modal-big">{p.timelineDays} days total</div>
-          <ul className="kpi-modal-list">
-            <li>Day {Math.min(p.elapsedDays, p.timelineDays)} of {p.timelineDays}.</li>
-            <li>Target completion {p.endLabel} ET.</li>
-            {p.addendumDays > 0 && <li>Addendum extended schedule by {p.addendumDays} day{p.addendumDays === 1 ? "" : "s"}.</li>}
-          </ul>
-        </>
-      );
-    case "penalty":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Late-completion penalty</h3>
-          <div className="kpi-modal-big">${p.penaltyAccrued.toLocaleString()}</div>
-          <ul className="kpi-modal-list">
-            <li>Per diem: ${p.penaltyPerDiem.toLocaleString()} / day past target.</li>
-            <li>Status: {p.penaltyStatus}.</li>
-            {p.penaltyStatus === "Paused" && (
-              <li>Clock paused while a filed exception is being resolved.</li>
-            )}
-          </ul>
-        </>
-      );
-    case "changeOrders":
-      return (
-        <>
-          <h3 className="kpi-modal-h">Pending change orders</h3>
-          <div className="kpi-modal-big">{p.pendingChangeOrders}</div>
-          <ul className="kpi-modal-list">
-            <li>
-              {p.pendingChangeOrders === 0
-                ? "No change orders are awaiting review."
-                : `${p.pendingChangeOrders} change order${
-                    p.pendingChangeOrders === 1 ? "" : "s"
-                  } awaiting approval or rejection.`}
-            </li>
-            <li>Open the Change Orders tab to review scope and budget impact.</li>
-            <li>Approving a change order folds its amount into the linked phase budget.</li>
-          </ul>
-        </>
-      );
-  }
 }

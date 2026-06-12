@@ -1,18 +1,24 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import {
-  loadProjectActivity,
-  loadProjectByCode,
-} from "@/lib/rehab/queries";
+import { loadProjectActivity, loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
+import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import { prisma } from "@/lib/prisma";
-import { PhaseStatus, DrawStatus, ChangeOrderStatus } from "@prisma/client";
+import {
+  PhaseStatus,
+  DrawStatus,
+  ChangeOrderStatus,
+  InvoiceClassification,
+  InvoiceStatus,
+  ProjectStatus,
+} from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+const DAY = 86_400_000;
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
 export default async function OverviewPage({
@@ -26,58 +32,152 @@ export default async function OverviewPage({
   const project = await loadProjectByCode(user.companyId, decodeURIComponent(projectId));
   if (!project) notFound();
 
+  const code = project.code;
   const meta = parseProjectMeta(project.meta);
   const budget = Number(project.budget ?? 0);
-  const draws = project.draws;
-  const paidDraws = draws.filter(
+
+  // Current spend = paid (released) draws.
+  const paidDraws = project.draws.filter(
     (d) => d.status === DrawStatus.Paid || d.status === DrawStatus.Approved
   );
   const totalSpent = paidDraws.reduce((acc, d) => acc + Number(d.amount), 0);
-  // Projected final: see Budget page for the same rule. Not-started phases
-  // contribute their budget; in-flight or completed phases contribute their
-  // recorded actual (or budget if actual is still 0).
-  const projectedFinal = project.phases.reduce((acc, p) => {
-    const budgetN = Number(p.budget ?? 0);
-    const actualN = Number(p.actual ?? 0);
-    return acc + (p.status === PhaseStatus.NotStarted ? budgetN : actualN || budgetN);
-  }, 0);
-  const overage = projectedFinal - budget;
-  const pendingDraws = draws.filter((d) => d.status === DrawStatus.Pending);
-  const pendingChangeOrders = await prisma.changeOrder.count({
-    where: { projectId: project.id, status: ChangeOrderStatus.Pending },
-  });
 
-  // Timeline
-  const start = project.startDate ?? new Date(project.createdAt);
-  const end = project.endDate ?? new Date();
-  const totalDays = Math.max(
-    1,
-    Math.round((end.getTime() - start.getTime()) / 86_400_000)
-  );
-  const elapsedDays = Math.max(0, Math.round((Date.now() - start.getTime()) / 86_400_000));
+  // Parallel aggregates: invoice spend/outstanding, pending change orders,
+  // contractor assignments, property meta (acquisition cost), activity feed.
+  const [
+    laborAgg,
+    materialAgg,
+    outstandingAgg,
+    pendingChangeOrders,
+    contractorAssignments,
+    propertyRow,
+    allActivity,
+  ] = await Promise.all([
+    prisma.invoice.aggregate({
+      where: {
+        projectId: project.id,
+        classification: InvoiceClassification.Labor,
+        status: InvoiceStatus.Paid,
+      },
+      _sum: { amount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: {
+        projectId: project.id,
+        classification: InvoiceClassification.Materials,
+        status: InvoiceStatus.Paid,
+      },
+      _sum: { amount: true },
+    }),
+    prisma.invoice.aggregate({
+      where: {
+        projectId: project.id,
+        status: { in: [InvoiceStatus.Unpaid, InvoiceStatus.Pending] },
+      },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.changeOrder.count({
+      where: { projectId: project.id, status: ChangeOrderStatus.Pending },
+    }),
+    prisma.contractorAssignment.findMany({
+      where: { projectId: project.id, companyId: user.companyId, status: "Active" },
+      include: { contact: true },
+    }),
+    prisma.property.findUnique({
+      where: { id: project.propertyId },
+      select: { meta: true },
+    }),
+    loadProjectActivity(user.companyId, 200),
+  ]);
 
-  // Phase rows
-  const code = project.code;
+  const laborSpend = Number(laborAgg._sum.amount ?? 0);
+  const materialSpend = Number(materialAgg._sum.amount ?? 0);
+  const outstandingAmount = Number(outstandingAgg._sum.amount ?? 0);
+  const outstandingCount = outstandingAgg._count._all;
+
+  // KPI computations
+  const totalPhases = project.phases.length;
+  const completedPhases = project.phases.filter((p) => p.status === PhaseStatus.Complete).length;
+  const rehabPct = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
+  const budgetPct = budget > 0 ? Math.round((totalSpent / budget) * 100) : 0;
+  const budgetRemaining = budget - totalSpent;
+
+  const targetEnd = project.endDate;
+  const now = Date.now();
+  const daysRemaining = targetEnd ? Math.ceil((targetEnd.getTime() - now) / DAY) : null;
+
+  const actualEnd = meta.actualEndDate ? new Date(`${meta.actualEndDate}T00:00:00`) : null;
+  const isComplete =
+    project.status === ProjectStatus.Complete ||
+    (totalPhases > 0 && completedPhases === totalPhases);
+  let daysDelayed = 0;
+  if (targetEnd) {
+    if (actualEnd && !Number.isNaN(actualEnd.getTime())) {
+      daysDelayed = Math.max(0, Math.ceil((actualEnd.getTime() - targetEnd.getTime()) / DAY));
+    } else if (!isComplete && now > targetEnd.getTime()) {
+      daysDelayed = Math.ceil((now - targetEnd.getTime()) / DAY);
+    }
+  }
+
+  // Property info card values
+  const propMeta =
+    propertyRow?.meta && typeof propertyRow.meta === "object" && !Array.isArray(propertyRow.meta)
+      ? (propertyRow.meta as { purchasePrice?: number })
+      : {};
+  const acquisitionCost =
+    typeof propMeta.purchasePrice === "number" ? propMeta.purchasePrice : null;
+
+  const addressLabel = [project.property.address, project.property.city, project.property.state]
+    .filter(Boolean)
+    .join(", ");
+
+  const pm = project.assignments.find((a) => /\bpm\b|project\s*manager/i.test(a.role));
+  const pmName = pm
+    ? `${pm.user.firstName ?? ""} ${pm.user.lastName ?? ""}`.trim() || pm.user.email || "—"
+    : "—";
+
+  const gc =
+    contractorAssignments.find((a) => /\bgc\b|general/i.test(a.role)) ?? contractorAssignments[0];
+  const contractorName = gc?.contact?.name ?? "—";
+
+  const statusClass =
+    project.status === ProjectStatus.Complete
+      ? "st-done"
+      : project.status === ProjectStatus.Active
+      ? "st-act"
+      : "st-wait";
+  const statusLabel = project.status === ProjectStatus.OnHold ? "On hold" : project.status;
+
+  // Phase tracker rows (unchanged)
   const phaseRows = project.phases.map((p) => {
     const draw = p.draws[0];
     const drawLabel =
       draw && (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved)
         ? `Draw #${draw.number} paid`
         : draw
-        ? `Draw #${draw.number} ${draw.status === DrawStatus.Pending ? "pending" : draw.status.toLowerCase()}`
+        ? `Draw #${draw.number} ${
+            draw.status === DrawStatus.Pending ? "pending" : draw.status.toLowerCase()
+          }`
         : p.drawNote || "—";
     const stClass =
-      p.status === PhaseStatus.Complete ? "st-done" : p.status === PhaseStatus.Active ? "st-act" : "st-wait";
+      p.status === PhaseStatus.Complete
+        ? "st-done"
+        : p.status === PhaseStatus.Active
+        ? "st-act"
+        : "st-wait";
     const stLabel =
-      p.status === PhaseStatus.Complete ? "Complete" : p.status === PhaseStatus.Active ? "In progress" : "Not started";
-    return { p, draw, drawLabel, stClass, stLabel };
+      p.status === PhaseStatus.Complete
+        ? "Complete"
+        : p.status === PhaseStatus.Active
+        ? "In progress"
+        : "Not started";
+    return { p, drawLabel, stClass, stLabel };
   });
 
   const team = project.assignments;
-  const recentDraws = [...draws].sort((a, b) => b.number - a.number);
 
   // Recent activity (project-scoped, last 6 entries)
-  const allActivity = await loadProjectActivity(user.companyId, 200);
   const recentActivity = allActivity
     .filter((e) => {
       const m = parseActivityMeta(e.meta);
@@ -87,268 +187,248 @@ export default async function OverviewPage({
 
   return (
     <div className="tab-panel active">
-      <OverviewKpis
-        budget={budget}
-        signedAt={formatET(project.startDate, false)}
-        totalSpent={totalSpent}
-        paidDrawsCount={paidDraws.length}
-        projectedFinal={projectedFinal}
-        overage={overage}
-        timelineDays={totalDays}
-        elapsedDays={elapsedDays}
-        endLabel={formatET(end, false)}
-        addendumDays={
-          meta.originalEndDate
-            ? Math.max(
-                0,
-                Math.round((end.getTime() - new Date(meta.originalEndDate).getTime()) / 86_400_000)
-              )
-            : 0
-        }
-        penaltyAccrued={meta.penaltyAccrued}
-        penaltyStatus={meta.penaltyStatus}
-        penaltyPerDiem={meta.penaltyPerDiem}
-        pendingDrawsCount={pendingDraws.length}
-        pendingBalance={pendingDraws.reduce((a, d) => a + Number(d.amount), 0)}
-        pendingChangeOrders={pendingChangeOrders}
-      />
-
-      <div className="body-split">
-        <div className="body-main">
-          <div className="sec-hd">
-            Phase tracker
-            <Link
-              href={`/rehab/${code}/schedule`}
-              style={{
-                float: "right",
-                fontWeight: 400,
-                textTransform: "none",
-                letterSpacing: 0,
-                color: "var(--blue)",
-                fontSize: 10,
-              }}
-            >
-              View full schedule →
-            </Link>
+      <div className="ov-scroll">
+        {/* ── Section 1: Property info ── */}
+        <div className="ov-prop">
+          <div className="ov-prop-col">
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Address</span>
+              <span className="ov-prop-v">
+                <Link href={`/property?id=${project.propertyId}`} style={{ color: "var(--blue)" }}>
+                  {addressLabel || project.property.code}
+                </Link>
+              </span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Project code</span>
+              <span className="ov-prop-v">{code}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Status</span>
+              <span className="ov-prop-v">
+                <span className={`st-badge ${statusClass}`}>{statusLabel}</span>
+              </span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Start date</span>
+              <span className="ov-prop-v">{formatET(project.startDate, false)}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Target completion</span>
+              <span className="ov-prop-v">{formatET(project.endDate, false)}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Actual completion</span>
+              <span className="ov-prop-v">
+                <ActualCompletionDate projectId={code} initial={meta.actualEndDate} />
+              </span>
+            </div>
           </div>
-          <div className="phase-tbl">
-            {phaseRows.map(({ p, drawLabel, stClass, stLabel }) => (
-              <Link
-                key={p.id}
-                href={`/rehab/${code}/checklist?phase=${p.number}`}
-                className={`ph-row ph-row-6 ${p.status === PhaseStatus.Active ? "cur" : ""}`}
-                style={{ textDecoration: "none", color: "inherit" }}
+          <div className="ov-prop-col">
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Project manager</span>
+              <span className="ov-prop-v">{pmName}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Contractor</span>
+              <span className="ov-prop-v">{contractorName}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Acquisition cost</span>
+              <span className="ov-prop-v">
+                {acquisitionCost === null ? "—" : fmt$(acquisitionCost)}
+              </span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Rehab budget</span>
+              <span className="ov-prop-v">{fmt$(budget)}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Current spend</span>
+              <span className="ov-prop-v">{fmt$(totalSpent)}</span>
+            </div>
+            <div className="ov-prop-row">
+              <span className="ov-prop-l">Budget remaining</span>
+              <span
+                className="ov-prop-v"
+                style={{ color: budgetRemaining < 0 ? "var(--danger)" : "inherit" }}
               >
-                <div>
-                  <div className="ph-name">{p.name}</div>
-                  <div className="ph-date">
-                    Phase {p.number} · {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
-                    {p.status === PhaseStatus.Active ? " — Active" : ""}
-                  </div>
-                </div>
-                <span className={`st-badge ${stClass}`}>{stLabel}</span>
-                <div className="ph-amt">{fmt$(Number(p.budget ?? 0))}</div>
-                <div className="ph-draw">{drawLabel}</div>
-              </Link>
-            ))}
+                {fmt$(budgetRemaining)}
+              </span>
+            </div>
           </div>
-
-          <div className="sec-hd">Open items</div>
-          {overage > 0 && (
-            <div className="oi-item">
-              <div className="oi-dot dot-amber"></div>
-              <div className="oi-body">
-                <div className="oi-text">
-                  Projected final {fmt$(projectedFinal)} exceeds approved budget by {fmt$(overage)} —
-                  change order required.
-                </div>
-                <div className="oi-tag">Budget · PM review required</div>
-              </div>
-            </div>
-          )}
-          {project.addenda
-            .filter((a) => Number(a.delta) !== 0 || a.title.includes("#2"))
-            .slice(-1)
-            .map((a) => (
-              <div className="oi-item" key={a.id}>
-                <div className="oi-dot dot-blue"></div>
-                <div className="oi-body">
-                  <div className="oi-text">{a.reason || a.title}</div>
-                  <div className="oi-tag">
-                    Schedule · Signed {formatET(a.createdAt, false)} ·{" "}
-                    <Link href={`/rehab/${code}/sow`} style={{ color: "var(--blue)" }}>
-                      View in SOW →
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          {meta.penaltyStatus === "Paused" && (
-            <div className="oi-item">
-              <div className="oi-dot dot-amber"></div>
-              <div className="oi-body">
-                <div className="oi-text">
-                  HVAC access exception filed. Penalty clock paused pending resolution.
-                </div>
-                <div className="oi-tag">
-                  Exception · Penalty paused ·{" "}
-                  <Link href={`/rehab/${code}/activity`} style={{ color: "var(--blue)" }}>
-                    View exception →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
-          {pendingDraws.slice(0, 1).map((d) => (
-            <div className="oi-item" key={d.id}>
-              <div className="oi-dot dot-blue"></div>
-              <div className="oi-body">
-                <div className="oi-text">
-                  Draw #{d.number} ({fmt$(Number(d.amount))}) locked — checklist must be verified first.
-                </div>
-                <div className="oi-tag">
-                  Payment · Awaiting sign-off ·{" "}
-                  <Link href={`/rehab/${code}/checklist`} style={{ color: "var(--blue)" }}>
-                    View checklist →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <div className="sec-hd">
-            Recent activity
-            <Link
-              href={`/rehab/${code}/activity`}
-              style={{
-                float: "right",
-                fontWeight: 400,
-                textTransform: "none",
-                letterSpacing: 0,
-                color: "var(--blue)",
-                fontSize: 10,
-              }}
-            >
-              View all →
-            </Link>
-          </div>
-          {recentActivity.length === 0 && (
-            <div style={{ padding: "8px 14px", fontSize: 10, color: "var(--text-tertiary)" }}>
-              No activity yet.
-            </div>
-          )}
-          {recentActivity.map((e) => {
-            const m = parseActivityMeta(e.meta);
-            const who = e.actor
-              ? `${e.actor.firstName ?? ""} ${e.actor.lastName ?? ""}`.trim() || e.actor.email || "User"
-              : "System";
-            // Promote legacy change-order entries (older meta.type === "task")
-            // so the dot + inline link match the new Activity feed treatment.
-            const isChangeOrder = e.action === "changeOrder.requested" || m.type === "changeOrder";
-            const dotColor = isChangeOrder
-              ? "#2A6CD0"
-              : m.type === "payment"
-              ? "var(--amber)"
-              : m.type === "flag"
-              ? "var(--red-txt)"
-              : m.type === "document"
-              ? "#993856"
-              : m.type === "task"
-              ? "var(--purple-txt)"
-              : m.type === "note"
-              ? "var(--green)"
-              : "var(--blue)";
-            const sowHref =
-              isChangeOrder && m.phaseNumber
-                ? `/rehab/${code}/sow?phase=${m.phaseNumber}#sow-phase-${m.phaseNumber}`
-                : null;
-            return (
-              <div className="oi-item" key={e.id}>
-                <div className="oi-dot" style={{ background: dotColor }}></div>
-                <div className="oi-body">
-                  <div className="oi-text">{e.message ?? ""}</div>
-                  <div className="oi-tag">
-                    {isChangeOrder && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "1px 5px",
-                          marginRight: 6,
-                          borderRadius: 3,
-                          background: "#E8F0FB",
-                          color: "#1F4FA8",
-                          fontWeight: 500,
-                        }}
-                      >
-                        Change order
-                      </span>
-                    )}
-                    {who} · {formatET(e.createdAt)}
-                    {sowHref && (
-                      <>
-                        {" · "}
-                        <Link href={sowHref} style={{ color: "var(--blue)" }}>
-                          {m.phaseNumber ? `View Phase ${m.phaseNumber} in SOW →` : "View in SOW →"}
-                        </Link>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
 
-        <div className="body-side">
-          <div className="sb-sec">
-            <div className="sb-hd">Project team</div>
-            {team.map((a) => {
-              const u = a.user;
-              const initials =
-                u.initials ||
-                [(u.firstName || "")[0], (u.lastName || "")[0]].filter(Boolean).join("").toUpperCase() ||
-                "??";
-              const avClass = ["av av-b", "av av-t", "av av-a", "av av-c", "av av-p"][a.role.length % 5];
+        {/* ── Section 2: KPI grid ── */}
+        <OverviewKpis
+          code={code}
+          rehabPct={rehabPct}
+          budget={budget}
+          budgetPct={budgetPct}
+          totalSpent={totalSpent}
+          daysRemaining={daysRemaining}
+          daysDelayed={daysDelayed}
+          laborSpend={laborSpend}
+          materialSpend={materialSpend}
+          outstandingCount={outstandingCount}
+          outstandingAmount={outstandingAmount}
+          pendingChangeOrders={pendingChangeOrders}
+        />
+
+        {/* ── Section 3: Phase tracker ── */}
+        <div className="sec-hd">
+          Phase tracker
+          <Link
+            href={`/rehab/${code}/schedule`}
+            style={{
+              float: "right",
+              fontWeight: 400,
+              textTransform: "none",
+              letterSpacing: 0,
+              color: "var(--blue)",
+              fontSize: 10,
+            }}
+          >
+            View full schedule →
+          </Link>
+        </div>
+        <div className="phase-tbl">
+          {phaseRows.map(({ p, drawLabel, stClass, stLabel }) => (
+            <Link
+              key={p.id}
+              href={`/rehab/${code}/checklist?phase=${p.number}`}
+              className={`ph-row ph-row-6 ${p.status === PhaseStatus.Active ? "cur" : ""}`}
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div>
+                <div className="ph-name">{p.name}</div>
+                <div className="ph-date">
+                  Phase {p.number} · {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
+                  {p.status === PhaseStatus.Active ? " — Active" : ""}
+                </div>
+              </div>
+              <span className={`st-badge ${stClass}`}>{stLabel}</span>
+              <div className="ph-amt">{fmt$(Number(p.budget ?? 0))}</div>
+              <div className="ph-draw">{drawLabel}</div>
+            </Link>
+          ))}
+        </div>
+
+        {/* ── Section 4: Recent activity + Project team ── */}
+        <div className="ov-cols">
+          <div className="ov-cols-main">
+            <div className="sec-hd">
+              Recent activity
+              <Link
+                href={`/rehab/${code}/activity`}
+                style={{
+                  float: "right",
+                  fontWeight: 400,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                  color: "var(--blue)",
+                  fontSize: 10,
+                }}
+              >
+                View all →
+              </Link>
+            </div>
+            {recentActivity.length === 0 && (
+              <div style={{ padding: "8px 14px", fontSize: 10, color: "var(--text-tertiary)" }}>
+                No activity yet.
+              </div>
+            )}
+            {recentActivity.map((e) => {
+              const m = parseActivityMeta(e.meta);
+              const who = e.actor
+                ? `${e.actor.firstName ?? ""} ${e.actor.lastName ?? ""}`.trim() ||
+                  e.actor.email ||
+                  "User"
+                : "System";
+              const isChangeOrder =
+                e.action === "changeOrder.requested" || m.type === "changeOrder";
+              const dotColor = isChangeOrder
+                ? "#2A6CD0"
+                : m.type === "payment"
+                ? "var(--amber)"
+                : m.type === "flag"
+                ? "var(--red-txt)"
+                : m.type === "document"
+                ? "#993856"
+                : m.type === "task"
+                ? "var(--purple-txt)"
+                : m.type === "note"
+                ? "var(--green)"
+                : "var(--blue)";
+              const sowHref =
+                isChangeOrder && m.phaseNumber
+                  ? `/rehab/${code}/sow?phase=${m.phaseNumber}#sow-phase-${m.phaseNumber}`
+                  : null;
               return (
-                <div key={a.id} className="team-row">
-                  <div className={avClass}>{initials}</div>
-                  <div>
-                    <div className="tm-name">
-                      {u.firstName} {u.lastName}
+                <div className="oi-item" key={e.id}>
+                  <div className="oi-dot" style={{ background: dotColor }}></div>
+                  <div className="oi-body">
+                    <div className="oi-text">{e.message ?? ""}</div>
+                    <div className="oi-tag">
+                      {isChangeOrder && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "1px 5px",
+                            marginRight: 6,
+                            borderRadius: 3,
+                            background: "#E8F0FB",
+                            color: "#1F4FA8",
+                            fontWeight: 500,
+                          }}
+                        >
+                          Change order
+                        </span>
+                      )}
+                      {who} · {formatET(e.createdAt)}
+                      {sowHref && (
+                        <>
+                          {" · "}
+                          <Link href={sowHref} style={{ color: "var(--blue)" }}>
+                            {m.phaseNumber ? `View Phase ${m.phaseNumber} in SOW →` : "View in SOW →"}
+                          </Link>
+                        </>
+                      )}
                     </div>
-                    <div className="tm-role">{a.role}</div>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="sb-sec">
-            <div className="sb-hd">
-              Draw history
-              <Link
-                href={`/rehab/${code}/budget`}
-                className="btn-sm"
-                style={{ float: "right", marginTop: -2 }}
-              >
-                See all
-              </Link>
+
+          <div className="ov-cols-side">
+            <div className="sb-sec">
+              <div className="sb-hd">Project team</div>
+              {team.map((a) => {
+                const u = a.user;
+                const initials =
+                  u.initials ||
+                  [(u.firstName || "")[0], (u.lastName || "")[0]]
+                    .filter(Boolean)
+                    .join("")
+                    .toUpperCase() ||
+                  "??";
+                const avClass = ["av av-b", "av av-t", "av av-a", "av av-c", "av av-p"][
+                  a.role.length % 5
+                ];
+                return (
+                  <div key={a.id} className="team-row">
+                    <div className={avClass}>{initials}</div>
+                    <div>
+                      <div className="tm-name">
+                        {u.firstName} {u.lastName}
+                      </div>
+                      <div className="tm-role">{a.role}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {recentDraws.map((d) => {
-              const paid = d.status === DrawStatus.Paid || d.status === DrawStatus.Approved;
-              return (
-                <div key={d.id} className="dr-row">
-                  <div className="dr-info">
-                    <div className="dr-num">Draw #{d.number}</div>
-                    <div className="dr-ph">{d.title.replace(/^Draw #\d+ — /, "")}</div>
-                    <div className="dr-et">{paid ? formatET(d.paidAt ?? d.approvedAt) : "Pending checklist"}</div>
-                  </div>
-                  <div className="dr-r">
-                    <div className="dr-amt">{fmt$(Number(d.amount))}</div>
-                    <span className={`dr-st ${paid ? "ds-p" : "ds-n"}`}>{paid ? "Paid" : "Pending"}</span>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>

@@ -1,0 +1,32 @@
+Redesign the Rehab Manager Overview tab. Read these files in full before changing anything:
+- apps/chg-rehab/app/rehab/[projectId]/overview/page.tsx
+- apps/chg-rehab/components/rehab/OverviewKpis.tsx
+
+Then rebuild the overview with this layout:
+
+SECTION 1 — Property Info card (top of page, full width)
+A clean card showing two columns of info:
+Left column: Property Address (linked to the property record), Project Code (e.g. CHG-2247), Status badge, Start Date, Target Completion Date, Actual Completion Date (editable inline — click pencil to set)
+Right column: Project Manager (from assignments where role='pm'), Contractor (from contractorAssignments), Acquisition Cost (from property.meta or PropertyFinancialSection), Rehab Budget (project.budget), Current Spend (sum of all paid draws), Budget Remaining (budget - current spend)
+
+SECTION 2 — KPI cards row (8 cards)
+Replace the existing OverviewKpis strip with these 8 cards in a responsive grid (4 across on desktop, 2 on mobile):
+
+1. Rehab % Complete — (completed phases / total phases) * 100, shown as % with a small progress bar
+2. Budget % Used — (current spend / budget) * 100, color: green <80%, amber 80-100%, red >100%
+3. Days Remaining — target completion date minus today, red if negative (overdue)
+4. Days Delayed — if actual > target (or today > target and not complete), show days over; else 0
+5. Labor Spend — sum of Invoice.amount where classification='Labor' and status='Paid'
+6. Material Spend — sum of Invoice.amount where classification='Materials' and status='Paid'
+7. Outstanding Invoices — count + total $ of invoices where status='Unpaid' or 'Pending'
+8. Pending Change Orders — count of ChangeOrder where status='Pending', clicking navigates to /rehab/[projectId]/change-orders
+
+SECTION 3 — Phase progress tracker (existing table, keep as-is)
+
+SECTION 4 — Two columns side by side:
+Left: Recent Activity (last 6 entries, existing)
+Right: Project Team (existing assignments list)
+
+Data: load Invoice and ChangeOrder aggregates in the page server component alongside the existing loadProjectByCode call. Use Promise.all for parallel fetches.
+
+Run npx tsc --noEmit after. Report what changed.
