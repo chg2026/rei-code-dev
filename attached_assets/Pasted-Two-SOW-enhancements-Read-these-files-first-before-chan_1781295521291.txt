@@ -1,0 +1,66 @@
+Two SOW enhancements. Read these files first before changing anything:
+- apps/chg-rehab/app/rehab/[projectId]/sow/page.tsx
+- apps/chg-rehab/components/rehab/SowPhase.tsx
+- apps/chg-rehab/app/api/rehab/[projectId]/phases/[phaseId]/route.ts
+
+ENHANCEMENT 1 — Add phases to an existing SOW (not just apply full template)
+
+In the SOW page action bar, add an "+ Add Phase" button (separate from "Use Template"). Clicking opens a panel with two options:
+
+Option A — "From Template"
+- Fetch all company SOW templates
+- Show each template as an expandable section listing its phases
+- Each phase has a checkbox
+- User can check individual phases or check the template header to select all
+- "Add Selected" button at bottom — POSTs each selected phase to /api/rehab/[projectId]/sow/add-phases
+- Phase numbers auto-assign starting from max(existing phase numbers) + 1
+
+Option B — "Custom Phase"  
+- Simple inline form: Phase Name (text), Description (text), Start Date (date), Estimated Days (number), Labor Budget ($), Materials Budget ($)
+- "Add Phase" button → POST to /api/rehab/[projectId]/phases/create
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/sow/add-phases/route.ts
+- POST: body { phases: Array<{ name, description, laborBudget, materialsBudget, dependencies, acceptanceCriteria }> }
+- Auto-assign phase numbers starting from current max + 1
+- Create Phase records, return them
+
+---
+
+ENHANCEMENT 2 — Start Date + Estimated Days on every phase (basis for Gantt)
+
+STEP A — Schema (raw SQL + prisma generate, NOT prisma db push)
+Run migration at apps/chg-rehab/scripts/migrate-phase-schedule.ts:
+
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "plannedStartDate" DATE;
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "estimatedDays" INT NOT NULL DEFAULT 0;
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "plannedEndDate" DATE GENERATED ALWAYS AS
+  (CASE WHEN "plannedStartDate" IS NOT NULL AND "estimatedDays" > 0
+    THEN "plannedStartDate" + ("estimatedDays" || ' days')::INTERVAL
+    ELSE NULL END) STORED;
+
+Note: if the generated column syntax fails on this Postgres version, skip the generated column and just store plannedEndDate as a regular column that the API computes and saves.
+
+Add to schema.prisma Phase model:
+  plannedStartDate  DateTime?  @db.Date
+  estimatedDays     Int        @default(0)
+  plannedEndDate    DateTime?  @db.Date
+
+Run: npx prisma generate
+
+STEP B — Update phase PATCH endpoint
+In apps/chg-rehab/app/api/rehab/[projectId]/phases/[phaseId]/route.ts
+Accept plannedStartDate and estimatedDays in the PATCH body. When saving, compute plannedEndDate = plannedStartDate + estimatedDays days (if both present) and save it.
+
+STEP C — SOW phase row UI
+In SowPhase.tsx expanded section, add two new fields:
+- Planned Start Date (date picker input)
+- Estimated Days (number input with "days" label)
+- Show computed "Planned End: [date]" below as read-only (plannedStartDate + estimatedDays)
+- On change: debounced PATCH to /api/rehab/[projectId]/phases/[phaseId]
+
+Also add these two fields to the "Custom Phase" add form from Enhancement 1.
+
+STEP D — Gantt data readiness
+In the Gantt view (apps/chg-rehab/app/rehab/[projectId]/schedule/page.tsx or the Gantt component), ensure it reads plannedStartDate, estimatedDays, and plannedEndDate from each phase for positioning bars. If the Gantt currently uses different fields, migrate it to use these. Each bar should show: phase name, start date, end date, and a progress fill based on phase.status (NotStarted=0%, Active=50%, Complete=100%).
+
+STEP E — Run npx tsc --noEmit. Fix errors. Report what changed.

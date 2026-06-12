@@ -25,6 +25,22 @@ export default async function SchedulePage({
   if (!project) notFound();
 
   const meta = parseProjectMeta(project.meta);
+
+  // Effective scheduling dates: prefer the planned* fields (basis for the
+  // Gantt) and fall back to the legacy start/end for phases not yet planned.
+  const phaseStart = (p: (typeof project.phases)[number]) =>
+    p.plannedStartDate ?? p.startDate ?? null;
+  const phaseEnd = (p: (typeof project.phases)[number]) =>
+    p.plannedEndDate ?? p.endDate ?? null;
+  const phaseDays = (p: (typeof project.phases)[number]) => {
+    if (p.estimatedDays && p.estimatedDays > 0) return p.estimatedDays;
+    const s = phaseStart(p);
+    const e = phaseEnd(p);
+    return s && e ? Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000)) : 0;
+  };
+  const progressPct = (status: PhaseStatus) =>
+    status === PhaseStatus.Complete ? 100 : status === PhaseStatus.Active ? 50 : 0;
+
   const start = project.startDate ?? new Date(project.createdAt);
   const end = project.endDate ?? new Date();
   const totalMs = Math.max(1, end.getTime() - start.getTime());
@@ -32,6 +48,18 @@ export default async function SchedulePage({
   const elapsed = Math.max(0, Math.min(totalDays, Math.round((Date.now() - start.getTime()) / 86_400_000)));
   const remaining = Math.max(0, totalDays - elapsed);
   const active = project.phases.find((p) => p.status === PhaseStatus.Active);
+
+  // Gantt chart range spans all planned phase dates, falling back to the
+  // project window when phases have no scheduling data yet.
+  const pStarts = project.phases.map(phaseStart).filter((d): d is Date => d !== null);
+  const pEnds = project.phases.map(phaseEnd).filter((d): d is Date => d !== null);
+  const chartStart = pStarts.length
+    ? new Date(Math.min(...pStarts.map((d) => d.getTime())))
+    : start;
+  const chartEnd = pEnds.length
+    ? new Date(Math.max(...pEnds.map((d) => d.getTime())))
+    : end;
+  const chartMs = Math.max(1, chartEnd.getTime() - chartStart.getTime());
 
   return (
     <div className="tab-panel active">
@@ -102,9 +130,9 @@ export default async function SchedulePage({
               <span className="col-label" style={{ textAlign: "right" }}>Budget</span>
             </div>
             {project.phases.map((p) => {
-              const days = p.startDate && p.endDate
-                ? Math.max(1, Math.round((p.endDate.getTime() - p.startDate.getTime()) / 86_400_000) + 1)
-                : 0;
+              const ps = phaseStart(p);
+              const pe = phaseEnd(p);
+              const days = phaseDays(p);
               const stCls =
                 p.status === PhaseStatus.Complete ? "st-done" : p.status === PhaseStatus.Active ? "st-act" : "st-wait";
               const stLabel =
@@ -127,8 +155,8 @@ export default async function SchedulePage({
                       {p.drawNote ? ` · ${p.drawNote}` : ""}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11 }}>{formatET(p.startDate, false)}</div>
-                  <div style={{ fontSize: 11 }}>{formatET(p.endDate, false)}</div>
+                  <div style={{ fontSize: 11 }}>{formatET(ps, false)}</div>
+                  <div style={{ fontSize: 11 }}>{formatET(pe, false)}</div>
                   <div style={{ fontSize: 11, textAlign: "right" }}>{days}</div>
                   <span className={`st-badge ${stCls}`} style={{ fontSize: 9 }}>{stLabel}</span>
                   <div style={{ textAlign: "right", fontSize: 11, fontWeight: 500 }}>{fmt$(Number(p.budget ?? 0))}</div>
@@ -139,16 +167,19 @@ export default async function SchedulePage({
         ) : (
           <div className="gantt-panel">
             <div className="g-months">
-              <div className="gm">{formatET(start, false).split(",")[0]} {start.getFullYear()}</div>
-              <div className="gm">{formatET(new Date(start.getTime() + totalMs / 2), false).split(",")[0]}</div>
-              <div className="gm">{formatET(end, false).split(",")[0]} {end.getFullYear()}</div>
+              <div className="gm">{formatET(chartStart, false).split(",")[0]} {chartStart.getFullYear()}</div>
+              <div className="gm">{formatET(new Date(chartStart.getTime() + chartMs / 2), false).split(",")[0]}</div>
+              <div className="gm">{formatET(chartEnd, false).split(",")[0]} {chartEnd.getFullYear()}</div>
             </div>
             <div style={{ flex: 1, overflowY: "auto" }}>
               {project.phases.map((p) => {
-                const ps = p.startDate?.getTime() ?? start.getTime();
-                const pe = p.endDate?.getTime() ?? start.getTime();
-                const left = Math.max(0, Math.min(100, ((ps - start.getTime()) / totalMs) * 100));
-                const width = Math.max(1, Math.min(100 - left, ((pe - ps) / totalMs) * 100));
+                const sd = phaseStart(p);
+                const ed = phaseEnd(p);
+                const ps = sd?.getTime() ?? chartStart.getTime();
+                const pe = ed?.getTime() ?? ps;
+                const left = Math.max(0, Math.min(100, ((ps - chartStart.getTime()) / chartMs) * 100));
+                const width = Math.max(1, Math.min(100 - left, ((pe - ps) / chartMs) * 100));
+                const progress = progressPct(p.status);
                 const barCls =
                   p.status === PhaseStatus.Complete ? "gb-done" : p.status === PhaseStatus.Active ? "gb-act" : "gb-pend";
                 const stCls =
@@ -159,10 +190,25 @@ export default async function SchedulePage({
                   <div key={p.id} className={`g-row ${p.status === PhaseStatus.Active ? "cur" : ""}`}>
                     <div className="g-ph">
                       <div className="g-ph-name">{p.name}</div>
-                      <div className="g-ph-sub">{formatET(p.startDate, false)} – {formatET(p.endDate, false)}</div>
+                      <div className="g-ph-sub">{formatET(sd, false)} – {formatET(ed, false)}</div>
                     </div>
                     <div className="g-track">
-                      <div className={`gbar ${barCls}`} style={{ left: `${left}%`, width: `${width}%` }} />
+                      <div
+                        className={`gbar ${barCls}`}
+                        title={`${p.name} · ${formatET(sd, false)} – ${formatET(ed, false)} · ${progress}%`}
+                        style={{ left: `${left}%`, width: `${width}%`, position: "relative", overflow: "hidden" }}
+                      >
+                        {progress > 0 && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              width: `${progress}%`,
+                              background: "rgba(0,0,0,0.22)",
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                     <span className={`g-st ${stCls}`} style={{ fontSize: 9, padding: "2px 5px" }}>{stLabel}</span>
                   </div>

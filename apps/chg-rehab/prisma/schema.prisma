@@ -236,6 +236,9 @@ model Phase {
   actual               Decimal?        @db.Decimal(14, 2)
   startDate            DateTime?
   endDate              DateTime?
+  plannedStartDate     DateTime?       @db.Date
+  estimatedDays        Int             @default(0)
+  plannedEndDate       DateTime?       @db.Date
   drawNote             String?
   description          String?
   laborBudget          Decimal         @default(0) @db.Decimal(14, 2)

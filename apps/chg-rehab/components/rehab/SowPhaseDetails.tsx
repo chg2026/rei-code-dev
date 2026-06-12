@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type PhaseRef = { number: number; name: string };
+
+/** start (YYYY-MM-DD) + N days → end (YYYY-MM-DD), or "" if not computable. */
+function addDays(ymd: string, days: number): string {
+  if (!ymd || !Number.isFinite(days) || days <= 0) return "";
+  const d = new Date(`${ymd}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function SowPhaseDetails({
   projectCode,
@@ -15,6 +24,8 @@ export default function SowPhaseDetails({
   dependencies,
   acceptanceCriteria,
   phaseRefs,
+  plannedStartDate,
+  estimatedDays,
 }: {
   projectCode: string;
   phaseId: string;
@@ -25,6 +36,8 @@ export default function SowPhaseDetails({
   dependencies: number[];
   acceptanceCriteria: string[];
   phaseRefs: PhaseRef[];
+  plannedStartDate: string;
+  estimatedDays: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -36,8 +49,16 @@ export default function SowPhaseDetails({
   const [criteria, setCriteria] = useState<string[]>(acceptanceCriteria ?? []);
   const [newCriterion, setNewCriterion] = useState("");
 
+  const [pStart, setPStart] = useState(plannedStartDate ?? "");
+  const [eDays, setEDays] = useState(String(estimatedDays ?? 0));
+  const scheduleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (scheduleTimer.current) clearTimeout(scheduleTimer.current);
+  }, []);
+
   const nameByNumber = new Map(phaseRefs.map((p) => [p.number, p.name]));
   const total = (Number(labor) || 0) + (Number(materials) || 0);
+  const plannedEnd = addDays(pStart, Number(eDays) || 0);
 
   function save(patch: Record<string, unknown>) {
     setError(null);
@@ -65,6 +86,18 @@ export default function SowPhaseDetails({
   function saveCriteria(next: string[]) {
     setCriteria(next);
     save({ acceptanceCriteria: next });
+  }
+
+  /** Debounced save for the schedule fields (typing in date / days inputs). */
+  function scheduleSave(nextStart: string, nextDays: string) {
+    if (scheduleTimer.current) clearTimeout(scheduleTimer.current);
+    scheduleTimer.current = setTimeout(() => {
+      const days = Number(nextDays);
+      save({
+        plannedStartDate: nextStart || null,
+        estimatedDays: Number.isInteger(days) && days >= 0 ? days : 0,
+      });
+    }, 600);
   }
 
   const labelStyle: React.CSSProperties = {
@@ -237,6 +270,47 @@ export default function SowPhaseDetails({
             <div style={{ fontSize: 13, fontWeight: 600 }}>
               ${Math.round(total).toLocaleString()}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule (basis for the Gantt) */}
+      <div>
+        <div style={labelStyle}>Schedule</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Planned start</span>
+            <input
+              type="date"
+              value={pStart}
+              disabled={!canEdit || pending}
+              onChange={(e) => {
+                setPStart(e.target.value);
+                scheduleSave(e.target.value, eDays);
+              }}
+              style={{ ...inputStyle, width: 150 }}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Estimated days</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                value={eDays}
+                disabled={!canEdit || pending}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, "");
+                  setEDays(v);
+                  scheduleSave(pStart, v);
+                }}
+                style={{ ...inputStyle, width: 70, textAlign: "right" }}
+              />
+              <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>days</span>
+            </div>
+          </label>
+          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+            <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Planned end</div>
+            <div style={{ fontSize: 12, fontWeight: 500 }}>{plannedEnd || "—"}</div>
           </div>
         </div>
       </div>

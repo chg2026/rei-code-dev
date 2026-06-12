@@ -25,6 +25,23 @@ function toDecimal(value: unknown): Prisma.Decimal | null {
   }
 }
 
+/** Parse a "YYYY-MM-DD" string into a UTC-midnight Date (for @db.Date columns). */
+function parseYmd(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** plannedStartDate + estimatedDays → plannedEndDate (null unless both set). */
+function computePlannedEnd(start: Date | null, days: number): Date | null {
+  if (!start || !Number.isFinite(days) || days <= 0) return null;
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + days);
+  return end;
+}
+
 /**
  * Update the SOW-enhancement fields on a single phase: description, the
  * labor/materials budget split (which keeps the rolled-up `budget` in sync),
@@ -46,7 +63,13 @@ export async function PATCH(
 
   const phase = await prisma.phase.findFirst({
     where: { id: phaseId, projectId: project.id },
-    select: { id: true, laborBudget: true, materialsBudget: true },
+    select: {
+      id: true,
+      laborBudget: true,
+      materialsBudget: true,
+      plannedStartDate: true,
+      estimatedDays: true,
+    },
   });
   if (!phase) return NextResponse.json({ error: "Phase not found" }, { status: 404 });
 
@@ -115,6 +138,41 @@ export async function PATCH(
       typeof body.assignedContractorId === "string" && body.assignedContractorId.trim()
         ? body.assignedContractorId.trim()
         : null;
+  }
+
+  // Schedule fields (basis for the Gantt). Recompute plannedEndDate whenever
+  // either plannedStartDate or estimatedDays is touched, using the existing
+  // value for the field that wasn't sent in this request.
+  let scheduleTouched = false;
+  let plannedStart: Date | null = phase.plannedStartDate ?? null;
+  let estimatedDays = phase.estimatedDays ?? 0;
+
+  if ("plannedStartDate" in body) {
+    if (body.plannedStartDate === null || body.plannedStartDate === "") {
+      plannedStart = null;
+    } else {
+      const parsed = parseYmd(body.plannedStartDate);
+      if (!parsed) {
+        return NextResponse.json({ error: "Invalid plannedStartDate" }, { status: 400 });
+      }
+      plannedStart = parsed;
+    }
+    data.plannedStartDate = plannedStart;
+    scheduleTouched = true;
+  }
+
+  if ("estimatedDays" in body) {
+    const n = Number(body.estimatedDays);
+    if (!Number.isInteger(n) || n < 0) {
+      return NextResponse.json({ error: "Invalid estimatedDays" }, { status: 400 });
+    }
+    estimatedDays = n;
+    data.estimatedDays = n;
+    scheduleTouched = true;
+  }
+
+  if (scheduleTouched) {
+    data.plannedEndDate = computePlannedEnd(plannedStart, estimatedDays);
   }
 
   if (Object.keys(data).length === 0) {
