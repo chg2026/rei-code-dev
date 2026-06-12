@@ -428,7 +428,7 @@ async function OverviewTab({ property, companyId }: { property: NonNullable<Awai
                   <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2 }}>{project.name}</div>
                   {activePhase && (
                     <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 3 }}>
-                      Phase {activePhase.number} of {project.phases.length} — {activePhase.name} in progress
+                      Job Type {activePhase.number} of {project.phases.length} — {activePhase.name} in progress
                       {project.endDate ? ` · ${formatET(project.endDate, false)} revised deadline` : ""}
                     </div>
                   )}
@@ -811,7 +811,7 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
           <FinSection
             title={`Rehab costs — ${project?.code}`}
             rows={phases.map((p) => ({
-              lbl: `Phase ${p.number} — ${p.name}${p.status === "InProgress" ? " (projected)" : p.status === "NotStarted" ? " (budgeted)" : ""}`,
+              lbl: `Job Type ${p.number} — ${p.name}${p.status === "InProgress" ? " (projected)" : p.status === "NotStarted" ? " (budgeted)" : ""}`,
               val: formatMoney(p.actual ? Number(p.actual) : Number(p.budget || 0)),
               valColor: p.status === "InProgress" ? "#BA7517" : p.status === "NotStarted" ? "var(--text-tertiary)" : undefined,
             }))}

@@ -168,7 +168,7 @@ export default function SowPhaseDetails({
                   borderRadius: 10,
                 }}
               >
-                After: {nameByNumber.get(n) ?? `Phase ${n}`}
+                After: {nameByNumber.get(n) ?? `Job Type ${n}`}
               </span>
             ))}
           </div>

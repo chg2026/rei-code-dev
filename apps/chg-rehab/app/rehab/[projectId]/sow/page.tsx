@@ -88,7 +88,7 @@ export default async function SowPage({
         <div style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
           <div className="sow-hd">
             <span></span>
-            <span className="col-label">Phase / Line item</span>
+            <span className="col-label">Job Type / Line item</span>
             <span className="col-label" style={{ textAlign: "right" }}>Days</span>
             <span className="col-label">Dates</span>
             <span className="col-label" style={{ textAlign: "right" }}>Estimated</span>
@@ -198,7 +198,7 @@ export default async function SowPage({
           <div className="sb-sec" style={{ padding: "10px 12px" }}>
             <div className="sb-hd" style={{ padding: "0 0 6px" }}>SOW metadata</div>
             <div className="ip-row"><span className="ir-lbl">Total value</span><span className="ir-val">{fmt$(totalValue)}</span></div>
-            <div className="ip-row"><span className="ir-lbl">Phases</span><span className="ir-val">{project.phases.length}</span></div>
+            <div className="ip-row"><span className="ir-lbl">Job Types</span><span className="ir-val">{project.phases.length}</span></div>
             <div className="ip-row"><span className="ir-lbl">Signed</span><span className="ir-val">{formatET(project.startDate, false)}</span></div>
             <div className="ip-row"><span className="ir-lbl">Addenda</span><span className="ir-val">{project.addenda.length}</span></div>
           </div>

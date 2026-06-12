@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseJobTypes } from "../route";
+import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
 import {
   InvoiceClassification,
   InvoiceStatus,
@@ -94,24 +96,51 @@ export async function PATCH(
     }
     data.status = body.status;
   }
-  if ("phaseId" in body) {
-    if (typeof body.phaseId === "string" && body.phaseId) {
-      const phase = await prisma.phase.findFirst({
-        where: { id: body.phaseId, projectId: resolved.projectId },
-        select: { id: true },
-      });
-      if (!phase) return NextResponse.json({ error: "Invalid phase" }, { status: 400 });
-      data.phaseId = phase.id;
-    } else {
-      data.phaseId = null;
+  // Job types replace the legacy single phaseId. When supplied we delete the
+  // existing rows and recreate them (delete + recreate on save).
+  let parsedJobTypes: Awaited<ReturnType<typeof parseJobTypes>> | null = null;
+  if ("jobTypes" in body) {
+    parsedJobTypes = await parseJobTypes(body.jobTypes, resolved.projectId);
+    if (!parsedJobTypes.ok) {
+      return NextResponse.json({ error: parsedJobTypes.error }, { status: 400 });
     }
   }
 
-  const invoice = await prisma.invoice.update({
-    where: { id: resolved.invoiceId },
-    data,
-    include: { attachments: { orderBy: { createdAt: "asc" } } },
+  // Phases affected by this change = the existing rows' phases plus any new ones.
+  const existing = await prisma.invoiceJobType.findMany({
+    where: { invoiceId: resolved.invoiceId },
+    select: { phaseId: true },
   });
+  const affectedPhaseIds = new Set<string>();
+  for (const r of existing) if (r.phaseId) affectedPhaseIds.add(r.phaseId);
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    if (parsedJobTypes && parsedJobTypes.ok) {
+      await tx.invoiceJobType.deleteMany({ where: { invoiceId: resolved.invoiceId } });
+      for (const r of parsedJobTypes.rows) {
+        await tx.invoiceJobType.create({
+          data: {
+            invoiceId: resolved.invoiceId,
+            phaseId: r.phaseId,
+            amount: r.amount,
+            notes: r.notes,
+          },
+        });
+        if (r.phaseId) affectedPhaseIds.add(r.phaseId);
+      }
+    }
+    return tx.invoice.update({
+      where: { id: resolved.invoiceId },
+      data,
+      include: {
+        attachments: { orderBy: { createdAt: "asc" } },
+        jobTypes: { orderBy: { createdAt: "asc" } },
+      },
+    });
+  });
+
+  await recomputePhaseActuals(resolved.projectId, Array.from(affectedPhaseIds));
+
   return NextResponse.json({ invoice });
 }
 
@@ -129,6 +158,17 @@ export async function DELETE(
   );
   if (!resolved) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const jobTypes = await prisma.invoiceJobType.findMany({
+    where: { invoiceId: resolved.invoiceId },
+    select: { phaseId: true },
+  });
+
   await prisma.invoice.delete({ where: { id: resolved.invoiceId } });
+
+  await recomputePhaseActuals(
+    resolved.projectId,
+    jobTypes.map((j) => j.phaseId)
+  );
+
   return NextResponse.json({ ok: true });
 }

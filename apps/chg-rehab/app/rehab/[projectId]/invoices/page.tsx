@@ -20,7 +20,10 @@ export default async function InvoicesPage({
 
   const rows = await prisma.invoice.findMany({
     where: { projectId: project.id },
-    include: { attachments: { orderBy: { createdAt: "asc" } } },
+    include: {
+      attachments: { orderBy: { createdAt: "asc" } },
+      jobTypes: { orderBy: { createdAt: "asc" } },
+    },
     orderBy: { date: "desc" },
   });
 
@@ -32,7 +35,12 @@ export default async function InvoicesPage({
     amount: Number(inv.amount),
     classification: inv.classification,
     status: inv.status,
-    phaseId: inv.phaseId,
+    jobTypes: inv.jobTypes.map((jt) => ({
+      id: jt.id,
+      phaseId: jt.phaseId,
+      amount: Number(jt.amount),
+      notes: jt.notes,
+    })),
     notes: inv.notes,
     attachments: inv.attachments.map((a) => ({
       id: a.id,

@@ -16,6 +16,13 @@ export type InvoiceAttachmentDTO = {
   size: number;
 };
 
+export type InvoiceJobTypeDTO = {
+  id: string;
+  phaseId: string | null;
+  amount: number;
+  notes: string | null;
+};
+
 export type InvoiceDTO = {
   id: string;
   vendor: string;
@@ -24,12 +31,14 @@ export type InvoiceDTO = {
   amount: number;
   classification: string;
   status: string;
-  phaseId: string | null;
+  jobTypes: InvoiceJobTypeDTO[];
   notes: string | null;
   attachments: InvoiceAttachmentDTO[];
 };
 
 type PhaseLite = { id: string; number: number; name: string };
+
+type JobTypeRow = { phaseId: string; amount: string; notes: string };
 
 const CLASSIFICATIONS = ["Labor", "Materials", "Permit", "Dumpster", "Utility", "Other"];
 const STATUSES = ["Unpaid", "Pending", "Paid"];
@@ -55,9 +64,13 @@ type FormState = {
   amount: string;
   classification: string;
   status: string;
-  phaseId: string;
+  jobTypes: JobTypeRow[];
   notes: string;
 };
+
+function emptyJobTypeRow(): JobTypeRow {
+  return { phaseId: "", amount: "", notes: "" };
+}
 
 function emptyForm(): FormState {
   return {
@@ -67,7 +80,7 @@ function emptyForm(): FormState {
     amount: "",
     classification: "Other",
     status: "Unpaid",
-    phaseId: "",
+    jobTypes: [emptyJobTypeRow()],
     notes: "",
   };
 }
@@ -80,7 +93,14 @@ function formFromInvoice(inv: InvoiceDTO): FormState {
     amount: String(inv.amount),
     classification: inv.classification,
     status: inv.status,
-    phaseId: inv.phaseId ?? "",
+    jobTypes:
+      inv.jobTypes.length > 0
+        ? inv.jobTypes.map((jt) => ({
+            phaseId: jt.phaseId ?? "",
+            amount: String(jt.amount),
+            notes: jt.notes ?? "",
+          }))
+        : [emptyJobTypeRow()],
     notes: inv.notes ?? "",
   };
 }
@@ -108,10 +128,18 @@ export default function InvoicesClient({
 
   const apiBase = `/api/rehab/${encodeURIComponent(projectCode)}/invoices`;
 
-  const phaseName = (id: string | null) => {
+  const jobTypeName = (id: string | null) => {
     if (!id) return null;
     const p = phases.find((x) => x.id === id);
-    return p ? `Phase ${p.number}` : null;
+    return p ? `Job Type ${p.number}` : null;
+  };
+
+  const jobTypeSummary = (inv: InvoiceDTO): string | null => {
+    if (inv.jobTypes.length === 0) return null;
+    if (inv.jobTypes.length === 1) {
+      return jobTypeName(inv.jobTypes[0].phaseId) ?? "1 job type";
+    }
+    return `${inv.jobTypes.length} job types`;
   };
 
   const filtered = useMemo(() => {
@@ -205,6 +233,20 @@ export default function InvoicesClient({
       setError("Enter a valid amount");
       return;
     }
+    // Keep only rows that carry an amount; drop fully-empty placeholder rows.
+    const jobTypeRows = form.jobTypes
+      .filter((r) => r.amount.trim() !== "" || r.phaseId !== "")
+      .map((r) => ({
+        phaseId: r.phaseId || null,
+        amount: r.amount.trim() === "" ? 0 : Number(r.amount),
+        notes: r.notes.trim() || null,
+      }));
+    for (const r of jobTypeRows) {
+      if (Number.isNaN(r.amount) || r.amount < 0) {
+        setError("Enter a valid amount for each job type");
+        return;
+      }
+    }
     const payload = {
       vendor: form.vendor.trim(),
       invoiceNumber: form.invoiceNumber.trim() || null,
@@ -212,7 +254,7 @@ export default function InvoicesClient({
       amount: form.amount,
       classification: form.classification,
       status: form.status,
-      phaseId: form.phaseId || null,
+      jobTypes: jobTypeRows,
       notes: form.notes.trim() || null,
     };
 
@@ -421,7 +463,7 @@ export default function InvoicesClient({
                 <div className="cell-name">{inv.vendor}</div>
                 <div className="cell-meta">
                   {inv.invoiceNumber ? `#${inv.invoiceNumber}` : "No invoice #"}
-                  {phaseName(inv.phaseId) ? ` · ${phaseName(inv.phaseId)}` : ""}
+                  {jobTypeSummary(inv) ? ` · ${jobTypeSummary(inv)}` : ""}
                   {inv.attachments.length > 0 ? ` · 📎 ${inv.attachments.length}` : ""}
                 </div>
               </div>
@@ -473,8 +515,36 @@ export default function InvoicesClient({
               <DetailRow label="Category" value={selected.classification} />
               <DetailRow label="Invoice #" value={selected.invoiceNumber || "—"} />
               <DetailRow label="Date" value={selected.date} />
-              <DetailRow label="Phase" value={phaseName(selected.phaseId) || "—"} />
               {selected.notes && <DetailRow label="Notes" value={selected.notes} />}
+
+              <div className="sb-hd" style={{ padding: "12px 0 6px" }}>
+                Job Types ({selected.jobTypes.length})
+              </div>
+              {selected.jobTypes.length === 0 && (
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 6 }}>
+                  No job types on this invoice.
+                </div>
+              )}
+              {selected.jobTypes.map((jt) => (
+                <div
+                  key={jt.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    padding: "4px 0",
+                    borderBottom: "0.5px solid var(--border-lo)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11 }}>{jobTypeName(jt.phaseId) || "Unassigned"}</div>
+                    {jt.notes && (
+                      <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>{jt.notes}</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{fmt$(jt.amount)}</div>
+                </div>
+              ))}
 
               <div className="sb-hd" style={{ padding: "12px 0 6px" }}>
                 Attachments ({selected.attachments.length})
@@ -624,11 +694,7 @@ function InvoiceForm({
         {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
 
-      <label style={lbl}>Phase</label>
-      <select style={field} value={form.phaseId} onChange={(e) => setForm((f) => ({ ...f, phaseId: e.target.value }))} disabled={pending}>
-        <option value="">— None —</option>
-        {phases.map((p) => <option key={p.id} value={p.id}>Phase {p.number} — {p.name}</option>)}
-      </select>
+      <JobTypesEditor form={form} setForm={setForm} phases={phases} pending={pending} field={field} lbl={lbl} />
 
       <label style={lbl}>Notes</label>
       <textarea
@@ -650,6 +716,115 @@ function InvoiceForm({
   );
 }
 
+function JobTypesEditor({
+  form,
+  setForm,
+  phases,
+  pending,
+  field,
+  lbl,
+}: {
+  form: FormState;
+  setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  phases: PhaseLite[];
+  pending: boolean;
+  field: React.CSSProperties;
+  lbl: React.CSSProperties;
+}) {
+  const updateRow = (idx: number, patch: Partial<JobTypeRow>) =>
+    setForm((f) => ({
+      ...f,
+      jobTypes: f.jobTypes.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    }));
+  const addRow = () =>
+    setForm((f) => ({ ...f, jobTypes: [...f.jobTypes, emptyJobTypeRow()] }));
+  const removeRow = (idx: number) =>
+    setForm((f) => {
+      const next = f.jobTypes.filter((_, i) => i !== idx);
+      return { ...f, jobTypes: next.length > 0 ? next : [emptyJobTypeRow()] };
+    });
+
+  const rowsTotal = form.jobTypes.reduce(
+    (sum, r) => sum + (r.amount.trim() === "" ? 0 : Number(r.amount) || 0),
+    0
+  );
+  const invoiceTotal = form.amount.trim() === "" ? 0 : Number(form.amount) || 0;
+  const mismatch = Math.abs(rowsTotal - invoiceTotal) > 0.005;
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <label style={lbl}>Job Types</label>
+      {form.jobTypes.map((r, idx) => (
+        <div key={idx} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "0.5px solid var(--border-lo)" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <select
+              style={{ ...field, marginBottom: 4, flex: 1 }}
+              value={r.phaseId}
+              onChange={(e) => updateRow(idx, { phaseId: e.target.value })}
+              disabled={pending}
+            >
+              <option value="">— No job type —</option>
+              {phases.map((p) => (
+                <option key={p.id} value={p.id}>
+                  Job Type {p.number} — {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn-sm"
+              onClick={() => removeRow(idx)}
+              disabled={pending}
+              aria-label="Remove job type"
+              style={{ marginBottom: 4 }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Amount"
+              style={{ ...field, marginBottom: 4, width: 110 }}
+              value={r.amount}
+              onChange={(e) => updateRow(idx, { amount: e.target.value })}
+              disabled={pending}
+            />
+            <input
+              placeholder="Notes"
+              style={{ ...field, marginBottom: 4, flex: 1 }}
+              value={r.notes}
+              onChange={(e) => updateRow(idx, { notes: e.target.value })}
+              disabled={pending}
+            />
+          </div>
+        </div>
+      ))}
+      <button type="button" className="btn-sm" onClick={addRow} disabled={pending} style={{ marginBottom: 6 }}>
+        + Add job type
+      </button>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: mismatch ? "var(--amber-txt)" : "var(--text-tertiary)",
+        }}
+      >
+        <span>Job types total</span>
+        <span style={{ fontWeight: 600 }}>{fmt$(rowsTotal)}</span>
+      </div>
+      {mismatch && (
+        <div style={{ fontSize: 9, color: "var(--amber-txt)", marginTop: 2 }}>
+          Job types total ({fmt$(rowsTotal)}) doesn&apos;t match the invoice amount ({fmt$(invoiceTotal)}).
+        </div>
+      )}
+    </div>
+  );
+}
+
 type RawInvoice = {
   id: string;
   vendor: string;
@@ -658,7 +833,12 @@ type RawInvoice = {
   amount: string | number;
   classification: string;
   status: string;
-  phaseId: string | null;
+  jobTypes?: Array<{
+    id: string;
+    phaseId: string | null;
+    amount: string | number;
+    notes: string | null;
+  }>;
   notes: string | null;
   attachments: InvoiceAttachmentDTO[];
 };
@@ -672,7 +852,12 @@ function normalizeInvoice(raw: RawInvoice): InvoiceDTO {
     amount: Number(raw.amount),
     classification: raw.classification,
     status: raw.status,
-    phaseId: raw.phaseId,
+    jobTypes: (raw.jobTypes ?? []).map((jt) => ({
+      id: jt.id,
+      phaseId: jt.phaseId,
+      amount: Number(jt.amount),
+      notes: jt.notes,
+    })),
     notes: raw.notes,
     attachments: (raw.attachments ?? []).map((a) => ({
       id: a.id,

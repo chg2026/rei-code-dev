@@ -84,7 +84,7 @@ export default async function SchedulePage({
             <div className="ip-lbl">Current phase</div>
             <div className="ip-val">{active?.name ?? "—"}</div>
             <div className="ip-sub">
-              {active ? `Phase ${active.number} of ${project.phases.length} · In progress` : "—"}
+              {active ? `Job Type ${active.number} of ${project.phases.length} · In progress` : "—"}
             </div>
           </div>
           <div className="ip-sec">
@@ -131,7 +131,7 @@ export default async function SchedulePage({
           <div className="gantt-panel" style={{ overflow: "auto" }}>
             <div className="data-hd" style={{ gridTemplateColumns: "32px minmax(0,1fr) 110px 110px 60px 110px 90px" }}>
               <span className="col-label">#</span>
-              <span className="col-label">Phase</span>
+              <span className="col-label">Job Type</span>
               <span className="col-label">Start (ET)</span>
               <span className="col-label">End (ET)</span>
               <span className="col-label" style={{ textAlign: "right" }}>Days</span>

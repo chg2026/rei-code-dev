@@ -118,7 +118,7 @@ export async function GET(req: Request) {
   }
 
   for (const p of phases) {
-    const label = `Phase ${p.number}: ${p.name}`;
+    const label = `Job Type ${p.number}: ${p.name}`;
     const proj = p.project?.name ? ` (${p.project.name})` : "";
     if (p.startDate && p.startDate >= start && p.startDate < end) {
       events.push({ id: `phase-start:${p.id}`, title: `${label} starts${proj}`, when: p.startDate.toISOString(), kind: "milestone", link: "/rehab" });

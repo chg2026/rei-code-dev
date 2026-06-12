@@ -64,7 +64,7 @@ export async function POST(
   }
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) return NextResponse.json({ error: "Phase name is required" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "Job Type name is required" }, { status: 400 });
 
   const labor = toDecimal(body.laborBudget);
   if (!labor) return NextResponse.json({ error: "Invalid laborBudget" }, { status: 400 });

@@ -5,7 +5,8 @@ import { can } from "@/lib/permissions";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import DocUploadButton from "@/components/rehab/DocUploadButton";
-import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
+import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
+import { prisma } from "@/lib/prisma";
 import { DrawStatus, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -31,18 +32,52 @@ export default async function BudgetPage({
   const canUploadDocs = await can(user, "documents", "edit");
   const invoiceDocs = project.documents.filter((d) => (d.category ?? "").toLowerCase() === "invoice");
 
+  // Per-phase actual spend is pulled directly from invoices: every
+  // InvoiceJobType.amount whose parent invoice is Paid, grouped by phaseId.
+  // This is the source of truth for the Actual / Variance / Spend-by-phase
+  // figures (Phase.actual is also kept in sync by recomputePhaseActuals on
+  // every invoice write, but reading invoices here keeps the page correct
+  // even for data that predates that helper).
+  const invoiceRows = await prisma.invoice.findMany({
+    where: { projectId: project.id },
+    include: { jobTypes: { orderBy: { createdAt: "asc" } } },
+    orderBy: { date: "desc" },
+  });
+  const paidActualByPhase = new Map<string, number>();
+  const invoicesByPhase = new Map<string, BudgetPhaseRow["invoices"]>();
+  for (const inv of invoiceRows) {
+    const isPaid = inv.status === "Paid";
+    for (const jt of inv.jobTypes) {
+      if (!jt.phaseId) continue;
+      const amt = Number(jt.amount);
+      if (isPaid) {
+        paidActualByPhase.set(jt.phaseId, (paidActualByPhase.get(jt.phaseId) ?? 0) + amt);
+      }
+      const list = invoicesByPhase.get(jt.phaseId) ?? [];
+      list.push({
+        id: `${inv.id}:${jt.id}`,
+        vendor: inv.vendor,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date.toISOString().slice(0, 10),
+        amount: amt,
+        status: inv.status,
+      });
+      invoicesByPhase.set(jt.phaseId, list);
+    }
+  }
+  const phaseActual = (phaseId: string) => paidActualByPhase.get(phaseId) ?? 0;
+
   const budget = Number(project.budget ?? 0);
   const totalSpent = project.draws
     .filter((d) => d.status === DrawStatus.Paid || d.status === DrawStatus.Approved)
     .reduce((acc, d) => acc + Number(d.amount), 0);
   // Projected final: not-started phases contribute their budget, in-flight or
-  // completed phases contribute their recorded actual (which may exceed budget
-  // for cost overruns). Note that `?? p.budget` is not enough because Decimal
-  // 0 (e.g. phase 6 actual=0 before any spend) is a valid non-null value, so
-  // we explicitly branch on phase status.
+  // completed phases contribute their invoice-derived actual (which may exceed
+  // budget for cost overruns). When a phase has no paid invoices yet we fall
+  // back to its budget so projections never understate the plan.
   const projected = project.phases.reduce((acc, p) => {
     const budgetN = Number(p.budget ?? 0);
-    const actualN = Number(p.actual ?? 0);
+    const actualN = phaseActual(p.id);
     return acc + (p.status === PhaseStatus.NotStarted ? budgetN : actualN || budgetN);
   }, 0);
   const remaining = Math.max(0, budget - totalSpent);
@@ -66,6 +101,29 @@ export default async function BudgetPage({
   });
   const lineItemsTotal = lineRows.reduce((acc, r) => acc + Number(r.li.totalCost ?? 0), 0);
   const baseLink = `/rehab/${project.code}/budget`;
+
+  const phaseRows: BudgetPhaseRow[] = project.phases.map((p) => {
+    const draw = p.draws[0];
+    const drawPaid = !!draw && (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved);
+    return {
+      id: p.id,
+      number: p.number,
+      name: p.name,
+      status: p.status,
+      budget: Number(p.budget ?? 0),
+      actual: phaseActual(p.id),
+      drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
+      drawLabel: draw
+        ? drawPaid
+          ? `Draw #${draw.number} paid`
+          : `Draw #${draw.number} pending`
+        : "—",
+      incompleteChecklist:
+        p.checklistItems.length > 0 &&
+        p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA"),
+      invoices: invoicesByPhase.get(p.id) ?? [],
+    };
+  });
 
   return (
     <div className="tab-panel active">
@@ -97,7 +155,7 @@ export default async function BudgetPage({
       <div className="body-split">
         <div className="body-main">
           {view === "phase" && (
-            <PhaseView project={project} />
+            <BudgetPhaseRows phases={phaseRows} projectCode={project.code} />
           )}
 
           {view === "lineItems" && (
@@ -107,7 +165,7 @@ export default async function BudgetPage({
                 style={{ gridTemplateColumns: "minmax(0,1fr) 78px 70px 70px 76px 88px" }}
               >
                 <span className="col-label">Line item</span>
-                <span className="col-label">Phase</span>
+                <span className="col-label">Job Type</span>
                 <span className="col-label" style={{ textAlign: "right" }}>Estimated</span>
                 <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
                 <span className="col-label" style={{ textAlign: "right" }}>Variance</span>
@@ -141,7 +199,7 @@ export default async function BudgetPage({
                       </div>
                       {li.notes && <div className="cell-meta">{li.notes}</div>}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Phase {p.number}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Job Type {p.number}</div>
                     <div style={{ textAlign: "right", fontSize: 11 }}>${est.toLocaleString()}</div>
                     <div style={{ textAlign: "right", fontSize: 11 }}>
                       {actVal !== null ? (
@@ -193,7 +251,7 @@ export default async function BudgetPage({
               <div className="data-hd" style={{ gridTemplateColumns: "minmax(0,1fr) 80px 68px 56px 24px" }}>
                 <span className="col-label">Description</span>
                 <span className="col-label" style={{ textAlign: "right" }}>Amount</span>
-                <span className="col-label">Phase</span>
+                <span className="col-label">Job Type</span>
                 <span className="col-label">Status</span>
                 <span></span>
               </div>
@@ -209,7 +267,7 @@ export default async function BudgetPage({
                       </div>
                     </div>
                     <div className="cell-amt">{fmt$(Number(d.amount))}</div>
-                    <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Phase {phase?.number ?? "—"}</div>
+                    <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Job Type {phase?.number ?? "—"}</div>
                     <span className={`cell-tag ${paid ? "tag-paid" : "tag-pend"}`}>{paid ? "Paid" : "Pending"}</span>
                     <span className="cell-dl">—</span>
                   </div>
@@ -248,7 +306,7 @@ export default async function BudgetPage({
               <div className="data-hd" style={{ gridTemplateColumns: "minmax(0,1fr) 80px 68px 56px 24px" }}>
                 <span className="col-label">Description</span>
                 <span className="col-label" style={{ textAlign: "right" }}>Amount</span>
-                <span className="col-label">Phase</span>
+                <span className="col-label">Job Type</span>
                 <span className="col-label">Status</span>
                 <span></span>
               </div>
@@ -264,7 +322,7 @@ export default async function BudgetPage({
                       </div>
                     </div>
                     <div className="cell-amt">{fmt$(Number(d.amount))}</div>
-                    <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Phase {phase?.number ?? "—"}</div>
+                    <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Job Type {phase?.number ?? "—"}</div>
                     <span className={`cell-tag ${paid ? "tag-paid" : "tag-pend"}`}>{paid ? "Paid" : "Pending"}</span>
                     <span className="cell-dl">↓</span>
                   </div>
@@ -277,7 +335,7 @@ export default async function BudgetPage({
           <div className="sb-sec" style={{ padding: "10px 12px" }}>
             <div className="sb-hd" style={{ padding: "0 0 6px" }}>Spend by phase</div>
             {project.phases.map((p) => {
-              const a = Number(p.actual ?? 0);
+              const a = phaseActual(p.id);
               const pct = totalSpent > 0 ? Math.round((a / Math.max(totalSpent + pendingBalance, 1)) * 100) : 0;
               return (
                 <div className="spend-bar-row" key={p.id}>
@@ -290,69 +348,5 @@ export default async function BudgetPage({
         </div>
       </div>
     </div>
-  );
-}
-
-function PhaseView({ project }: { project: Awaited<ReturnType<typeof loadProjectByCode>> }) {
-  if (!project) return null;
-  return (
-    <>
-      <div
-        className="data-hd"
-        style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 130px 92px" }}
-      >
-        <span className="col-label">Phase</span>
-        <span className="col-label" style={{ textAlign: "right" }}>Budget</span>
-        <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
-        <span className="col-label" style={{ textAlign: "right" }}>Variance</span>
-        <span className="col-label">Status</span>
-        <span className="col-label">Draw status</span>
-      </div>
-      {project.phases.map((p) => {
-        const b = Number(p.budget ?? 0);
-        const a = Number(p.actual ?? 0);
-        const v = a - b;
-        const draw = p.draws[0];
-        const tagCls = draw && (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved) ? "tag-paid" : "tag-pend";
-        const tagLabel = draw
-          ? (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved
-              ? `Draw #${draw.number} paid`
-              : `Draw #${draw.number} pending`)
-          : "—";
-        const actCol = p.status === PhaseStatus.NotStarted
-          ? <span style={{ color: "var(--text-tertiary)" }}>—</span>
-          : <span style={{ fontWeight: 500, color: v > 0 ? "var(--amber)" : "var(--green)" }}>{fmt$(a)}</span>;
-        const varCol = p.status === PhaseStatus.NotStarted
-          ? <span style={{ color: "var(--text-tertiary)" }}>—</span>
-          : <span style={{ color: v > 0 ? "var(--amber)" : "var(--green)" }}>{v > 0 ? `+${fmt$(v)}` : v < 0 ? `${fmt$(v)}` : "$0"}</span>;
-        const incompleteChecklist =
-          p.checklistItems.length > 0 &&
-          p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
-        return (
-          <div
-            className="data-row"
-            style={{ gridTemplateColumns: "minmax(0,1fr) 68px 70px 70px 130px 92px" }}
-            key={p.id}
-          >
-            <div>
-              <div className="cell-name">{p.name}</div>
-              <div className="cell-meta">Phase {p.number}{p.status === PhaseStatus.InProgress ? " — active" : ""}</div>
-            </div>
-            <div style={{ textAlign: "right", fontSize: 11 }}>{fmt$(b)}</div>
-            <div style={{ textAlign: "right", fontSize: 11 }}>{actCol}</div>
-            <div style={{ textAlign: "right", fontSize: 10 }}>{varCol}</div>
-            <div>
-              <PhaseStatusSelect
-                phaseId={p.id}
-                projectId={project.code}
-                currentStatus={p.status}
-                incompleteChecklist={incompleteChecklist}
-              />
-            </div>
-            <span className={`cell-tag ${tagCls}`}>{tagLabel}</span>
-          </div>
-        );
-      })}
-    </>
   );
 }

@@ -149,7 +149,7 @@ export async function releaseDraw(
       action: "draw.approved",
       entity: "Draw",
       entityId: gate.draw.id,
-      message: `Draw #${gate.draw.number} approved — $${drawAmount.toLocaleString()} for Phase ${phase.number}: ${phase.name}.${
+      message: `Draw #${gate.draw.number} approved — $${drawAmount.toLocaleString()} for Job Type ${phase.number}: ${phase.name}.${
         check.ok ? "" : " (Released in advisory mode — checklist incomplete.)"
       }`,
       meta: {
@@ -186,7 +186,7 @@ export async function releaseDraw(
       projectId: phase.projectId,
       contactIds: activeContractors.map((a) => a.contactId),
       title: `Draw #${gate.draw.number} approved on ${phase.project.code}`,
-      body: `$${drawAmount.toLocaleString()} released for Phase ${phase.number}: ${phase.name}.${
+      body: `$${drawAmount.toLocaleString()} released for Job Type ${phase.number}: ${phase.name}.${
         check.ok ? "" : " (Advisory mode — checklist incomplete.)"
       }`,
       link: `/rehab/${phase.project.code}/budget`,
@@ -254,7 +254,7 @@ export async function fileException(projectCode: string, phaseNumber: number, su
       actorId: user.id,
       action: "exception.filed",
       entity: "Phase",
-      message: `Phase ${phaseNumber} — exception filed: ${summary.trim()} · Penalty paused.`,
+      message: `Job Type ${phaseNumber} — exception filed: ${summary.trim()} · Penalty paused.`,
       meta: { type: "flag", phaseNumber, projectId: project.id },
     },
   });
@@ -262,7 +262,7 @@ export async function fileException(projectCode: string, phaseNumber: number, su
     companyId: user.companyId,
     event: "exceptions",
     projectId: project.id,
-    title: `Exception filed on ${project.code} Phase ${phaseNumber}`,
+    title: `Exception filed on ${project.code} Job Type ${phaseNumber}`,
     body: summary.trim(),
     link: `/rehab/${project.code}/activity`,
     meta: {
@@ -365,7 +365,7 @@ export async function requestChangeOrder(
       actorId: user.id,
       action: "changeOrder.requested",
       entity: "Phase",
-      message: `Phase ${phaseNumber} — change order requested: ${scope.trim()}${estimateDollars ? ` (estimate $${estimateDollars})` : ""}.`,
+      message: `Job Type ${phaseNumber} — change order requested: ${scope.trim()}${estimateDollars ? ` (estimate $${estimateDollars})` : ""}.`,
       meta: {
         type: "changeOrder",
         phaseNumber,
@@ -415,7 +415,7 @@ export async function approveChangeOrder(activityEntryId: string, projectCode: s
         actorId: user.id,
         action: "changeOrder.approved",
         entity: "Phase",
-        message: `Phase ${phaseNumber ?? "?"} — change order approved${scope ? `: ${scope}` : ""}${estimate && estimate !== "0" ? ` (estimate $${estimate})` : ""}.`,
+        message: `Job Type ${phaseNumber ?? "?"} — change order approved${scope ? `: ${scope}` : ""}${estimate && estimate !== "0" ? ` (estimate $${estimate})` : ""}.`,
         meta: {
           type: "changeOrder",
           phaseNumber,
@@ -428,7 +428,7 @@ export async function approveChangeOrder(activityEntryId: string, projectCode: s
     prisma.projectAddendum.create({
       data: {
         projectId: project.id,
-        title: `CO — Phase ${phaseNumber ?? "?"}: ${scope || "Change order"}`,
+        title: `CO — Job Type ${phaseNumber ?? "?"}: ${scope || "Change order"}`,
         reason: scope || null,
         delta: estimate && estimate !== "0" ? parseFloat(estimate) : null,
         status: "Approved",
@@ -479,7 +479,7 @@ export async function rejectChangeOrder(
         actorId: user.id,
         action: "changeOrder.rejected",
         entity: "Phase",
-        message: `Phase ${phaseNumber ?? "?"} — change order rejected${scope ? ` (${scope})` : ""}. Reason: ${reason.trim()}`,
+        message: `Job Type ${phaseNumber ?? "?"} — change order rejected${scope ? ` (${scope})` : ""}. Reason: ${reason.trim()}`,
         meta: {
           type: "changeOrder",
           phaseNumber,

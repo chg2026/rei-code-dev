@@ -1924,7 +1924,6 @@ model PmActivity {
 model Invoice {
   id             String                @id @default(cuid())
   projectId      String
-  phaseId        String?
   vendor         String
   invoiceNumber  String?
   date           DateTime              @db.Date
@@ -1936,8 +1935,22 @@ model Invoice {
   updatedAt      DateTime              @updatedAt
   project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   attachments    InvoiceAttachment[]
+  jobTypes       InvoiceJobType[]
 
   @@index([projectId])
+}
+
+model InvoiceJobType {
+  id        String   @id @default(cuid())
+  invoiceId String
+  phaseId   String?
+  amount    Decimal  @db.Decimal(14, 2)
+  notes     String?
+  createdAt DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([phaseId])
 }
 
 model InvoiceAttachment {

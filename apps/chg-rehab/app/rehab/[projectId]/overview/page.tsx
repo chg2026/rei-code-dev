@@ -20,7 +20,13 @@ import {
 export const dynamic = "force-dynamic";
 
 const DAY = 86_400_000;
-const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
+const fmt$ = (n: number) =>
+  n.toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export default async function OverviewPage({
   params,
@@ -269,7 +275,7 @@ export default async function OverviewPage({
 
         {/* ── Section 3: Phase tracker ── */}
         <div className="sec-hd">
-          Phase tracker
+          Job Type tracker
           <Link
             href={`/rehab/${code}/schedule`}
             style={{
@@ -295,7 +301,7 @@ export default async function OverviewPage({
               <div>
                 <div className="ph-name">{p.name}</div>
                 <div className="ph-date">
-                  Phase {p.number} · {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
+                  Job Type {p.number} · {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
                   {p.status === PhaseStatus.InProgress ? " — In progress" : ""}
                 </div>
               </div>
@@ -387,7 +393,7 @@ export default async function OverviewPage({
                         <>
                           {" · "}
                           <Link href={sowHref} style={{ color: "var(--blue)" }}>
-                            {m.phaseNumber ? `View Phase ${m.phaseNumber} in SOW →` : "View in SOW →"}
+                            {m.phaseNumber ? `View Job Type ${m.phaseNumber} in SOW →` : "View in SOW →"}
                           </Link>
                         </>
                       )}

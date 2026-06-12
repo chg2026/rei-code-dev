@@ -337,7 +337,7 @@ export default function ActivityFeed({
                               textDecoration: "none",
                             }}
                           >
-                            {e.phaseNumber ? `View Phase ${e.phaseNumber} in SOW →` : "View in SOW →"}
+                            {e.phaseNumber ? `View Job Type ${e.phaseNumber} in SOW →` : "View in SOW →"}
                           </a>
                         )}
                       </div>

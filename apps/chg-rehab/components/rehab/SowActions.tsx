@@ -39,10 +39,10 @@ export default function SowActions({
       try {
         if (mode === "exception") {
           await fileException(projectCode, phaseNumber, summary);
-          setOkMessage(`Exception filed for Phase ${phaseNumber}.`);
+          setOkMessage(`Exception filed for Job Type ${phaseNumber}.`);
         } else if (mode === "changeOrder") {
           await requestChangeOrder(projectCode, phaseNumber, summary, estimate);
-          setOkMessage(`Change order requested for Phase ${phaseNumber}.`);
+          setOkMessage(`Change order requested for Job Type ${phaseNumber}.`);
         }
         reset();
         setTimeout(() => setOkMessage(null), 4000);
@@ -90,7 +90,7 @@ export default function SowActions({
       </div>
       <div className="sap-body">
         <label className="sap-row">
-          <span className="sap-lbl">Phase</span>
+          <span className="sap-lbl">Job Type</span>
           <select
             value={phaseNumber}
             onChange={(e) => setPhaseNumber(parseInt(e.target.value, 10))}
@@ -99,7 +99,7 @@ export default function SowActions({
           >
             {phases.map((p) => (
               <option key={p.number} value={p.number}>
-                Phase {p.number} — {p.name}
+                Job Type {p.number} — {p.name}
               </option>
             ))}
           </select>

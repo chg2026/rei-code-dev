@@ -22,8 +22,25 @@ export async function GET(req: Request) {
   }
   const linkType = url.searchParams.get("linkType");
   const linkId = url.searchParams.get("linkId");
-  if (linkType) where.linkType = linkType;
-  if (linkId) where.linkId = linkId;
+  if (linkType === "property" && linkId) {
+    // The property Tasks tab also surfaces tasks linked to rehab projects
+    // that live on this property (linkType="project"), not just property-level
+    // tasks. Resolve the property's projects and OR them in.
+    const projects = await prisma.project.findMany({
+      where: { companyId: user.companyId, propertyId: linkId },
+      select: { id: true },
+    });
+    const projectIds = projects.map((p) => p.id);
+    where.OR = [
+      { linkType: "property", linkId },
+      ...(projectIds.length
+        ? [{ linkType: "project", linkId: { in: projectIds } }]
+        : []),
+    ];
+  } else {
+    if (linkType) where.linkType = linkType;
+    if (linkId) where.linkId = linkId;
+  }
 
   const tasks = await prisma.wsTask.findMany({
     where,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { billingAwareErrorMessage } from "@/lib/billing-blocked-client";
 import { useBillingGateProps } from "@/lib/useBillingHealth";
+import AddressAutocompleteFields from "@/components/property/AddressAutocompleteFields";
 
 type Modal =
   | null
@@ -354,12 +355,7 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 11, color: "var(--text-tertiary)", padding: "0 0 8px", lineHeight: 1.5 }}>
           Fill in what you know now — all fields can be updated after creation. Upload photos and documents from the property record.
         </div>
-        <Field label="Address"><input name="address" required style={inputStyle()} placeholder="2247 Meadowbrook Blvd." /></Field>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 70px 90px", gap: 8 }}>
-          <Field label="City"><input name="city" required placeholder="e.g. Cleveland" style={inputStyle()} /></Field>
-          <Field label="State"><input name="state" required placeholder="OH" maxLength={2} style={inputStyle()} /></Field>
-          <Field label="ZIP"><input name="zip" required placeholder="44106" style={inputStyle()} /></Field>
-        </div>
+        <AddressAutocompleteFields />
         <Field label="Status">
           <select name="status" defaultValue="Acquired" style={inputStyle()}>
             <option>Acquired</option>

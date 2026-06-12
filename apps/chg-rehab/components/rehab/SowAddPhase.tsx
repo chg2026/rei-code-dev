@@ -184,7 +184,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
 
   function addCustom() {
     if (!name.trim()) {
-      setError("Phase name is required.");
+      setError("Job Type name is required.");
       return;
     }
     setError(null);
@@ -222,7 +222,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
   return (
     <>
       <button className="btn" onClick={() => setOpen(true)}>
-        + Add Phase
+        + Add Job Type
       </button>
       {open && (
         <div onClick={close} style={overlayStyle}>
@@ -245,7 +245,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
                 className={`tg-btn ${tab === "custom" ? "active" : ""}`}
                 onClick={() => setTab("custom")}
               >
-                Custom Phase
+                Custom Job Type
               </button>
             </div>
 
@@ -334,7 +334,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   <div>
-                    <div style={labelStyle}>Phase name</div>
+                    <div style={labelStyle}>Job Type name</div>
                     <input
                       value={name}
                       disabled={pending}
@@ -413,7 +413,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
                 </button>
               ) : (
                 <button className="btn" onClick={addCustom} disabled={pending || !name.trim()}>
-                  {pending ? "Adding…" : "Add Phase"}
+                  {pending ? "Adding…" : "Add Job Type"}
                 </button>
               )}
             </div>

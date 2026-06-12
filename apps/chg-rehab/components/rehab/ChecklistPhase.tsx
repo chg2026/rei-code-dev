@@ -216,7 +216,7 @@ export default function ChecklistPhase({
         <div className="ph-name-wrap">
           <div style={{ fontSize: 11, fontWeight: 500 }}>{phase.name}</div>
           <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
-            Phase {phase.number} · {phase.startLabel} – {phase.endLabel}
+            Job Type {phase.number} · {phase.startLabel} – {phase.endLabel}
             {phase.status === "InProgress" ? " — In progress" : ""}
           </div>
         </div>

@@ -268,7 +268,7 @@ export default function ChangeOrdersClient({
           >
             <div>CO #</div>
             <div>Title</div>
-            <div>Phase</div>
+            <div>Job Type</div>
             <div style={{ textAlign: "right" }}>Amount</div>
             <div>Status</div>
             <div>Approved by</div>
@@ -303,7 +303,7 @@ export default function ChangeOrdersClient({
                   )}
                 </div>
                 <div style={{ color: "var(--text-secondary)" }}>
-                  {phase ? `Phase ${phase.number} · ${phase.name}` : "—"}
+                  {phase ? `Job Type ${phase.number} · ${phase.name}` : "—"}
                 </div>
                 <div
                   style={{
@@ -369,7 +369,7 @@ export default function ChangeOrdersClient({
               />
             </Field>
 
-            <Field label="Phase">
+            <Field label="Job Type">
               <select
                 value={form.phaseId}
                 onChange={(e) => setForm({ ...form, phaseId: e.target.value })}
@@ -379,7 +379,7 @@ export default function ChangeOrdersClient({
                 <option value="">— No phase —</option>
                 {phases.map((p) => (
                   <option key={p.id} value={p.id}>
-                    Phase {p.number} · {p.name}
+                    Job Type {p.number} · {p.name}
                   </option>
                 ))}
               </select>
@@ -457,7 +457,7 @@ export default function ChangeOrdersClient({
 
             {form.status === "Approved" && selectedPhase && (
               <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Approving folds {fmt$(changeAmount || 0)} into Phase {selectedPhase.number}&apos;s budget.
+                Approving folds {fmt$(changeAmount || 0)} into Job Type {selectedPhase.number}&apos;s budget.
               </div>
             )}
 

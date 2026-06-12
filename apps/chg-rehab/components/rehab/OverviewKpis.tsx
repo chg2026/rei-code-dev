@@ -1,6 +1,12 @@
 import Link from "next/link";
 
-const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
+const fmt$ = (n: number) =>
+  n.toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 type Props = {
   code: string;

@@ -11,6 +11,7 @@ import { can } from "@/lib/permissions";
 import { DocStatus } from "@prisma/client";
 import { parseDocumentMeta } from "@/lib/rehab/types";
 import DocUploadButton from "@/components/rehab/DocUploadButton";
+import DocPreviewButton from "@/components/rehab/DocPreviewButton";
 
 export const dynamic = "force-dynamic";
 
@@ -99,11 +100,13 @@ export default async function DocumentsPage({
                   )}
                   <div className="doc-date-cell">{dateStr} ET</div>
                   <div className="doc-acts">
-                    <button className="view-btn">View</button>
+                    <DocPreviewButton docId={doc.id} />
                     {isStaged && canEdit ? (
                       <button className="view-btn" style={{ background: "var(--blue)", color: "#fff", borderColor: "var(--blue)" }}>
                         Promote
                       </button>
+                    ) : doc.fileKey ? (
+                      <a className="cell-dl" href={`/api/documents/${doc.id}/download`} aria-label={`Download ${doc.name}`}>↓</a>
                     ) : (
                       <span className="cell-dl">↓</span>
                     )}
