@@ -39,7 +39,10 @@ export default async function UnderwritingPage({
         closing: sp.closing ?? null,
         holding: sp.holding ?? null,
         strategy: sp.strategy ?? null,
+        rehabPeriod: sp.rehabPeriod ?? null,
+        financingType: sp.financingType ?? null,
       }}
+      initialReadonly={sp.readonly === "true" || sp.readonly === "1"}
     />
   );
 }

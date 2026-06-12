@@ -18,16 +18,20 @@ type InitialInputs = {
   closing: string | null;
   holding: string | null;
   strategy: string | null;
+  rehabPeriod: string | null;
+  financingType: string | null;
 };
 
 export default function UnderwritingClient({
   properties,
   initialPropertyId,
   initialInputs,
+  initialReadonly = false,
 }: {
   properties: Property[];
   initialPropertyId?: string | null;
   initialInputs?: InitialInputs | null;
+  initialReadonly?: boolean;
 }) {
   const initialSelected =
     (initialPropertyId ? properties.find((p) => p.id === initialPropertyId) : null) ??
@@ -51,6 +55,8 @@ export default function UnderwritingClient({
   const closing = initialInputs?.closing ?? (meta.closingCosts ? String(meta.closingCosts) : null);
   const holding = initialInputs?.holding ?? null;
   const strategy = initialInputs?.strategy ?? null;
+  const rehabPeriod = initialInputs?.rehabPeriod ?? null;
+  const financingType = initialInputs?.financingType ?? null;
 
   function buildIframeSrc(prop: Property | null) {
     if (!prop) return "/underwriting-calc.html";
@@ -66,6 +72,9 @@ export default function UnderwritingClient({
     if (closing) p.set("closing", closing);
     if (holding) p.set("holding", holding);
     if (strategy) p.set("strategy", strategy);
+    if (rehabPeriod) p.set("rehabPeriod", rehabPeriod);
+    if (financingType) p.set("financingType", financingType);
+    if (initialReadonly) p.set("readonly", "true");
     return `/underwriting-calc.html?${p.toString()}`;
   }
 

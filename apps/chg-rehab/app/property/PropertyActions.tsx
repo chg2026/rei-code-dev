@@ -345,6 +345,8 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
           return;
         }
         const { id } = await res.json();
+        setSubmitting(false);
+        onClose();
         router.push(`/property?id=${id}&tab=overview`);
         router.refresh();
       }}>

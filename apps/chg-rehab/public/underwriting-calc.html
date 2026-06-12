@@ -1871,6 +1871,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     var closing = params.get("closing");
     var holding = params.get("holding");
     var strategy = params.get("strategy");
+    var rehabPeriod = params.get("rehabPeriod");
+    var financingType = params.get("financingType");
+    var readonly = params.get("readonly") === "true" || params.get("readonly") === "1";
 
     // Signature of the analysis the current URL is asking to load. Persisted
     // alongside the values so we can tell a remount/reload of the *same* view
@@ -1878,11 +1881,13 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     // analysis via deep-link params (seed from the params instead).
     var seedSig = JSON.stringify({
       purchase: purchase || '', rehab: rehab || '', arv: arv || '',
-      closing: closing || '', holding: holding || '', strategy: strategy || ''
+      closing: closing || '', holding: holding || '', strategy: strategy || '',
+      rehabPeriod: rehabPeriod || '', financingType: financingType || ''
     });
-    var hasCoreParams = !!(purchase || rehab || arv || closing || holding || strategy);
+    var hasCoreParams = !!(purchase || rehab || arv || closing || holding || strategy || rehabPeriod || financingType);
 
     function persistState() {
+      if (readonly) return;
       try {
         var data = {};
         calcFields().forEach(function(el) { data[el.id] = el.value; });
@@ -1916,6 +1921,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       if (arv) { setVal('f-arv', arv); setVal('b-arv', arv); }
       if (closing) setVal('ap-closing', closing);
       if (holding) setVal('ap-holding', holding);
+      if (rehabPeriod) setVal('ap-rmo', rehabPeriod);
+      if (financingType) setVal('ap-fin', financingType);
     }
 
     function clickStrategyTab(strat) {
@@ -1951,7 +1958,9 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     //  - Otherwise (no core params, or same analysis being remounted/reloaded)
     //    restore the user's session edits so navigation never loses work.
     var stored = readStored();
-    var useStored = stored && (!hasCoreParams || stored.__seed === seedSig);
+    // In read-only snapshot mode always seed from the URL params (the saved
+    // analysis) — never restore the user's prior session edits.
+    var useStored = !readonly && stored && (!hasCoreParams || stored.__seed === seedSig);
 
     if (useStored) {
       applyStored(stored);
@@ -1959,6 +1968,21 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
     } else {
       seedFromParams();
       clickStrategyTab(strategy);
+    }
+
+    // Read-only snapshot: lock every input/select so the user sees the exact
+    // saved values (the floating Save button is skipped separately).
+    if (readonly) {
+      var roFields = document.querySelectorAll('#screen-calc input, #screen-calc select, #screen-calc textarea');
+      Array.prototype.forEach.call(roFields, function (el) {
+        var t = (el.type || '').toLowerCase();
+        if (el.tagName === 'SELECT' || t === 'checkbox' || t === 'radio' || t === 'range') {
+          el.disabled = true;
+        } else {
+          el.readOnly = true;
+        }
+        el.style.cursor = 'not-allowed';
+      });
     }
 
     // Track which fields the user actually edited. isTrusted is true only for
@@ -2010,6 +2034,8 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       if (a) { fill('f-arv', a); fill('b-arv', a); }
       fill('ap-closing', qp.get('closing'));
       fill('ap-holding', qp.get('holding'));
+      fill('ap-rmo', qp.get('rehabPeriod'));
+      fill('ap-fin', qp.get('financingType'));
     }
 
     function updateHeader(qp) {
@@ -3501,6 +3527,8 @@ updateSliderTrack($('slider-hold'),true);
   function setInput(id, val) { var el = document.getElementById(id); if (el && val !== null) { el.value = val; } }
   document.addEventListener('DOMContentLoaded', function () {
     var params = new URLSearchParams(window.location.search);
+    // Read-only snapshot: skip the seed-duplication + floating Save button.
+    if (params.get('readonly') === 'true' || params.get('readonly') === '1') return;
     var purchase = fmt(params.get('purchase'));
     var arv      = fmt(params.get('arv'));
     var rehab    = fmt(params.get('rehab'));
@@ -3556,7 +3584,8 @@ updateSliderTrack($('slider-hold'),true);
           holding: raw('ap-holding'),
           downPayment: raw('ap-down'),
           interestRate: raw('ap-rate'),
-          rehabPeriod: (document.getElementById('ap-rehab-months') || {}).value || null,
+          rehabPeriod: (document.getElementById('ap-rmo') || {}).value || null,
+          financingType: (document.getElementById('ap-fin') || {}).value || null,
         },
         costs: {
           allIn: txt('f-all-in') || txt('b-all-in'),

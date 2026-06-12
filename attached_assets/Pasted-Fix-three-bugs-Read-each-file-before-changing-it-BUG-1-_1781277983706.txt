@@ -1,0 +1,31 @@
+Fix three bugs. Read each file before changing it.
+
+---
+
+BUG 1: Delete property returns 500
+Read apps/chg-rehab/app/api/properties/[id]/route.ts
+Find the DELETE handler. The 500 is likely a Prisma cascade issue — child records (tasks, attachments, activity, project phases, etc.) are blocking the delete. Fix by deleting related records first in the correct order before deleting the property, OR add onDelete: Cascade to the relevant Prisma relations and run npx prisma db push --accept-data-loss.
+
+---
+
+BUG 2: Create property modal doesn't close after saving
+Read apps/chg-rehab/components/AddPropertyModal.tsx (or wherever the property creation form lives — search for the form that has Address, City, State, ZIP fields).
+After a successful POST to /api/properties, the modal is not closing. Find the onSuccess/onClose handler and make sure it is called after a successful response. If the "Saving..." button state is never resetting, also fix that — reset to idle on both success and error.
+
+---
+
+BUG 3: Saved analysis opens as editable calculator with wrong values
+The issue has two parts:
+a) The saved analysis (in the Analysis tab) should display as a read-only snapshot, not an editable calculator
+b) The rehab period and other inputs are not being restored correctly when "Open full report" is clicked
+
+Read apps/chg-rehab/app/api/properties/[id]/analyses/route.ts and apps/chg-rehab/app/property/AnalysisTab.tsx (or similar).
+
+Fix approach:
+1. When "Save analysis to deal" is clicked in the calculator iframe, the save payload must include ALL calculator inputs: purchase, rehab, arv, closing, holding, strategy, rehabPeriod, holdPeriod, financingType, and any other fields. Store them as a JSON blob in the analysis record (add a column `inputs Json?` to the Analysis model if not present, run npx prisma db push).
+
+2. In the Analysis tab, show the saved analysis as a read-only summary card (the current card showing purchase/rehab/arv/profit/ROI is good). The "Open full report" button should open the calculator pre-loaded with ALL saved inputs — not just purchase/rehab/arv but also rehabPeriod, holdPeriod etc. Pass them as URL params.
+
+3. Do NOT open the calculator in an editable mode from the saved analysis. Instead, add a query param ?readonly=true to the calculator URL and in underwriting-calc.html, if readonly=true is in the URL, disable all inputs (set them to readonly/disabled) so the user sees the exact snapshot they saved.
+
+Run npx tsc --noEmit after all changes. Report what you changed.

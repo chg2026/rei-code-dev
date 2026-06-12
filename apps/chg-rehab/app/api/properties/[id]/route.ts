@@ -49,9 +49,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await can(user, "property", "edit"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const { id } = await params;
   const property = await prisma.property.findFirst({ where: { id, companyId: user.companyId } });
   if (!property) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  await prisma.property.delete({ where: { id } });
+
+  // Projects have a required FK to Property with no ON DELETE cascade, so they
+  // block the delete (Prisma P2003). Remove them first — their own children
+  // (phases, draws, SOW sections, etc.) cascade off Project — then delete the
+  // property, which cascades assets/financials/documents and nulls out the
+  // optional pipeline-deal / offering references.
+  await prisma.$transaction([
+    prisma.project.deleteMany({ where: { propertyId: id } }),
+    prisma.property.delete({ where: { id } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

@@ -1104,7 +1104,10 @@ function AnalysisList({ sections, propertyId }: { sections: { id: string; sectio
                   if (inputs.arv) p.set("arv", String(inputs.arv));
                   if (inputs.closing) p.set("closing", String(inputs.closing));
                   if (inputs.holding) p.set("holding", String(inputs.holding));
+                  if (inputs.rehabPeriod) p.set("rehabPeriod", String(inputs.rehabPeriod));
+                  if (inputs.financingType) p.set("financingType", String(inputs.financingType));
                   if (d.strategy) p.set("strategy", String(d.strategy));
+                  p.set("readonly", "true");
                   return `/underwriting?${p.toString()}`;
                 })()}
                 style={{ fontSize: 12, fontWeight: 500, padding: "6px 14px", borderRadius: 6, background: "#1F4D5C", color: "#fff", textDecoration: "none" }}
