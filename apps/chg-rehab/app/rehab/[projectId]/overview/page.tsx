@@ -8,7 +8,8 @@ import {
 import { formatET } from "@/lib/datetime";
 import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
-import { PhaseStatus, DrawStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { PhaseStatus, DrawStatus, ChangeOrderStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,9 @@ export default async function OverviewPage({
   }, 0);
   const overage = projectedFinal - budget;
   const pendingDraws = draws.filter((d) => d.status === DrawStatus.Pending);
+  const pendingChangeOrders = await prisma.changeOrder.count({
+    where: { projectId: project.id, status: ChangeOrderStatus.Pending },
+  });
 
   // Timeline
   const start = project.startDate ?? new Date(project.createdAt);
@@ -106,6 +110,7 @@ export default async function OverviewPage({
         penaltyPerDiem={meta.penaltyPerDiem}
         pendingDrawsCount={pendingDraws.length}
         pendingBalance={pendingDraws.reduce((a, d) => a + Number(d.amount), 0)}
+        pendingChangeOrders={pendingChangeOrders}
       />
 
       <div className="body-split">

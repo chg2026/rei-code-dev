@@ -220,6 +220,7 @@ model Project {
   documents             Document[]
   warehouseAllocations  WarehouseItem[]
   invoices              Invoice[]
+  changeOrders          ChangeOrder[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1921,4 +1922,29 @@ enum InvoiceStatus {
   Unpaid
   Pending
   Paid
+}
+
+model ChangeOrder {
+  id           String            @id @default(cuid())
+  projectId    String
+  phaseId      String?
+  number       Int
+  title        String
+  reason       String?
+  amount       Decimal           @db.Decimal(14, 2)
+  status       ChangeOrderStatus @default(Pending)
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+  @@index([projectId])
+}
+
+enum ChangeOrderStatus {
+  Pending
+  Approved
+  Rejected
 }

@@ -1,0 +1,94 @@
+Build the Change Orders tab for the Rehab Manager. Read apps/chg-rehab/prisma/schema.prisma first.
+
+STEP 1 — Schema (raw SQL + prisma generate, do NOT use prisma db push)
+
+Run this SQL via Supabase client (migration script at apps/chg-rehab/scripts/migrate-change-orders.ts, run with npx ts-node):
+
+CREATE TYPE "ChangeOrderStatus" AS ENUM ('Pending', 'Approved', 'Rejected');
+
+CREATE TABLE "ChangeOrder" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "projectId" TEXT NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
+  "phaseId" TEXT,
+  number INT NOT NULL,
+  title TEXT NOT NULL,
+  reason TEXT,
+  amount DECIMAL(14,2) NOT NULL,
+  status "ChangeOrderStatus" NOT NULL DEFAULT 'Pending',
+  "approvedById" TEXT,
+  "approvedAt" TIMESTAMPTZ,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE("projectId", number)
+);
+
+Add to schema.prisma:
+
+model ChangeOrder {
+  id           String            @id @default(cuid())
+  projectId    String
+  phaseId      String?
+  number       Int
+  title        String
+  reason       String?
+  amount       Decimal           @db.Decimal(14, 2)
+  status       ChangeOrderStatus @default(Pending)
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+}
+
+enum ChangeOrderStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+Add "changeOrders ChangeOrder[]" to the Project model. Run: npx prisma generate
+
+STEP 2 — API routes
+Create apps/chg-rehab/app/api/rehab/[projectId]/change-orders/route.ts
+- GET: return all change orders for project, order by number asc
+- POST: create change order — auto-increment number (SELECT MAX(number)+1 for this project), accept title, reason, amount, phaseId
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/change-orders/[coId]/route.ts
+- PATCH: update fields; if status changes to Approved, set approvedById=currentUser.id and approvedAt=now()
+- DELETE: delete (only if Pending)
+
+All routes: auth-guard with getCurrentUser(), scope to companyId.
+
+STEP 3 — UI
+Create apps/chg-rehab/app/rehab/[projectId]/change-orders/page.tsx
+
+Layout: full-width list + slide-in detail panel (createPortal).
+
+Summary bar at top:
+- Total COs | Total Approved ($) | Total Pending ($) | Total Rejected ($)
+
+Table columns: CO # | Title | Phase | Reason | Amount | Status badge | Approved by | Date | Actions
+
+Status badges: Pending=amber, Approved=green, Rejected=red
+
+Detail panel (opens on row click or "+ New Change Order"):
+- CO # (auto, read-only)
+- Title (text input)
+- Phase (select from project phases)
+- Reason (textarea)
+- Original budget for selected phase (read-only, pulled from phase.budget)
+- Change amount ($ input — can be positive or negative)
+- New budget if approved (calculated: original + change, shown live)
+- Status (select: Pending / Approved / Rejected)
+- If Approved: show "Approved by [name] on [date]"
+- Save / Cancel
+
+When a CO is Approved: update the linked phase's budget by adding the CO amount (PATCH the phase budget in the same API call).
+
+STEP 4 — Add "Change Orders" tab to apps/chg-rehab/components/rehab/TabNav.tsx
+
+STEP 5 — On the Overview KPI strip, update the "Pending Change Orders" KPI card to show the count of Pending change orders for this project (query ChangeOrder where projectId=project.id and status=Pending).
+
+STEP 6 — Run npx tsc --noEmit. Fix errors. Report what was created.

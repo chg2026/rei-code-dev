@@ -4,7 +4,14 @@ import { useState } from "react";
 
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-type KpiKey = "budget" | "spent" | "projected" | "timeline" | "penalty" | null;
+type KpiKey =
+  | "budget"
+  | "spent"
+  | "projected"
+  | "timeline"
+  | "penalty"
+  | "changeOrders"
+  | null;
 
 type Props = {
   budget: number;
@@ -22,6 +29,7 @@ type Props = {
   penaltyPerDiem: number;
   pendingDrawsCount: number;
   pendingBalance: number;
+  pendingChangeOrders: number;
 };
 
 export default function OverviewKpis(props: Props) {
@@ -85,6 +93,15 @@ export default function OverviewKpis(props: Props) {
             }
           >
             {props.penaltyStatus === "Paused" ? "Paused — exception" : props.penaltyStatus}
+          </div>
+        </KpiCard>
+        <KpiCard onClick={() => setOpen("changeOrders")}>
+          <div className="kpi-label">Pending change orders</div>
+          <div className={`kpi-val ${props.pendingChangeOrders > 0 ? "amber" : ""}`}>
+            {props.pendingChangeOrders}
+          </div>
+          <div className="kpi-sub">
+            {props.pendingChangeOrders === 0 ? "None awaiting review" : "Awaiting review"}
           </div>
         </KpiCard>
       </div>
@@ -219,6 +236,24 @@ function renderDetail(key: NonNullable<KpiKey>, p: Props) {
             {p.penaltyStatus === "Paused" && (
               <li>Clock paused while a filed exception is being resolved.</li>
             )}
+          </ul>
+        </>
+      );
+    case "changeOrders":
+      return (
+        <>
+          <h3 className="kpi-modal-h">Pending change orders</h3>
+          <div className="kpi-modal-big">{p.pendingChangeOrders}</div>
+          <ul className="kpi-modal-list">
+            <li>
+              {p.pendingChangeOrders === 0
+                ? "No change orders are awaiting review."
+                : `${p.pendingChangeOrders} change order${
+                    p.pendingChangeOrders === 1 ? "" : "s"
+                  } awaiting approval or rejection.`}
+            </li>
+            <li>Open the Change Orders tab to review scope and budget impact.</li>
+            <li>Approving a change order folds its amount into the linked phase budget.</li>
           </ul>
         </>
       );

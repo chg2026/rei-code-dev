@@ -3,4 +3,5 @@
 - [Warehouse catalog self-heal](warehouse-catalog-self-heal.md) — standard catalog auto-seeds (lib/warehouseSeed.ts) when a company has 0 departments; advisory-lock + tx; keep trigger narrow.
 - [Prisma client stale vs schema](prisma-client-stale-vs-schema.md) — node_modules @prisma/client drifts from committed chg-rehab schema; regenerate before trusting tsc; regen can surface other features' pre-existing breakage.
 - [WsTask subtasks model](wstask-subtasks.md) — parentTaskId self-rel; top-level list queries must filter parentTaskId:null; parent delete must cascade subtasks (FK is SetNull).
+- [Approval-folds-into-total fields lock](change-order-budget-locking.md) — when a one-time approval folds an amount into a derived total (Phase.budget), lock the source financial fields after; editing them later drifts the total.
 - [Attachment objectPath IDOR](objectpath-attachment-idor.md) — attachment-register routes must validate the minted `uploads/<uuid>` objectPath shape before storing/signing, or callers can sign others' objects.

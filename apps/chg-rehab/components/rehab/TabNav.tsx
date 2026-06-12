@@ -7,6 +7,7 @@ const TABS = [
   { slug: "sow", label: "Scope of Work" },
   { slug: "budget", label: "Budget & Costs" },
   { slug: "invoices", label: "Invoices" },
+  { slug: "change-orders", label: "Change Orders" },
   { slug: "schedule", label: "Schedule" },
   { slug: "checklist", label: "Checklist & Payments" },
   { slug: "documents", label: "Documents" },
