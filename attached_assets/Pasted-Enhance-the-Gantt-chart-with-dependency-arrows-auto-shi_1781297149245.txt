@@ -1,0 +1,48 @@
+Enhance the Gantt chart with dependency arrows, auto-shift on delays, and critical path highlighting.
+
+Read these files first:
+- apps/chg-rehab/app/rehab/[projectId]/schedule/page.tsx
+- The Gantt component (whatever file renders the Gantt bars — likely in components/rehab/)
+
+ENHANCEMENT 1 — Dependency-aware scheduling
+When rendering the Gantt, before drawing bars, run a schedule calculation:
+
+function computeSchedule(phases):
+  For each phase (sorted by number):
+    - If phase has no dependencies and has a plannedStartDate → use it as-is
+    - If phase has dependencies:
+      - Find the latest plannedEndDate among all dependency phases
+      - If that date is AFTER this phase's plannedStartDate (or plannedStartDate is null):
+        - Override the displayed start date = latestDependencyEndDate + 1 day
+        - Override the displayed end date = displayedStart + estimatedDays
+        - Mark phase as "shifted" (show amber indicator)
+  Return the adjusted schedule
+
+Use this computed schedule for bar positioning, not the raw phase dates. Show a small amber "⚠ shifted" badge on any phase whose start was pushed by a dependency.
+
+ENHANCEMENT 2 — Dependency arrows
+Between dependent phases, draw SVG arrows connecting the end of the predecessor bar to the start of the successor bar. Use a right-angle elbow line (horizontal → vertical → horizontal). Color: gray normally, red if the dependency is causing a delay (predecessor end > successor planned start).
+
+ENHANCEMENT 3 — Critical path highlighting
+The critical path = the longest chain of dependent phases that determines the project end date.
+
+Algorithm:
+1. For each phase compute earliest finish = computed start + estimatedDays
+2. Work backwards from the last phase: a phase is on the critical path if delaying it by 1 day delays the project end date
+3. Mark critical path phases with a red/dark bar color instead of the default color
+4. Show a "Critical Path" legend item
+
+ENHANCEMENT 4 — Progress fill
+Each Gantt bar should show a fill % based on:
+- NotStarted = 0%
+- Active = use checklist completion % (completed checklist items / total items * 100). If no checklist items, use 50%.
+- Complete = 100%
+Fill as a lighter shade of the bar color from left.
+
+ENHANCEMENT 5 — Today line
+Draw a vertical red dashed line at today's date on the Gantt. Label it "Today".
+
+ENHANCEMENT 6 — Zoom controls
+Add three zoom buttons: Week | Month | Project (fits all phases). Default to Month view.
+
+Run npx tsc --noEmit. Fix errors. Report what changed.
