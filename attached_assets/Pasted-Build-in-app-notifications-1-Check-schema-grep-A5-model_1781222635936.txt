@@ -1,0 +1,42 @@
+Build in-app notifications.
+
+1. Check schema: grep -A5 "model Notification" apps/chg-rehab/prisma/schema.prisma
+
+2. If Notification model missing, add to schema.prisma:
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  linkHref  String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+Add "notifications Notification[]" to UserProfile. Run: npx prisma db push --accept-data-loss
+
+3. Create apps/chg-rehab/lib/notify.ts:
+import { prisma } from "./prisma";
+export async function createNotification(userId: string, type: string, title: string, body: string, linkHref?: string) {
+  if (!userId) return;
+  await prisma.notification.create({ data: { userId, type, title, body, linkHref: linkHref ?? "" } });
+}
+
+4. Create GET /api/notifications/route.ts — returns { notifications, unreadCount } for current user, newest first, limit 30.
+   Create PATCH /api/notifications/[id]/read/route.ts — sets read=true.
+   Create PATCH /api/notifications/read-all/route.ts — sets read=true for all current user notifications.
+
+5. Wire into task assignment: in POST /api/workspace/tasks/route.ts, after creating the task, if assigneeId exists and assigneeId !== user.id, call createNotification(assigneeId, "task_assigned", "Task assigned to you", title, "/command-center")
+
+6. In TopNav.tsx, find the bell icon. Add:
+   - useState for notifications array and unreadCount
+   - useEffect that fetches /api/notifications on mount and every 30 seconds
+   - Red badge on bell showing unreadCount (hide when 0)
+   - onClick toggles a dropdown panel showing notifications list (white card, 360px wide, fixed position, right-aligned under bell)
+   - Each row: dot indicator if unread + title + body truncated to 60 chars + relative time ("2m ago", "1h ago")
+   - Clicking a row: PATCH /api/notifications/[id]/read, then navigate to linkHref
+   - "Mark all read" button at top calls PATCH /api/notifications/read-all
+   - Close on outside click
+
+Run: npx tsc --noEmit. Report errors.
