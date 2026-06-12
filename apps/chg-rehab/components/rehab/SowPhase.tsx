@@ -42,7 +42,7 @@ export default function SowPhase({
       >
         {header}
       </div>
-      {open && <div className="sow-items">{children}</div>}
+      {open && <div className="sow-items open">{children}</div>}
     </>
   );
 }

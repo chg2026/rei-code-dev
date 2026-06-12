@@ -9,6 +9,7 @@ import SowPhase from "@/components/rehab/SowPhase";
 import SowActions from "@/components/rehab/SowActions";
 import SowPhaseDetails from "@/components/rehab/SowPhaseDetails";
 import SowTemplatePicker from "@/components/rehab/SowTemplatePicker";
+import { ensureDefaultTemplates } from "@/lib/rehab/seed-templates";
 
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -26,6 +27,7 @@ export default async function SowPage({
   const project = await loadProjectByCode(user.companyId, decodeURIComponent(projectId));
   if (!project) notFound();
   const canEdit = await can(user, "rehab", "edit");
+  await ensureDefaultTemplates(user.companyId, user.id);
 
   const sp = (await searchParams) ?? {};
   const focusPhase = sp.phase ? parseInt(sp.phase, 10) : NaN;

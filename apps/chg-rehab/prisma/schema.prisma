@@ -251,6 +251,35 @@ model Phase {
   @@index([projectId])
 }
 
+model SowTemplate {
+  id          String             @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  phases      SowTemplatePhase[]
+
+  @@index([companyId])
+}
+
+model SowTemplatePhase {
+  id                 String      @id @default(cuid())
+  templateId         String
+  number             Int
+  name               String
+  description        String?
+  laborBudget        Decimal     @default(0) @db.Decimal(14, 2)
+  materialsBudget    Decimal     @default(0) @db.Decimal(14, 2)
+  dependencies       Int[]       @default([])
+  acceptanceCriteria String[]    @default([])
+  template           SowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, number])
+  @@index([templateId])
+}
+
 model ChecklistItem {
   id        String          @id @default(cuid())
   phaseId   String

@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { Prisma } from "@prisma/client";
-import { SOW_TEMPLATES, type SowTemplateKey } from "@/lib/rehab/sow-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +15,9 @@ async function resolveProject(projectIdOrCode: string, companyId: string) {
 }
 
 /**
- * Bootstrap a project's phases from a pre-built SOW template. Refuses to run if
- * the project already has any phases — the caller must clear them first.
+ * Bootstrap a project's phases from a saved SOW template. Refuses to run if the
+ * project already has any phases — the caller must clear them first. The
+ * template must belong to the caller's company.
  */
 export async function POST(
   req: NextRequest,
@@ -34,11 +34,22 @@ export async function POST(
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
-  const key = body && typeof body === "object" ? (body.template as string) : "";
-  if (key !== "full_gut" && key !== "turnover") {
-    return NextResponse.json({ error: "Unknown template" }, { status: 400 });
+  const templateId =
+    body && typeof body === "object" && typeof body.templateId === "string"
+      ? body.templateId
+      : "";
+  if (!templateId) {
+    return NextResponse.json({ error: "templateId is required" }, { status: 400 });
   }
-  const template = SOW_TEMPLATES[key as SowTemplateKey];
+
+  const template = await prisma.sowTemplate.findFirst({
+    where: { id: templateId, companyId: user.companyId },
+    include: { phases: { orderBy: { number: "asc" } } },
+  });
+  if (!template) return NextResponse.json({ error: "Template not found" }, { status: 404 });
+  if (template.phases.length === 0) {
+    return NextResponse.json({ error: "Template has no phases." }, { status: 400 });
+  }
 
   const existing = await prisma.phase.count({ where: { projectId: project.id } });
   if (existing > 0) {
@@ -48,18 +59,29 @@ export async function POST(
     );
   }
 
+  // Phases are renumbered to a contiguous 1..N sequence on copy, so template
+  // dependencies (which reference template phase numbers, possibly gapped after
+  // edits) must be remapped to the new numbers. Unresolvable refs are dropped.
+  const numberMap = new Map<number, number>(
+    template.phases.map((p, idx) => [p.number, idx + 1])
+  );
+
   await prisma.phase.createMany({
     data: template.phases.map((p, idx) => {
       const labor = new Prisma.Decimal(p.laborBudget ?? 0);
       const materials = new Prisma.Decimal(p.materialsBudget ?? 0);
+      const dependencies = p.dependencies
+        .map((d) => numberMap.get(d))
+        .filter((n): n is number => typeof n === "number");
       return {
         projectId: project.id,
         number: idx + 1,
         name: p.name,
+        description: p.description ?? null,
         laborBudget: labor,
         materialsBudget: materials,
         budget: labor.plus(materials),
-        dependencies: p.dependencies,
+        dependencies,
         acceptanceCriteria: p.acceptanceCriteria,
       };
     }),

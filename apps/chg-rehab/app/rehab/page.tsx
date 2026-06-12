@@ -70,6 +70,9 @@ export default async function RehabIndex({
           </svg>
           <span className="proj-addr">Rehab Manager</span>
           <AddProjectButton />
+          <Link href="/rehab/templates" className="btn-sm" style={{ textDecoration: "none", marginLeft: 4 }}>
+            SOW Templates
+          </Link>
         </div>
         <div className="proj-r">
           <span className="proj-ts">{allProjects.length} project{allProjects.length !== 1 ? "s" : ""}</span>

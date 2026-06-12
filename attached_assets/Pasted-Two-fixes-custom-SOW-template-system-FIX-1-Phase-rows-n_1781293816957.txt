@@ -1,0 +1,116 @@
+Two fixes + custom SOW template system.
+
+FIX 1 — Phase rows not expanding
+Read apps/chg-rehab/components/rehab/SowPhase.tsx in full.
+The phase row click is not opening the expanded section. Find the expand toggle (likely a useState or onClick handler) and fix it. Common causes: event propagation blocked, state not toggling, or the expanded content renders outside the visible area. Make sure clicking anywhere on the phase row header toggles open/close of the detail section (description, dependencies, acceptance criteria, budget split).
+
+FIX 2 + FEATURE — Custom SOW Templates (fully user-manageable)
+Remove the hard-coded template concept. Replace with a database-driven template system.
+
+STEP A — Schema (raw SQL + prisma generate, NOT prisma db push)
+Run migration at apps/chg-rehab/scripts/migrate-sow-templates.ts:
+
+CREATE TABLE "SowTemplate" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "companyId" TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  "createdById" TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE "SowTemplatePhase" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "templateId" TEXT NOT NULL REFERENCES "SowTemplate"(id) ON DELETE CASCADE,
+  number INT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  "laborBudget" DECIMAL(14,2) NOT NULL DEFAULT 0,
+  "materialsBudget" DECIMAL(14,2) NOT NULL DEFAULT 0,
+  dependencies INT[] NOT NULL DEFAULT '{}',
+  "acceptanceCriteria" TEXT[] NOT NULL DEFAULT '{}',
+  UNIQUE("templateId", number)
+);
+
+Add to schema.prisma:
+
+model SowTemplate {
+  id            String             @id @default(cuid())
+  companyId     String
+  name          String
+  description   String?
+  createdById   String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  phases        SowTemplatePhase[]
+}
+
+model SowTemplatePhase {
+  id                 String      @id @default(cuid())
+  templateId         String
+  number             Int
+  name               String
+  description        String?
+  laborBudget        Decimal     @default(0) @db.Decimal(14, 2)
+  materialsBudget    Decimal     @default(0) @db.Decimal(14, 2)
+  dependencies       Int[]
+  acceptanceCriteria String[]
+  template           SowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, number])
+}
+
+Run: npx prisma generate
+
+STEP B — Seed two default templates on first load
+In apps/chg-rehab/lib/rehab/seed-templates.ts, create a function ensureDefaultTemplates(companyId, userId) that checks if the company has any SowTemplates. If zero exist, create "Full Gut Rehab" and "Turnover Rehab" with the standard phases (same phase names and acceptance criteria from the previous instruction).
+Call this function from the SOW page server component.
+
+STEP C — API routes
+Create apps/chg-rehab/app/api/rehab/sow-templates/route.ts
+- GET: return all templates for current user's company (include phases ordered by number)
+- POST: create new template (name, description) — blank, no phases yet
+
+Create apps/chg-rehab/app/api/rehab/sow-templates/[templateId]/route.ts
+- PATCH: update name/description
+- DELETE: delete template
+
+Create apps/chg-rehab/app/api/rehab/sow-templates/[templateId]/phases/route.ts
+- GET: return phases for template
+- POST: add a phase to template
+
+Create apps/chg-rehab/app/api/rehab/sow-templates/[templateId]/phases/[phaseId]/route.ts
+- PATCH: update phase fields
+- DELETE: remove phase from template
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/sow/apply-template/route.ts (replace existing)
+- POST: body { templateId: string }
+- If project already has phases, return 400
+- Copy all SowTemplatePhase records as Phase records for this project
+- Return created phases
+
+STEP D — UI: Template Manager
+Create apps/chg-rehab/app/rehab/templates/page.tsx — a standalone page at /rehab/templates
+
+Layout:
+- Header: "SOW Templates" + "+ New Template" button
+- Left panel: list of templates (name, phase count, created by). Click to select.
+- Right panel: selected template detail
+  - Editable name and description at top
+  - Phase list (drag to reorder, or just numbered)
+  - Each phase row: number | name | dependency chips | acceptance criteria count | labor $ | materials $
+  - Click phase to expand inline editor: name, description, dependencies (multi-select from other phases in template), acceptance criteria (add/remove text items), labor budget, materials budget
+  - "+ Add Phase" button at bottom of list
+  - "Delete template" button (with confirm)
+
+Add "Templates" link in the Rehab Manager sidebar or in a settings gear icon — somewhere accessible from the rehab section.
+
+STEP E — UI: Apply Template modal in SOW page
+In the SOW page "Use Template" button: open a modal that:
+- Fetches GET /api/rehab/sow-templates
+- Lists all company templates with name, phase count, description
+- Has a "+ Manage Templates" link → /rehab/templates (opens in same tab)
+- On select: POST apply-template with templateId, reload page
+
+STEP F — Run npx tsc --noEmit. Fix errors. Report what changed.
