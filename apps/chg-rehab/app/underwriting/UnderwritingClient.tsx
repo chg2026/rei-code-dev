@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Property = {
   id: string;
@@ -71,6 +71,49 @@ export default function UnderwritingClient({
 
   const iframeSrc = buildIframeSrc(selected);
 
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  // Freeze the first src so React never updates the iframe's `src` attribute —
+  // changing it would reload the iframe and wipe everything the user typed.
+  // Subsequent property/param changes are pushed in via postMessage instead.
+  const initialSrcRef = useRef(iframeSrc);
+  const firstRun = useRef(true);
+  const readyRef = useRef(false);
+  const pendingSrcRef = useRef<string | null>(null);
+
+  // The iframe posts CALC_READY once its message listener is attached. Until
+  // then we buffer the latest src so a fast property switch is never dropped.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data && e.data.type === "CALC_READY") {
+        readyRef.current = true;
+        const pending = pendingSrcRef.current;
+        if (pending) {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: "LOAD_PARAMS", src: pending },
+            "*",
+          );
+          pendingSrcRef.current = null;
+        }
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return; // initial load is handled by the src attribute
+    }
+    const win = iframeRef.current?.contentWindow;
+    if (readyRef.current && win) {
+      win.postMessage({ type: "LOAD_PARAMS", src: iframeSrc }, "*");
+    } else {
+      // Not ready yet — flush this once CALC_READY arrives.
+      pendingSrcRef.current = iframeSrc;
+    }
+  }, [iframeSrc]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
       {/* Property selector bar */}
@@ -115,10 +158,10 @@ export default function UnderwritingClient({
         )}
       </div>
 
-      {/* Calculator iframe — key forces remount on property/input change */}
+      {/* Calculator iframe — never remounts; updates flow in via postMessage */}
       <iframe
-        key={iframeSrc}
-        src={iframeSrc}
+        ref={iframeRef}
+        src={initialSrcRef.current}
         style={{ flex: 1, border: "none", width: "100%", height: "100%", display: "block" }}
         title="Underwriting Calculator"
       />

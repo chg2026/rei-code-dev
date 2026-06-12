@@ -1927,6 +1927,23 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       if (tab) tab.click();
     }
 
+    // Snapshot the factory-default values BEFORE any seeding so we can fully
+    // reset every field when switching (via postMessage) to a property that has
+    // no saved state. The old remount got this isolation for free by reloading
+    // the whole document; without it, non-core fields would bleed across
+    // properties.
+    var baseline = {};
+    calcFields().forEach(function(el) { baseline[el.id] = el.value; });
+    function resetToBaseline() {
+      Object.keys(baseline).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.value = baseline[id];
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+
     // Precedence:
     //  - Explicit deep-link to a *different* saved analysis (core params present
     //    and don't match the stored seed) wins: seed from URL params so
@@ -1944,17 +1961,117 @@ body{font-family:var(--font);font-size:13px;color:var(--t1);background:var(--bg)
       clickStrategyTab(strategy);
     }
 
-    // Persist every change (debounced) so the latest state always survives a remount.
+    // Track which fields the user actually edited. isTrusted is true only for
+    // real user input, not our programmatic dispatch — so param fills coming
+    // from the parent never clobber values the user typed. (Inputs ship with
+    // factory defaults, so "is it dirty" is the right test, not "is it empty".)
+    var dirty = {};
+    function markRestoredDirty(data) {
+      if (!data) return;
+      Object.keys(data).forEach(function(id) {
+        if (id === '__strategy' || id === '__seed') return;
+        dirty[id] = true;
+      });
+    }
+
+    // Persist every change (debounced) so the latest state always survives.
     var saveTimer = null;
     function scheduleSave() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(persistState, 250);
     }
-    document.addEventListener('input', scheduleSave);
-    document.addEventListener('change', scheduleSave);
+    function onEdit(e) {
+      if (e && e.isTrusted && e.target && e.target.id) dirty[e.target.id] = true;
+      scheduleSave();
+    }
+    document.addEventListener('input', onEdit);
+    document.addEventListener('change', onEdit);
     document.addEventListener('click', function(e) {
       if (e.target && e.target.closest && e.target.closest('.tf')) scheduleSave();
     });
+
+    // Values restored from this property's saved session are authoritative —
+    // protect them from being overwritten by later param fills.
+    if (useStored && stored) markRestoredDirty(stored);
+
+    // Fill ONLY fields the user hasn't touched, from a set of URL params.
+    function fillEmptyFromParams(qp) {
+      function fill(id, v) {
+        if (!v || dirty[id]) return;
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      fill('ap-price', qp.get('purchase'));
+      fill('ap-rehab', qp.get('rehab'));
+      var a = qp.get('arv');
+      if (a) { fill('f-arv', a); fill('b-arv', a); }
+      fill('ap-closing', qp.get('closing'));
+      fill('ap-holding', qp.get('holding'));
+    }
+
+    function updateHeader(qp) {
+      var addr = qp.get('address'), c = qp.get('city'), s = qp.get('state'), st = qp.get('status');
+      var nameEl = document.querySelector('.db-name');
+      var subEl = document.querySelector('.db-sub');
+      if (nameEl && addr) nameEl.textContent = addr;
+      if (subEl) {
+        var parts = [c, s].filter(Boolean).join(', ');
+        subEl.textContent = parts ? parts + (st ? ' · ' + st : '') : (st || 'Enter property details to begin');
+      }
+    }
+
+    // The parent (UnderwritingClient) posts LOAD_PARAMS instead of remounting
+    // the iframe, so switching property / opening a report updates seed values
+    // in place without wiping the user's work.
+    window.addEventListener('message', function(ev) {
+      var msg = ev && ev.data;
+      if (!msg || msg.type !== 'LOAD_PARAMS' || !msg.src) return;
+      var qp;
+      try { qp = new URLSearchParams(String(msg.src).split('?')[1] || ''); } catch (e) { return; }
+
+      updateHeader(qp);
+
+      var newPid = qp.get('propertyId');
+      if (newPid && newPid !== propertyId) {
+        // Save the outgoing property, switch storage scope, restore the new one.
+        persistState();
+        propertyId = newPid;
+        window._propertyId = newPid;
+        storageKey = 'uw-calc-state:' + (propertyId || 'default');
+        dirty = {};
+        var restored = readStored();
+        if (restored) {
+          applyStored(restored);
+          markRestoredDirty(restored);
+          clickStrategyTab(restored.__strategy || qp.get('strategy'));
+        } else {
+          // No saved state for this property — wipe to factory defaults so the
+          // previous property's non-core inputs don't bleed in.
+          resetToBaseline();
+          clickStrategyTab(qp.get('strategy') || 'flip');
+        }
+      }
+
+      fillEmptyFromParams(qp);
+
+      setTimeout(function() {
+        try { recalcFlip(); } catch(e) {}
+        try { recalcB(); } catch(e) {}
+        try { recalc(); } catch(e) {}
+        persistState();
+      }, 60);
+    });
+
+    // Tell the parent we're ready to receive LOAD_PARAMS — covers the case
+    // where the user switches property before this listener was attached.
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'CALC_READY' }, '*');
+      }
+    } catch (e) {}
 
     // Trigger recalculation after a short delay to let the DOM settle
     setTimeout(function() {
