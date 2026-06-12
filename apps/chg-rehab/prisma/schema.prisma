@@ -219,6 +219,7 @@ model Project {
   contractorAssignments ContractorAssignment[]
   documents             Document[]
   warehouseAllocations  WarehouseItem[]
+  invoices              Invoice[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1873,4 +1874,51 @@ model PmActivity {
   user      User     @relation("PmActivityLog", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+}
+
+model Invoice {
+  id             String                @id @default(cuid())
+  projectId      String
+  phaseId        String?
+  vendor         String
+  invoiceNumber  String?
+  date           DateTime              @db.Date
+  amount         Decimal               @db.Decimal(14, 2)
+  classification InvoiceClassification @default(Other)
+  status         InvoiceStatus         @default(Unpaid)
+  notes          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attachments    InvoiceAttachment[]
+
+  @@index([projectId])
+}
+
+model InvoiceAttachment {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  name       String
+  objectPath String
+  mimeType   String   @default("application/octet-stream")
+  size       Int      @default(0)
+  createdAt  DateTime @default(now())
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+enum InvoiceClassification {
+  Labor
+  Materials
+  Permit
+  Dumpster
+  Utility
+  Other
+}
+
+enum InvoiceStatus {
+  Unpaid
+  Pending
+  Paid
 }

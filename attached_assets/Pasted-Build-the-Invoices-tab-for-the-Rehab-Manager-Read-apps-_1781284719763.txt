@@ -1,0 +1,120 @@
+Build the Invoices tab for the Rehab Manager. Read apps/chg-rehab/prisma/schema.prisma first to understand the current schema.
+
+STEP 1 — Schema
+Since prisma db push fails on this DB (cross-schema FK), use raw SQL + prisma generate.
+
+Run this SQL via the Supabase JS client (create a one-time migration script at apps/chg-rehab/scripts/migrate-invoices.ts and run it with npx ts-node):
+
+CREATE TYPE "InvoiceClassification" AS ENUM ('Labor', 'Materials', 'Permit', 'Dumpster', 'Utility', 'Other');
+CREATE TYPE "InvoiceStatus" AS ENUM ('Unpaid', 'Pending', 'Paid');
+
+CREATE TABLE "Invoice" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "projectId" TEXT NOT NULL REFERENCES "Project"(id) ON DELETE CASCADE,
+  "phaseId" TEXT,
+  vendor TEXT NOT NULL,
+  "invoiceNumber" TEXT,
+  date DATE NOT NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  classification "InvoiceClassification" NOT NULL DEFAULT 'Other',
+  status "InvoiceStatus" NOT NULL DEFAULT 'Unpaid',
+  notes TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE "InvoiceAttachment" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "invoiceId" TEXT NOT NULL REFERENCES "Invoice"(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  "objectPath" TEXT NOT NULL,
+  "mimeType" TEXT NOT NULL DEFAULT 'application/octet-stream',
+  size INT NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+Then add to schema.prisma:
+
+model Invoice {
+  id             String                 @id @default(cuid())
+  projectId      String
+  phaseId        String?
+  vendor         String
+  invoiceNumber  String?
+  date           DateTime               @db.Date
+  amount         Decimal                @db.Decimal(14, 2)
+  classification InvoiceClassification  @default(Other)
+  status         InvoiceStatus          @default(Unpaid)
+  notes          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attachments    InvoiceAttachment[]
+}
+
+model InvoiceAttachment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  name        String
+  objectPath  String
+  mimeType    String   @default("application/octet-stream")
+  size        Int      @default(0)
+  createdAt   DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum InvoiceClassification {
+  Labor
+  Materials
+  Permit
+  Dumpster
+  Utility
+  Other
+}
+
+enum InvoiceStatus {
+  Unpaid
+  Pending
+  Paid
+}
+
+Add "invoices Invoice[]" to the Project model. Run: npx prisma generate
+
+STEP 2 — API routes
+Create apps/chg-rehab/app/api/rehab/[projectId]/invoices/route.ts
+- GET: return all invoices for project, include attachments, order by date desc
+- POST: create invoice (vendor, invoiceNumber, date, amount, classification, status, notes, phaseId)
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/invoices/[invoiceId]/route.ts
+- PATCH: update invoice fields
+- DELETE: delete invoice
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/invoices/[invoiceId]/attachments/route.ts
+- GET: return attachments with signed download URLs
+- POST: register uploaded attachment (objectPath, name, mimeType, size)
+
+Create apps/chg-rehab/app/api/rehab/[projectId]/invoices/[invoiceId]/attachments/[attachmentId]/route.ts
+- DELETE: remove attachment
+
+All routes: auth-guard with getCurrentUser(), scope to companyId via project lookup.
+
+STEP 3 — UI
+Create apps/chg-rehab/app/rehab/[projectId]/invoices/page.tsx
+
+Layout: two-panel. Left = invoice list. Right = invoice detail/form (slide-in panel or right pane).
+
+Invoice list:
+- Header: "Invoices" title + "+ Add Invoice" button + filter row (All / Unpaid / Pending / Paid / by Classification)
+- Summary bar: Total invoiced | Total unpaid | Total paid (calculated from list)
+- Table rows: Vendor | Invoice # | Date | Phase | Classification chip | Amount | Status badge (color-coded: Unpaid=red, Pending=yellow, Paid=green) | Actions (edit, delete)
+- Empty state if no invoices
+
+Invoice detail panel (opens on row click or "+ Add Invoice"):
+- Form fields: Vendor (text), Invoice # (text), Date (date), Amount ($), Classification (select), Status (select), Phase (select — populated from project phases), Notes (textarea)
+- Attachments section: upload button → uses /api/uploads/request-url → PUT to signed URL → POST to register. Shows file list with download links and delete buttons.
+- Save / Cancel buttons
+
+STEP 4 — Add "Invoices" tab to TabNav
+Read apps/chg-rehab/components/rehab/TabNav.tsx and add an "Invoices" tab linking to /rehab/[projectId]/invoices
+
+STEP 5 — Run npx tsc --noEmit. Fix errors. Report what was created.
