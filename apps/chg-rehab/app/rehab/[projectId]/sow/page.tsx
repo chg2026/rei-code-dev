@@ -7,6 +7,8 @@ import { can } from "@/lib/permissions";
 import { parseProjectMeta } from "@/lib/rehab/types";
 import SowPhase from "@/components/rehab/SowPhase";
 import SowActions from "@/components/rehab/SowActions";
+import SowPhaseDetails from "@/components/rehab/SowPhaseDetails";
+import SowTemplatePicker from "@/components/rehab/SowTemplatePicker";
 
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -61,6 +63,9 @@ export default async function SowPage({
           </button>
         </div>
         <button className="btn">Export PDF</button>
+        {canEdit && project.phases.length === 0 && (
+          <SowTemplatePicker projectCode={project.code} />
+        )}
         <SowActions
           projectCode={project.code}
           phases={project.phases.map((p) => ({ number: p.number, name: p.name }))}
@@ -121,6 +126,17 @@ export default async function SowPage({
                   </>
                 }
               >
+                <SowPhaseDetails
+                  projectCode={project.code}
+                  phaseId={p.id}
+                  canEdit={canEdit}
+                  description={p.description ?? null}
+                  laborBudget={Number(p.laborBudget ?? 0)}
+                  materialsBudget={Number(p.materialsBudget ?? 0)}
+                  dependencies={p.dependencies ?? []}
+                  acceptanceCriteria={p.acceptanceCriteria ?? []}
+                  phaseRefs={project.phases.map((ph) => ({ number: ph.number, name: ph.name }))}
+                />
                 {section && section.lineItems.length > 0 ? (
                   <>
                     <div className="li-hd">

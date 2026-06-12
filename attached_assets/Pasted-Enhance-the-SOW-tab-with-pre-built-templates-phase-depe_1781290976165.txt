@@ -1,0 +1,72 @@
+Enhance the SOW tab with pre-built templates, phase dependencies, acceptance criteria, and labor/materials budget split.
+
+Read these files first:
+- apps/chg-rehab/app/rehab/[projectId]/sow/page.tsx
+- apps/chg-rehab/components/rehab/SowPhase.tsx
+- apps/chg-rehab/prisma/schema.prisma (Phase and SOWSection models)
+
+STEP 1 — Schema (raw SQL + prisma generate, NOT prisma db push)
+
+Run migration script at apps/chg-rehab/scripts/migrate-sow-enhancements.ts:
+
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "laborBudget" DECIMAL(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "materialsBudget" DECIMAL(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS dependencies INT[] NOT NULL DEFAULT '{}';
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "acceptanceCriteria" TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE "Phase" ADD COLUMN IF NOT EXISTS "assignedContractorId" TEXT;
+
+Update schema.prisma Phase model to include these fields. Run: npx prisma generate
+
+STEP 2 — SOW Templates
+Create apps/chg-rehab/lib/rehab/sow-templates.ts with two templates as exported constants:
+
+FULL_GUT_REHAB: phases = [
+  { name: 'Demo', laborBudget: 0, materialsBudget: 0, dependencies: [], acceptanceCriteria: ['All debris removed', 'Dumpster ordered'] },
+  { name: 'Framing', dependencies: [1], acceptanceCriteria: ['All walls framed', 'Inspection passed'] },
+  { name: 'Electrical', dependencies: [2], acceptanceCriteria: ['All outlets installed', 'GFCIs installed', 'Fixtures installed', 'Panel labeled', 'Inspection passed'] },
+  { name: 'Plumbing', dependencies: [2], acceptanceCriteria: ['Rough-in complete', 'Pressure test passed', 'Inspection passed'] },
+  { name: 'HVAC', dependencies: [2], acceptanceCriteria: ['Ducts installed', 'Unit installed', 'Inspection passed'] },
+  { name: 'Insulation', dependencies: [3,4,5], acceptanceCriteria: ['All cavities insulated', 'Inspection passed'] },
+  { name: 'Drywall', dependencies: [6], acceptanceCriteria: ['Hung', 'Mudded', 'Sanded', 'Ready for paint'] },
+  { name: 'Paint', dependencies: [7], acceptanceCriteria: ['Prime coat done', 'Two finish coats done', 'Touch-ups complete'] },
+  { name: 'Flooring', dependencies: [8], acceptanceCriteria: ['Subfloor prepped', 'Flooring installed', 'Transitions installed'] },
+  { name: 'Kitchen', dependencies: [8], acceptanceCriteria: ['Cabinets installed', 'Countertops installed', 'Appliances installed'] },
+  { name: 'Bathroom', dependencies: [8], acceptanceCriteria: ['Tile complete', 'Fixtures installed', 'Vanity installed'] },
+  { name: 'Doors', dependencies: [8], acceptanceCriteria: ['All doors hung', 'Hardware installed'] },
+  { name: 'Trim', dependencies: [8], acceptanceCriteria: ['Baseboards installed', 'Casing installed', 'Painted'] },
+  { name: 'Exterior', dependencies: [], acceptanceCriteria: ['Siding/paint done', 'Landscaping done'] },
+  { name: 'Punch List', dependencies: [9,10,11,12,13], acceptanceCriteria: ['All punch items addressed', 'PM walkthrough complete'] },
+  { name: 'Rent Ready', dependencies: [15], acceptanceCriteria: ['Deep clean done', 'Keys ready', 'Utilities on'] }
+]
+
+TURNOVER_REHAB: phases = [
+  { name: 'Paint', dependencies: [], acceptanceCriteria: ['All rooms painted', 'Touch-ups done'] },
+  { name: 'Flooring', dependencies: [1], acceptanceCriteria: ['Cleaned or replaced', 'Transitions done'] },
+  { name: 'Cleaning', dependencies: [1,2], acceptanceCriteria: ['Deep clean complete', 'Appliances cleaned'] },
+  { name: 'Repairs', dependencies: [], acceptanceCriteria: ['All work orders addressed'] },
+  { name: 'Rent Ready', dependencies: [1,2,3,4], acceptanceCriteria: ['PM walkthrough done', 'Keys ready'] }
+]
+
+STEP 3 — API: apply template
+Create apps/chg-rehab/app/api/rehab/[projectId]/sow/apply-template/route.ts
+- POST: body { template: 'full_gut' | 'turnover' }
+- If project already has phases, return 400 with message "Project already has phases. Clear them first."
+- Create Phase records from the template (use template phase number as the phase number field)
+- Return the created phases
+
+STEP 4 — API: update phase enhancements
+In apps/chg-rehab/app/api/rehab/[projectId]/phases/[phaseId]/route.ts (create if not exists):
+- PATCH: accept description, laborBudget, materialsBudget, dependencies (array of ints), acceptanceCriteria (array of strings), assignedContractorId
+
+STEP 5 — UI: SOW page enhancements
+
+In the SOW page, add a "Use Template" button in the action bar (only shown if no phases exist yet). Clicking opens a small modal with two options: "Full Gut Rehab" and "Turnover Rehab". On select, POST to /api/rehab/[projectId]/sow/apply-template and reload.
+
+In SowPhase.tsx, expand the phase row to show (in an expandable section):
+- Description (editable text)
+- Dependencies: chips showing phase names this phase depends on (e.g. "After: Framing")
+- Acceptance Criteria: checklist of criteria items (add/remove items inline)
+- Budget split: two inline inputs — Labor $ and Materials $ — that sum to show Total Budget. When either changes, PATCH the phase.
+
+STEP 6 — Run npx tsc --noEmit. Fix errors. Report what changed.

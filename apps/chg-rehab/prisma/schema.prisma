@@ -227,19 +227,25 @@ model Project {
 }
 
 model Phase {
-  id             String          @id @default(cuid())
-  projectId      String
-  number         Int
-  name           String
-  status         PhaseStatus     @default(NotStarted)
-  budget         Decimal?        @db.Decimal(14, 2)
-  actual         Decimal?        @db.Decimal(14, 2)
-  startDate      DateTime?
-  endDate        DateTime?
-  drawNote       String?
-  checklistItems ChecklistItem[]
-  draws          Draw[]
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                   String          @id @default(cuid())
+  projectId            String
+  number               Int
+  name                 String
+  status               PhaseStatus     @default(NotStarted)
+  budget               Decimal?        @db.Decimal(14, 2)
+  actual               Decimal?        @db.Decimal(14, 2)
+  startDate            DateTime?
+  endDate              DateTime?
+  drawNote             String?
+  description          String?
+  laborBudget          Decimal         @default(0) @db.Decimal(14, 2)
+  materialsBudget      Decimal         @default(0) @db.Decimal(14, 2)
+  dependencies         Int[]           @default([])
+  acceptanceCriteria   String[]        @default([])
+  assignedContractorId String?
+  checklistItems       ChecklistItem[]
+  draws                Draw[]
+  project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, number])
   @@index([projectId])
