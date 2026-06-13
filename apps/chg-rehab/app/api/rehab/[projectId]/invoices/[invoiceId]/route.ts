@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseJobTypes } from "../route";
+import { parseJobTypes } from "@/lib/rehab/invoice-utils";
 import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
 import {
   InvoiceClassification,
