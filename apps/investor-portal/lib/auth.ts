@@ -151,25 +151,51 @@ async function resolveCurrentInvestor(): Promise<SessionInvestor | null> {
     create: { id: accountId, name: fullName || email || "Investor account" },
   });
 
-  const created = await prisma.investor.upsert({
-    where: { id: supaUser.id },
-    update: {
-      email: email || null,
-      firstName: firstName || null,
-      lastName,
-      phone: profile.phone ?? supaUser.phone ?? null,
-      portalLastLoginAt: new Date(),
-    },
-    create: {
-      id: supaUser.id,
-      companyId: accountId,
-      email: email || null,
-      firstName: firstName || null,
-      lastName,
-      phone: profile.phone ?? supaUser.phone ?? null,
-      portalLastLoginAt: new Date(),
-    },
-  });
+  let created: Investor;
+  try {
+    created = await prisma.investor.upsert({
+      where: { id: supaUser.id },
+      update: {
+        email: email || null,
+        firstName: firstName || null,
+        lastName,
+        phone: profile.phone ?? supaUser.phone ?? null,
+        portalLastLoginAt: new Date(),
+      },
+      create: {
+        id: supaUser.id,
+        companyId: accountId,
+        email: email || null,
+        firstName: firstName || null,
+        lastName,
+        phone: profile.phone ?? supaUser.phone ?? null,
+        portalLastLoginAt: new Date(),
+      },
+    });
+  } catch (err) {
+    // The upsert keys on `id`, but `Investor.email` carries its own unique
+    // constraint. When a row with this email already exists under a DIFFERENT
+    // id (e.g. created from the operator/chg-rehab side before the investor
+    // first logged in here), the create branch hits that constraint and
+    // throws P2002 — the id-keyed upsert can't reconcile an email collision.
+    // Fall back to locating that pre-existing row by email instead of letting
+    // login 500.
+    if ((err as { code?: string }).code === "P2002" && email) {
+      const byEmail = await prisma.investor.findFirst({ where: { email } });
+      if (!byEmail) {
+        console.error(
+          "[investor-auth] P2002 on investor email but no row found by email",
+          email,
+        );
+        return null;
+      }
+      if (byEmail.status === "Inactive") return null;
+      const accountProducts = await loadAccountProductCodes(accountId);
+      return toSessionInvestor(byEmail, accountProducts);
+    }
+    console.error("[investor-auth] failed to create investor row", err);
+    return null;
+  }
   const accountProducts = await loadAccountProductCodes(accountId);
   return toSessionInvestor(created, accountProducts);
 }
