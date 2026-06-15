@@ -64,7 +64,17 @@ export async function getCurrentInvestor(): Promise<SessionInvestor | null> {
   const cached = investorCache.get(h);
   if (cached !== undefined) return cached;
 
-  const result = await resolveCurrentInvestor();
+  // Never let an auth-resolution failure (a thrown Prisma error, a missing
+  // env var when building the admin client, a transient DB drop, etc.)
+  // bubble up into a Server Component render or API route as a 500. Treat
+  // any throw as "no investor session" and let callers redirect to /login.
+  let result: SessionInvestor | null;
+  try {
+    result = await resolveCurrentInvestor();
+  } catch (err) {
+    console.error("[investor-auth] getCurrentInvestor failed", err);
+    result = null;
+  }
   investorCache.set(h, result);
   return result;
 }
