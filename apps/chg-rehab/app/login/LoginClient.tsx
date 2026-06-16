@@ -8,9 +8,11 @@ import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 export default function LoginClient({
   next,
   initialError,
+  initialMessage = "",
 }: {
   next: string;
   initialError: string;
+  initialMessage?: string;
 }) {
   const LEGACY_API = (process.env.NEXT_PUBLIC_LEGACY_API_BASE_URL || "https://rei-code-dev.replit.app").replace(/\/$/, "");
   const router = useRouter();
@@ -110,6 +112,15 @@ export default function LoginClient({
         <div className="login-sub">
           {ssoHandling ? "Signing you in…" : "Operations platform — sign in to continue"}
         </div>
+
+        {initialMessage ? (
+          <div
+            className="login-sub"
+            style={{ color: "#15803d", fontWeight: 600 }}
+          >
+            {initialMessage}
+          </div>
+        ) : null}
 
         {error ? <div className="login-error">{error}</div> : null}
 

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
 
@@ -17,5 +17,11 @@ export default async function LoginPage({
     redirect(dest);
   }
 
-  return <LoginClient next={sp.next || "/"} initialError={sp.error || ""} />;
+  return (
+    <LoginClient
+      next={sp.next || "/"}
+      initialError={sp.error || ""}
+      initialMessage={sp.message || ""}
+    />
+  );
 }

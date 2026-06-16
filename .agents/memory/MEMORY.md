@@ -6,3 +6,4 @@
 - [bash/rg output obfuscation](bash-output-identifier-obfuscation.md) — shell/grep observations redact identifiers to `n`/`ln`; trust the read tool for true names, not grep output.
 - [Approval-folds-into-total fields lock](change-order-budget-locking.md) — when a one-time approval folds an amount into a derived total (Phase.budget), lock the source financial fields after; editing them later drifts the total.
 - [Attachment objectPath IDOR](objectpath-attachment-idor.md) — attachment-register routes must validate the minted `uploads/<uuid>` objectPath shape before storing/signing, or callers can sign others' objects.
+- [Invite acceptance flow](invite-acceptance-flow.md) — /api/invites/use must create the Prisma User inline (login's create-new path needs a user_profiles row; refreshFromSupabase doesn't); tenancy guard must precede any auth password mutation.

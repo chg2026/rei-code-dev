@@ -28,6 +28,9 @@ export default function SignupClient() {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+  const [inviteCheckError, setInviteCheckError] = useState("");
   const checkRef = useRef<string>("");
 
   async function checkCredential(value: string) {
@@ -58,6 +61,38 @@ export default function SignupClient() {
       setEmail(emailParam);
       checkCredential(emailParam);
     }
+  }, []);
+
+  // Validate the invite token (if present) and surface the invited email.
+  useEffect(() => {
+    if (!inviteToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/invites/validate?token=${encodeURIComponent(inviteToken)}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.valid) {
+          setInviteEmail(data.email || "");
+          setInviteValid(true);
+        } else {
+          setInviteValid(false);
+          setInviteCheckError(data.error || "This invite link is not valid.");
+        }
+      } catch {
+        if (!cancelled) {
+          setInviteValid(false);
+          setInviteCheckError(
+            "Could not validate this invite. Please try again."
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Derive current mode from the credential check result
@@ -172,18 +207,12 @@ export default function SignupClient() {
         body: JSON.stringify({ token: inviteToken, password }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to accept invite.");
       }
-      const supabase = getSupabaseBrowserClient();
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password,
-      });
-      if (signInErr) {
-        throw new Error("Account created but sign-in failed. Try signing in at /login.");
-      }
-      window.location.href = "/pipeline";
+      window.location.href = `/login?message=${encodeURIComponent(
+        "Account created. Please sign in."
+      )}`;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to accept invite.");
       setLoading(false);
@@ -198,21 +227,38 @@ export default function SignupClient() {
             <div className="login-logo">CHG</div>
             <div className="login-title">CHG <span>Rehab</span></div>
           </div>
-          <div className="login-sub">You&apos;ve been invited to join a CHG Rehab workspace. Set a password to get started.</div>
-          {error ? <div className="login-error">{error}</div> : null}
-          <form onSubmit={handleInviteAccept} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <label className="login-label">
-              Password
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="At least 8 characters" autoFocus />
-            </label>
-            <label className="login-label">
-              Confirm password
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="Repeat password" />
-            </label>
-            <button type="submit" className="login-cta" disabled={loading}>
-              {loading ? "Joining…" : "Accept invite"}
-            </button>
-          </form>
+          {inviteValid === false ? (
+            <>
+              <div className="login-sub">{inviteCheckError || "This invite link is not valid."}</div>
+              <a href="/login" className="login-cta" style={{ display: "block", textAlign: "center", marginTop: 12 }}>
+                Go to sign in
+              </a>
+            </>
+          ) : inviteValid === null ? (
+            <div className="login-sub">Validating your invite…</div>
+          ) : (
+            <>
+              <div className="login-sub">You&apos;ve been invited to join a CHG Rehab workspace. Set a password to get started.</div>
+              {error ? <div className="login-error">{error}</div> : null}
+              <form onSubmit={handleInviteAccept} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label className="login-label">
+                  Email
+                  <input type="email" value={inviteEmail} className="login-input" disabled readOnly />
+                </label>
+                <label className="login-label">
+                  Password
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="At least 8 characters" autoFocus />
+                </label>
+                <label className="login-label">
+                  Confirm password
+                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="login-input" required minLength={8} disabled={loading} placeholder="Repeat password" />
+                </label>
+                <button type="submit" className="login-cta" disabled={loading}>
+                  {loading ? "Joining…" : "Accept invite"}
+                </button>
+              </form>
+            </>
+          )}
           <div className="login-foot">© 2026 CHG · Privacy · Terms</div>
         </div>
       </div>
