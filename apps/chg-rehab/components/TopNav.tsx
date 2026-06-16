@@ -16,7 +16,8 @@ const BASE_SECTIONS: NavSection[] = [
   {
     label: "My Workspace",
     items: [
-      { href: "/command-center", label: "Tasks & Calendar" },
+      { href: "/workspace/tasks", label: "My Tasks" },
+      { href: "/workspace/calendar", label: "Calendar" },
       { href: "/messages", label: "Messages" },
     ],
   },
@@ -34,9 +35,16 @@ const BASE_SECTIONS: NavSection[] = [
       { href: "/rehab", label: "Rehab Manager" },
       { href: "/warehouse", label: "Warehouse" },
       { href: "/finance", label: "Finance" },
-      { href: "/pm", label: "Project Manager" },
       { href: "/docs", label: "Documents Hub" },
     ],
+  },
+  {
+    label: "Project Manager",
+    items: [{ href: "/pm", label: "Project Manager" }],
+  },
+  {
+    label: "Goals",
+    items: [{ href: "/goals", label: "Goals" }],
   },
   {
     label: "People",

@@ -1,0 +1,42 @@
+Find the sidebar navigation component — it likely contains nav items like "Tasks & Calendar", "Pipeline", "Rehab Manager", "Project Manager", "Documents Hub", "Contacts". Could be named Sidebar.tsx, Navigation.tsx, or similar. Search for a file containing "Project Manager" text.
+
+Once found, restructure the sidebar navigation to match this exact spec:
+
+CURRENT STRUCTURE → NEW STRUCTURE:
+
+1. MY WORKSPACE section:
+   - "Tasks & Calendar" (single item) → split into TWO separate items:
+     - "My Tasks" → links to /workspace/tasks
+     - "Calendar" → links to /workspace/calendar
+   - "Messages" → stays as-is
+
+2. DEALS section → unchanged (Pipeline, Underwriting)
+
+3. PORTFOLIO section:
+   - Property Record → stays
+   - Rehab Manager → stays
+   - Warehouse → stays
+   - Finance → stays
+   - "Documents Hub" → MOVE HERE (currently it's a standalone item below Project Manager) as last item in Portfolio group
+   - Project Manager → REMOVE from here (moves to its own section below)
+
+4. Add new section "PROJECT MANAGER" (between PORTFOLIO and PEOPLE):
+   - Construction → (same sub-items as before, with expand arrow)
+   - Marketing → (same sub-items as before, with expand arrow)
+   - Property Management List → (same sub-items as before, with expand arrow)
+   - "Manage spaces ›" link → stays
+   NOTE: This is the exact same Project Manager block that was inside Portfolio — just move it out to its own top-level section with its own section header label "PROJECT MANAGER"
+
+5. Add new section "GOALS" (between PROJECT MANAGER and PEOPLE):
+   - Single item: "Goals" → links to /goals
+   - Style it exactly like the other nav items
+
+6. PEOPLE section → unchanged (Contacts, Contractor Portal, Investor Portal, Team)
+
+7. ADMIN section → unchanged (Billing, Admin Settings)
+
+8. ACCOUNT section → unchanged (Profile Settings)
+
+Also: if there's a route for /workspace/tasks and /workspace/calendar that doesn't exist yet, create a simple page for each that renders a placeholder "Coming soon" or redirects to the existing Tasks & Calendar page for now — just make sure the nav links don't 404. Similarly for /goals.
+
+Make minimal changes — do not touch any styling, just restructure the nav items. Keep the exact same visual design.
