@@ -1,48 +1,71 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { goldBridgeFetch } from "@/lib/goldBridgeApi";
-import UpgradeModal from "@/components/UpgradeModal";
-
-type TeamRole = "Admin" | "Viewer";
 
 type Member = {
   id: string;
-  email: string;
-  name?: string | null;
-  role: TeamRole | string;
-  status?: "active" | "pending" | string;
-  inviteId?: string | null;
+  email: string | null;
+  name: string;
+  role: string;
+  joinedAt: string;
 };
 
-type Guest = {
+type PendingInvite = {
   id: string;
   email: string;
-  name?: string | null;
-  role: TeamRole | string;
-  status?: "active" | "pending" | string;
-  inviteId?: string | null;
+  role: string;
+  createdAt: string;
+  expiresAt: string;
 };
 
 type MembersResponse = {
   members?: Member[];
-  guests?: Guest[];
-  invites?: Array<Member & { inviteId: string; kind?: "member" | "guest" }>;
+  pendingInvites?: PendingInvite[];
 };
 
-type Billing = {
-  plan?: string;
-  seats_used?: number;
-  seat_limit?: number;
-  guests_used?: number;
-  guest_limit?: number;
-};
+const INVITE_ROLES: { value: string; label: string }[] = [
+  { value: "Admin", label: "Admin" },
+  { value: "ProjectManager", label: "Project Manager" },
+  { value: "GeneralContractor", label: "General Contractor" },
+  { value: "Inspector", label: "Inspector" },
+];
 
-type MeResponse = {
-  billing?: Billing;
-};
+function roleLabel(role: string): string {
+  return INVITE_ROLES.find((r) => r.value === role)?.label ?? role;
+}
 
-const apiFetch = goldBridgeFetch;
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = (await res.json()) as { error?: string; message?: string };
+      detail = j.error || j.message || "";
+    } catch {
+      /* noop */
+    }
+    throw new Error(detail || `Request failed (${res.status})`);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
 
 function Toast({ message }: { message: string | null }) {
   if (!message) return null;
@@ -65,55 +88,6 @@ function Toast({ message }: { message: string | null }) {
   );
 }
 
-function UsageBar({
-  used,
-  limit,
-  label,
-}: {
-  used: number;
-  limit: number;
-  label: string;
-}) {
-  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const over = limit > 0 && used >= limit;
-  return (
-    <div style={{ minWidth: 220 }}>
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--text-tertiary)",
-          textTransform: "uppercase",
-          marginBottom: 4,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <span>{label}</span>
-        <span>
-          {used} / {limit > 0 ? limit : "—"}
-        </span>
-      </div>
-      <div
-        style={{
-          height: 6,
-          borderRadius: 3,
-          background: "var(--bg-mid, #f0f0f0)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: over ? "#dc2626" : "#111827",
-            transition: "width 200ms ease",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 export default function TeamSettingsClient({
   userName,
   userEmail,
@@ -123,45 +97,18 @@ export default function TeamSettingsClient({
   userEmail: string | null;
   role: string;
 }) {
+  const isAdmin = role === "Admin";
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [guests, setGuests] = useState<Guest[]>([]);
-  const [pending, setPending] = useState<
-    Array<Member & { inviteId: string; kind: "member" | "guest" }>
-  >([]);
-  const [billing, setBilling] = useState<Billing>({});
+  const [pending, setPending] = useState<PendingInvite[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<TeamRole>("Viewer");
+  const [inviteRole, setInviteRole] = useState<string>("ProjectManager");
   const [inviting, setInviting] = useState(false);
-
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [showUpgradedBanner, setShowUpgradedBanner] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("upgraded") === "true") {
-      setShowUpgradedBanner(true);
-      params.delete("upgraded");
-      const qs = params.toString();
-      const next = window.location.pathname + (qs ? `?${qs}` : "");
-      window.history.replaceState({}, "", next);
-    }
-  }, []);
-
-  const isPersonalPlan = useMemo(() => {
-    const plan = (billing.plan ?? "").toLowerCase();
-    return plan === "personal" || plan === "free";
-  }, [billing.plan]);
-
-  const showUpgradeCta = useMemo(() => {
-    const plan = (billing.plan ?? "").toLowerCase();
-    return plan === "personal" && (billing.seat_limit ?? 0) === 0;
-  }, [billing.plan, billing.seat_limit]);
 
   const showToast = useCallback((m: string) => {
     setToast(m);
@@ -172,20 +119,11 @@ export default function TeamSettingsClient({
     setLoading(true);
     setError(null);
     try {
-      const [team, me] = await Promise.all([
-        apiFetch<MembersResponse>("/api/team/members"),
-        apiFetch<MeResponse>("/api/auth/me"),
-      ]);
-      setMembers(team.members ?? []);
-      setGuests(team.guests ?? []);
-      setPending(
-        ((team.invites ?? (team as any).pending_invites) ?? []).map((i: any) => ({
-          ...i,
-          inviteId: i.inviteId ?? i.id,
-          kind: (i.kind ?? "member") as "member" | "guest",
-        })),
+      const data = await jsonFetch<MembersResponse>(
+        "/api/settings/team/members",
       );
-      setBilling(me.billing ?? {});
+      setMembers(data.members ?? []);
+      setPending(data.pendingInvites ?? []);
     } catch (e) {
       setError((e as Error).message || "Failed to load team data");
     } finally {
@@ -202,7 +140,7 @@ export default function TeamSettingsClient({
     if (!inviteEmail.trim()) return;
     setInviting(true);
     try {
-      await apiFetch("/api/team/invite", {
+      await jsonFetch("/api/admin/users", {
         method: "POST",
         body: JSON.stringify({
           email: inviteEmail.trim(),
@@ -210,7 +148,7 @@ export default function TeamSettingsClient({
         }),
       });
       setInviteEmail("");
-      setInviteRole("Viewer");
+      setInviteRole("ProjectManager");
       showToast("Invite sent");
       await loadAll();
     } catch (err) {
@@ -220,29 +158,32 @@ export default function TeamSettingsClient({
     }
   }
 
-  async function removeMember(userId: string) {
-    if (!confirm("Remove this member from the team?")) return;
-    setBusyId(userId);
+  async function resendInvite(inviteId: string) {
+    setBusyId(inviteId);
     try {
-      await apiFetch(`/api/team/members/${encodeURIComponent(userId)}`, {
-        method: "DELETE",
-      });
-      showToast("Removed");
+      const res = await jsonFetch<{ emailDelivered?: boolean }>(
+        `/api/settings/team/invites/${encodeURIComponent(inviteId)}/resend`,
+        { method: "POST" },
+      );
+      showToast(
+        res.emailDelivered ? "Invite resent" : "Invite refreshed (email not sent)",
+      );
       await loadAll();
     } catch (err) {
-      showToast((err as Error).message || "Remove failed");
+      showToast((err as Error).message || "Resend failed");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function cancelInvite(inviteId: string) {
+  async function revokeInvite(inviteId: string) {
     if (!confirm("Cancel this pending invite?")) return;
     setBusyId(inviteId);
     try {
-      await apiFetch(`/api/team/invites/${encodeURIComponent(inviteId)}`, {
-        method: "DELETE",
-      });
+      await jsonFetch(
+        `/api/settings/team/invites/${encodeURIComponent(inviteId)}`,
+        { method: "DELETE" },
+      );
       showToast("Invite cancelled");
       await loadAll();
     } catch (err) {
@@ -252,57 +193,15 @@ export default function TeamSettingsClient({
     }
   }
 
-  const seatLimit = billing.seat_limit ?? 0;
-  const seatsUsed = billing.seats_used ?? members.length;
-  const guestLimit = billing.guest_limit ?? 0;
-  const guestsUsed = billing.guests_used ?? guests.length;
-
-  const pendingMembers = pending.filter((p) => p.kind !== "guest");
-  const pendingGuests = pending.filter((p) => p.kind === "guest");
+  const memberCount = useMemo(() => members.length, [members]);
 
   return (
     <div className="admin-wrap" style={{ padding: 24, maxWidth: 980 }}>
       <h1 style={{ margin: "0 0 4px", fontSize: 22 }}>Team</h1>
       <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18 }}>
         {userName}
-        {userEmail ? ` · ${userEmail}` : ""} · {role}
-        {billing.plan ? ` · ${billing.plan} plan` : ""}
+        {userEmail ? ` · ${userEmail}` : ""} · {roleLabel(role)}
       </div>
-
-      {showUpgradedBanner && (
-        <div
-          style={{
-            border: "1px solid #bbf7d0",
-            background: "#f0fdf4",
-            color: "#166534",
-            padding: "10px 12px",
-            borderRadius: 6,
-            fontSize: 13,
-            marginBottom: 16,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <span>You are now on the Team plan! Your team seats are ready.</span>
-          <button
-            onClick={() => setShowUpgradedBanner(false)}
-            aria-label="Dismiss"
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: 18,
-              lineHeight: 1,
-              color: "#166534",
-              cursor: "pointer",
-              padding: 4,
-            }}
-          >
-            ×
-          </button>
-        </div>
-      )}
 
       {error && (
         <div
@@ -359,91 +258,40 @@ export default function TeamSettingsClient({
                 People in your organization with access to CHG Platform.
               </div>
             </div>
-            <UsageBar used={seatsUsed} limit={seatLimit} label="Seats used" />
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-tertiary)",
+                textTransform: "uppercase",
+              }}
+            >
+              {memberCount} {memberCount === 1 ? "member" : "members"}
+            </div>
           </div>
 
           {loading ? (
             <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
               Loading…
             </div>
-          ) : members.length === 0 && pendingMembers.length === 0 ? (
+          ) : members.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
               No team members yet.
             </div>
           ) : (
-            <>
-              {members.map((m) => (
-                <div className="admin-row" key={`m-${m.id}`}>
-                  <div className="admin-info">
-                    <div className="admin-lbl">{m.name || m.email}</div>
-                    <div className="admin-desc">
-                      {m.email}
-                      {m.name ? "" : ""} · {m.role}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <button
-                      onClick={() => void removeMember(m.id)}
-                      disabled={busyId === m.id}
-                      style={{
-                        fontSize: 12,
-                        padding: "4px 10px",
-                        borderRadius: 4,
-                        border: "1px solid var(--border-mid, #e5e7eb)",
-                        background: "transparent",
-                        color: "#991b1b",
-                        cursor: busyId === m.id ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {busyId === m.id ? "Removing…" : "Remove"}
-                    </button>
+            members.map((m) => (
+              <div className="admin-row" key={`m-${m.id}`}>
+                <div className="admin-info">
+                  <div className="admin-lbl">{m.name}</div>
+                  <div className="admin-desc">
+                    {m.email ?? "—"} · {roleLabel(m.role)} · joined{" "}
+                    {formatDate(m.joinedAt)}
                   </div>
                 </div>
-              ))}
-              {pendingMembers.map((p) => (
-                <div className="admin-row" key={`pm-${p.inviteId}`}>
-                  <div className="admin-info">
-                    <div className="admin-lbl">
-                      {p.email}{" "}
-                      <span
-                        style={{
-                          fontSize: 10,
-                          marginLeft: 6,
-                          padding: "1px 6px",
-                          borderRadius: 4,
-                          background: "var(--bg-mid, #f0f0f0)",
-                          color: "var(--text-tertiary)",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Pending
-                      </span>
-                    </div>
-                    <div className="admin-desc">Invited as {p.role}</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <button
-                      onClick={() => void cancelInvite(p.inviteId)}
-                      disabled={busyId === p.inviteId}
-                      style={{
-                        fontSize: 12,
-                        padding: "4px 10px",
-                        borderRadius: 4,
-                        border: "1px solid var(--border-mid, #e5e7eb)",
-                        background: "transparent",
-                        color: "var(--text-primary)",
-                        cursor: busyId === p.inviteId ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {busyId === p.inviteId ? "Cancelling…" : "Cancel invite"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </>
+              </div>
+            ))
           )}
 
-          {/* Invite form / upgrade prompt */}
+          {/* Invite form */}
           <div
             style={{
               marginTop: 14,
@@ -453,35 +301,7 @@ export default function TeamSettingsClient({
               background: "var(--bg-soft, #fafafa)",
             }}
           >
-            {showUpgradeCta || isPersonalPlan ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  fontSize: 13,
-                }}
-              >
-                <span>Team members require a Team plan.</span>
-                <button
-                  type="button"
-                  onClick={() => setUpgradeOpen(true)}
-                  style={{
-                    padding: "6px 14px",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    borderRadius: 4,
-                    border: "1px solid #111827",
-                    background: "#111827",
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  Upgrade to Team
-                </button>
-              </div>
-            ) : (
+            {isAdmin ? (
               <form
                 onSubmit={sendInvite}
                 style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
@@ -498,11 +318,14 @@ export default function TeamSettingsClient({
                 <select
                   className="admin-input"
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as TeamRole)}
-                  style={{ width: 120 }}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  style={{ width: 180 }}
                 >
-                  <option value="Admin">Admin</option>
-                  <option value="Viewer">Viewer</option>
+                  {INVITE_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="submit"
@@ -522,99 +345,65 @@ export default function TeamSettingsClient({
                   {inviting ? "Sending…" : "Send invite"}
                 </button>
               </form>
+            ) : (
+              <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                Only account admins can invite teammates.
+              </div>
             )}
           </div>
         </div>
 
-        {/* Guests */}
+        {/* Pending Invites */}
         <div className="admin-group">
+          <div className="admin-group-title">Pending Invites</div>
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-end",
-              gap: 16,
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+              lineHeight: 1.5,
               marginBottom: 8,
             }}
           >
-            <div>
-              <div className="admin-group-title">Guests</div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-tertiary)",
-                  lineHeight: 1.5,
-                }}
-              >
-                External collaborators (contractors, lenders, partners) with
-                limited access.
-              </div>
-            </div>
-            <UsageBar used={guestsUsed} limit={guestLimit} label="Guests used" />
+            Invitations that haven&apos;t been accepted yet.
           </div>
 
           {loading ? (
             <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
               Loading…
             </div>
-          ) : guests.length === 0 && pendingGuests.length === 0 ? (
+          ) : pending.length === 0 ? (
             <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
-              No guests yet.
+              No pending invites.
             </div>
           ) : (
-            <>
-              {guests.map((g) => (
-                <div className="admin-row" key={`g-${g.id}`}>
-                  <div className="admin-info">
-                    <div className="admin-lbl">{g.name || g.email}</div>
-                    <div className="admin-desc">
-                      {g.email} · {g.role}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <button
-                      onClick={() => void removeMember(g.id)}
-                      disabled={busyId === g.id}
+            pending.map((p) => (
+              <div className="admin-row" key={`p-${p.id}`}>
+                <div className="admin-info">
+                  <div className="admin-lbl">
+                    {p.email}{" "}
+                    <span
                       style={{
-                        fontSize: 12,
-                        padding: "4px 10px",
+                        fontSize: 10,
+                        marginLeft: 6,
+                        padding: "1px 6px",
                         borderRadius: 4,
-                        border: "1px solid var(--border-mid, #e5e7eb)",
-                        background: "transparent",
-                        color: "#991b1b",
-                        cursor: busyId === g.id ? "not-allowed" : "pointer",
+                        background: "var(--bg-mid, #f0f0f0)",
+                        color: "var(--text-tertiary)",
+                        textTransform: "uppercase",
                       }}
                     >
-                      {busyId === g.id ? "Removing…" : "Remove"}
-                    </button>
+                      Pending
+                    </span>
+                  </div>
+                  <div className="admin-desc">
+                    Invited as {roleLabel(p.role)} · expires {formatDate(p.expiresAt)}
                   </div>
                 </div>
-              ))}
-              {pendingGuests.map((p) => (
-                <div className="admin-row" key={`pg-${p.inviteId}`}>
-                  <div className="admin-info">
-                    <div className="admin-lbl">
-                      {p.email}{" "}
-                      <span
-                        style={{
-                          fontSize: 10,
-                          marginLeft: 6,
-                          padding: "1px 6px",
-                          borderRadius: 4,
-                          background: "var(--bg-mid, #f0f0f0)",
-                          color: "var(--text-tertiary)",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Pending
-                      </span>
-                    </div>
-                    <div className="admin-desc">Invited as {p.role}</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {isAdmin && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button
-                      onClick={() => void cancelInvite(p.inviteId)}
-                      disabled={busyId === p.inviteId}
+                      onClick={() => void resendInvite(p.id)}
+                      disabled={busyId === p.id}
                       style={{
                         fontSize: 12,
                         padding: "4px 10px",
@@ -622,28 +411,35 @@ export default function TeamSettingsClient({
                         border: "1px solid var(--border-mid, #e5e7eb)",
                         background: "transparent",
                         color: "var(--text-primary)",
-                        cursor: busyId === p.inviteId ? "not-allowed" : "pointer",
+                        cursor: busyId === p.id ? "not-allowed" : "pointer",
                       }}
                     >
-                      {busyId === p.inviteId ? "Cancelling…" : "Cancel invite"}
+                      {busyId === p.id ? "Working…" : "Resend"}
+                    </button>
+                    <button
+                      onClick={() => void revokeInvite(p.id)}
+                      disabled={busyId === p.id}
+                      style={{
+                        fontSize: 12,
+                        padding: "4px 10px",
+                        borderRadius: 4,
+                        border: "1px solid var(--border-mid, #e5e7eb)",
+                        background: "transparent",
+                        color: "#991b1b",
+                        cursor: busyId === p.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Revoke
                     </button>
                   </div>
-                </div>
-              ))}
-            </>
+                )}
+              </div>
+            ))
           )}
         </div>
       </div>
 
       <Toast message={toast} />
-
-      <UpgradeModal
-        open={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
-        currentPlan={billing.plan}
-        successUrl="https://chg.doorine.com/billing/success?session_id={CHECKOUT_SESSION_ID}"
-        cancelUrl="https://chg.doorine.com/settings/team"
-      />
     </div>
   );
 }

@@ -1,0 +1,44 @@
+Consolidate team management into one place. Read all files mentioned before changing anything:
+- apps/chg-rehab/app/settings/team/page.tsx
+- apps/chg-rehab/app/settings/team/Client.tsx
+- apps/chg-rehab/app/admin/page.tsx
+- apps/chg-rehab/app/admin/Client.tsx
+- apps/chg-rehab/app/api/admin/users/route.ts
+
+CHANGE 1 — Rewire Team page to use the working Admin API
+
+In apps/chg-rehab/app/settings/team/Client.tsx:
+- Replace the "Send invite" form's POST call from goldBridgeFetch('/api/team/invite') to a local fetch POST to /api/admin/users
+- Body: { email, role } where role defaults to 'ProjectManager' (use a role dropdown: Admin, ProjectManager, GeneralContractor, Inspector)
+- On success: refresh the member list
+- On error: show the error message returned from the API
+
+Replace the member list data source:
+- Remove the GET /api/team/members call to the Express server
+- Instead fetch from a new local API route GET /api/settings/team/members (create this below)
+- Show: active users (name, email, role, joined date) + pending invites (email, role, "Pending" badge, resend/revoke buttons)
+
+Create apps/chg-rehab/app/api/settings/team/members/route.ts:
+- GET: auth-guard, return { members: User[], pendingInvites: Invite[] } from Prisma
+- members = prisma.user.findMany({ where: { accountId: currentUser.accountId } })  
+- pendingInvites = prisma.invite.findMany({ where: { accountId: currentUser.accountId, status: 'Pending' } })
+
+Create apps/chg-rehab/app/api/settings/team/invites/[inviteId]/route.ts:
+- DELETE: revoke invite (set status to 'Revoked')
+- POST to /resend: call sendInviteEmail again and reset expiry
+
+CHANGE 2 — Remove duplicate from Admin Settings
+
+In apps/chg-rehab/app/admin/Client.tsx:
+- Find the "Users & Permissions" tab. Remove it entirely (remove the tab button and its panel content).
+- If it's the default tab, change the default to the next available tab (Billing or Account).
+
+In apps/chg-rehab/app/admin/page.tsx:
+- Remove any server-side data fetching for users/invites that was only used by the removed tab.
+
+CHANGE 3 — Update nav
+In apps/chg-rehab/components/TopNav.tsx:
+- The "Team" link already points to /settings/team — keep it.
+- Verify "Admin Settings" still links to /admin (it will now just show Billing + Account, not Users).
+
+Run npx tsc --noEmit. Fix errors. Report what changed.
