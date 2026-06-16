@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   "/api/logout",
   "/api/health",
   "/api/invites/accept",
+  "/api/invites/use",
   "/api/cron/notifications-sweep",
   "/api/contacts/unsubscribe",
   "/api/stripe/webhook",
