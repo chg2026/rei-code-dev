@@ -18,7 +18,15 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function CommandCenterPage() {
-  const [tab, setTab] = useState<TabId>("todo");
+  const [tab, setTab] = useState<TabId>(() => {
+    if (typeof window !== "undefined") {
+      const view = new URLSearchParams(window.location.search).get("view");
+      if (view === "calendar") return "calendar";
+      if (view === "list" || view === "todo") return "todo";
+      if (view === "goals" || view === "reminders") return view;
+    }
+    return "todo";
+  });
   const [creatingTask, setCreatingTask] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
