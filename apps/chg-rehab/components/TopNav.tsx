@@ -34,7 +34,7 @@ const BASE_SECTIONS: NavSection[] = [
       { href: "/property", label: "Property Record" },
       { href: "/rehab", label: "Rehab Manager" },
       { href: "/warehouse", label: "Warehouse" },
-      { href: "/finance", label: "Finance" },
+      { href: "/investor-portal?tab=finance", label: "Finance" },
       { href: "/docs", label: "Documents Hub" },
     ],
   },
