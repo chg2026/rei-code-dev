@@ -1,0 +1,68 @@
+The Reminders feature needs to be rebuilt from scratch. Here are all the issues to fix in one pass:
+
+---
+
+**1. FIX TIMEZONE BUG (critical)**
+Reminders are being saved a day early. The bug is a classic UTC offset issue — dates are being stored or parsed as UTC midnight which rolls back one day for EST users.
+
+Fix: When saving a reminder date, store it as a date-only string (YYYY-MM-DD) with no time component, OR store with the user's local timezone offset. When displaying, always parse dates in the user's local timezone, never as UTC midnight. Add `timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone` to any date formatting calls. This should auto-detect the user's timezone.
+
+---
+
+**2. REMINDER DATA MODEL — add these fields if not already present**
+The reminder should support:
+- `title` (string, required)
+- `notes` (string, optional)
+- `tags` (string array, optional)  
+- `dueDate` (date, required — the day of the reminder)
+- `dueTime` (time string optional — e.g. "09:00" — for alarm)
+- `urgency` (enum: low | medium | high | urgent)
+- `dismissed` (boolean — whether the user clicked to dismiss the pop-up)
+- `completedAt` (timestamp, nullable)
+
+Run any needed DB migration with raw SQL + prisma generate.
+
+---
+
+**3. REMINDER CREATION — on the Calendar page**
+Add a "+ New reminder" button at the top of the Calendar page (next to the page title).
+
+Clicking it opens a modal/slide-over with these fields:
+- Title (text input, required)
+- Notes (textarea, optional)
+- Tags (multi-tag input — type and press Enter to add a tag)
+- Date (date picker, required)
+- Time / Alarm (time picker, optional — "Set an alarm for this reminder")
+- Urgency (segmented control or dropdown: Low / Medium / High / Urgent)
+
+"Save reminder" button creates it. Modal closes. Reminder appears in the Active Reminders section.
+
+---
+
+**4. REMINDER LIST — in the Calendar page**
+The "Active reminders" section at the bottom of the Calendar page should:
+- Show all reminders that are not yet dismissed/completed
+- Each row shows: urgency color indicator | title | due date + time | tags | dismiss button (✓)
+- Clicking a reminder row opens an inline edit panel (NOT redirecting to Command Center) — same modal used for creation, pre-filled with the reminder's data
+- Clicking ✓ marks it dismissed/completed and removes it from Active list
+- Add an "Overdue" label for reminders past their due date (already exists, keep it)
+- Fix: clicking any reminder must NOT open Command Center
+
+---
+
+**5. POP-UP NOTIFICATION for due reminders**
+Build a global notification system (add it to the root layout so it works on any page):
+
+- On app load and every 60 seconds, check if there are any reminders where `dueDate` is today AND `dismissed = false`
+- If found, show a dismissible modal/banner (like a macOS reminder pop-up):
+  - Title: the reminder title
+  - Body: due date/time + notes (if any)  
+  - Two buttons: "Dismiss" (marks dismissed=true) and "Snooze 1 hour" (sets dueTime to now + 1 hour)
+- The pop-up must be clicked to disappear — it does NOT auto-close
+- If multiple reminders are due, stack them or show them one at a time
+- Style it to match the CHG design system (cream/warm tones, rounded corners)
+
+---
+
+**6. REMOVE all links/redirects to /command-center from the Reminders feature**
+Any place where clicking a reminder navigates to Command Center — fix it to open the inline edit modal instead.

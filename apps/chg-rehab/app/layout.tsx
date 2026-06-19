@@ -10,6 +10,7 @@ import BillingNavBadge from "@/components/BillingNavBadge";
 import NotificationBell from "@/components/NotificationBell";
 import AppSwitcher from "@/components/AppSwitcher";
 import ProfileCompletionBanner from "@/components/ProfileCompletionBanner";
+import ReminderPopups from "@/components/ReminderPopups";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -94,6 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </div>
         </div>
+        <ReminderPopups />
       </body>
     </html>
   );

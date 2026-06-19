@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
+const URGENCIES = new Set(["low", "medium", "high", "urgent"]);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^\d{2}:\d{2}$/;
+
 /**
  * GET /api/workspace/reminders — returns a unified, derived feed:
  *  - documents expiring within 30 days
  *  - tasks overdue (dueDate < now and not done)
- *  - user-created WsReminder rows
+ *  - user-created WsReminder rows (with full editable fields)
+ *  - pipeline deals that have stalled
  */
 export async function GET() {
   const user = await getCurrentUser();
@@ -36,9 +43,9 @@ export async function GET() {
       take: 50,
     }),
     prisma.wsReminder.findMany({
-      where: { companyId: user.companyId, done: false },
-      orderBy: { remindAt: "asc" },
-      take: 50,
+      where: { companyId: user.companyId, done: false, dismissed: false },
+      orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+      take: 100,
     }),
     prisma.pipelineDeal.findMany({
       where: { companyId: user.companyId, closedAt: null, updatedAt: { lt: stuckBefore } },
@@ -55,6 +62,13 @@ export async function GET() {
     when: string | null;
     urgent: boolean;
     kind: "doc" | "task" | "manual" | "deal";
+    // manual-only editable fields
+    reminderId?: string;
+    notes?: string | null;
+    tags?: string[];
+    dueDate?: string | null;
+    dueTime?: string | null;
+    urgency?: string | null;
   };
   const items: Item[] = [];
   for (const d of expDocs) {
@@ -73,8 +87,8 @@ export async function GET() {
     items.push({
       id: `task:${t.id}`,
       title: `Overdue: ${t.title}`,
-      source: "Command Center · To-do list",
-      link: "/command-center",
+      source: "My Tasks · To-do list",
+      link: "/workspace/tasks",
       when: t.dueDate?.toISOString() ?? null,
       urgent: true,
       kind: "task",
@@ -83,12 +97,18 @@ export async function GET() {
   for (const r of manual) {
     items.push({
       id: `manual:${r.id}`,
+      reminderId: r.id,
       title: r.title,
       source: r.source ?? "Reminder",
       link: r.link,
-      when: r.remindAt?.toISOString() ?? null,
-      urgent: r.urgent,
+      when: r.dueDate ? `${r.dueDate}T${r.dueTime ?? "00:00"}` : r.remindAt?.toISOString() ?? null,
+      urgent: r.urgency === "high" || r.urgency === "urgent" || r.urgent,
       kind: "manual",
+      notes: r.notes,
+      tags: r.tags ?? [],
+      dueDate: r.dueDate,
+      dueTime: r.dueTime,
+      urgency: r.urgency ?? (r.urgent ? "high" : "medium"),
     });
   }
   for (const d of stuckDeals) {
@@ -113,20 +133,37 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({})) as {
     title?: string;
-    remindAt?: string | null;
-    urgent?: boolean;
+    notes?: string | null;
+    tags?: string[];
+    dueDate?: string | null; // YYYY-MM-DD
+    dueTime?: string | null; // HH:MM
+    urgency?: string | null;
     source?: string | null;
     link?: string | null;
   };
   const title = (body.title ?? "").trim();
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
+  const urgency = body.urgency && URGENCIES.has(body.urgency) ? body.urgency : "medium";
+  const tags = Array.isArray(body.tags)
+    ? body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 20)
+    : [];
+  if (body.dueDate && !DATE_RE.test(body.dueDate)) {
+    return NextResponse.json({ error: "Invalid date format (expected YYYY-MM-DD)" }, { status: 400 });
+  }
+  if (body.dueTime && !TIME_RE.test(body.dueTime)) {
+    return NextResponse.json({ error: "Invalid time format (expected HH:MM)" }, { status: 400 });
+  }
   const r = await prisma.wsReminder.create({
     data: {
       companyId: user.companyId,
       userId: user.id,
       title,
-      remindAt: body.remindAt ? new Date(body.remindAt) : null,
-      urgent: Boolean(body.urgent),
+      notes: body.notes?.trim() || null,
+      tags,
+      dueDate: body.dueDate || null,
+      dueTime: body.dueTime || null,
+      urgency,
+      urgent: urgency === "high" || urgency === "urgent",
       source: body.source ?? null,
       link: body.link ?? null,
     },

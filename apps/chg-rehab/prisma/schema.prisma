@@ -1732,11 +1732,20 @@ model WsReminder {
   doneAt    DateTime?
   createdAt DateTime  @default(now())
 
+  notes       String?
+  tags        String[]  @default([])
+  dueDate     String? // date-only YYYY-MM-DD, stored as string to avoid UTC offset bugs
+  dueTime     String? // HH:MM (24h) local time for the alarm
+  urgency     String? // low | medium | high | urgent
+  dismissed   Boolean   @default(false)
+  completedAt DateTime?
+
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([companyId, done, remindAt])
   @@index([companyId, userId, done])
+  @@index([companyId, dismissed, dueDate])
 }
 
 model WsCalendarEvent {
