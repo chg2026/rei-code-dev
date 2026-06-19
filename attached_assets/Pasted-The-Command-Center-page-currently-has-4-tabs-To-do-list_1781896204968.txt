@@ -1,0 +1,33 @@
+The Command Center page currently has 4 tabs: "To-do list", "Calendar", "Goals", "Reminders". We are dismantling this into 3 separate standalone pages. The Command Center page/nav item goes away entirely.
+
+Here's exactly what to build:
+
+---
+
+**1. /workspace/tasks → My Tasks page**
+- Extract the "To-do list" tab content from Command Center and render it as a full standalone page
+- No tabs — just the task list with the Mine/All/Assigned out filter, the task rows, completed section, and "+ New task" button
+- Page title: "My Tasks"
+- Subtitle: "All tasks assigned to you"
+
+**2. /workspace/calendar → Calendar page**
+- Extract the "Calendar" tab content from Command Center and render it as a full standalone page
+- Also merge the "Reminders" tab content into this page — add a "Reminders" section or panel inside the Calendar page (since reminders are time-based, they belong alongside the calendar)
+- No tabs — just the calendar view with reminders integrated
+- Page title: "Calendar"
+- Subtitle: "Your schedule and reminders"
+
+**3. /goals → Goals page**
+- Extract the "Goals" tab content from Command Center and render it as a full standalone page
+- No tabs — just the goals view
+- Page title: "Goals"
+- Subtitle: "Track your objectives"
+
+---
+
+**Implementation approach:**
+- The tab content components in Command Center are likely already separate components (e.g. TaskList, CalendarView, GoalsView). If so, just import them directly into the new pages.
+- If the tab content is inline JSX inside Command Center, extract each section into its own component first, then use it in both the new page and (temporarily) keep Command Center working.
+- The routes /workspace/tasks, /workspace/calendar, /goals should each render their respective new page component — remove the redirect to /command-center.
+- Do NOT delete the Command Center page file yet — just remove it from the sidebar nav. We'll clean it up later.
+- Keep all existing data fetching, API calls, and state logic intact — just move the UI into the new pages.
