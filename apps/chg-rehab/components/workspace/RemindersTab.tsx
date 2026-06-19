@@ -19,6 +19,9 @@ type Reminder = {
   dueDate?: string | null;
   dueTime?: string | null;
   urgency?: string | null;
+  assigneeId?: string | null;
+  assigneeName?: string | null;
+  assigneeInitials?: string | null;
 };
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -84,7 +87,7 @@ function derivedIcon(r: Reminder) {
   return "🔔";
 }
 
-export default function RemindersTab({ refreshKey = 0 }: { refreshKey?: number }) {
+export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey?: number; onChanged?: () => void }) {
   const [items, setItems] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ReminderDraft | null>(null);
@@ -109,6 +112,7 @@ export default function RemindersTab({ refreshKey = 0 }: { refreshKey?: number }
       dueDate: r.dueDate ?? null,
       dueTime: r.dueTime ?? null,
       urgency: r.urgency ?? "medium",
+      assigneeId: r.assigneeId ?? null,
     });
     setModalOpen(true);
   };
@@ -121,6 +125,7 @@ export default function RemindersTab({ refreshKey = 0 }: { refreshKey?: number }
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ dismissed: true }),
     });
+    onChanged?.();
   };
 
   const manual = items.filter((r) => r.kind === "manual");
@@ -154,6 +159,24 @@ export default function RemindersTab({ refreshKey = 0 }: { refreshKey?: number }
                         <span style={{ color: due.overdue ? "#ef4444" : undefined, fontWeight: due.overdue ? 600 : undefined }}>
                           {due.overdue ? `Overdue · ${due.text}` : due.text}
                         </span>
+                        {r.assigneeId && r.assigneeInitials ? (
+                          <span
+                            title={r.assigneeName ?? undefined}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 18,
+                              height: 18,
+                              borderRadius: "50%",
+                              background: "var(--marine, #2f5d8a)",
+                              color: "#fff",
+                              fontSize: 9,
+                              fontWeight: 600,
+                              flexShrink: 0,
+                            }}
+                          >{r.assigneeInitials}</span>
+                        ) : null}
                         {(r.tags ?? []).map((t) => (
                           <span key={t} style={{ background: "var(--bone, #f1efe9)", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>{t}</span>
                         ))}
@@ -200,7 +223,7 @@ export default function RemindersTab({ refreshKey = 0 }: { refreshKey?: number }
         open={modalOpen}
         reminder={editing}
         onClose={() => { setModalOpen(false); setEditing(null); }}
-        onSaved={load}
+        onSaved={() => { load(); onChanged?.(); }}
       />
     </div>
   );

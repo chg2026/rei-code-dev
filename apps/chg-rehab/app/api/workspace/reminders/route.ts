@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { notifyReminderMentions } from "@/lib/workspace/reminderMentions";
 
 export const dynamic = "force-dynamic";
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 const URGENCIES = new Set(["low", "medium", "high", "urgent"]);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -69,7 +77,27 @@ export async function GET() {
     dueDate?: string | null;
     dueTime?: string | null;
     urgency?: string | null;
+    assigneeId?: string | null;
+    assigneeName?: string | null;
+    assigneeInitials?: string | null;
   };
+
+  // Resolve assignee display names for manual reminders in a single query.
+  const assigneeIds = Array.from(
+    new Set(manual.map((r) => r.assigneeId).filter((x): x is string => Boolean(x))),
+  );
+  const assigneeMap = new Map<string, { name: string; initials: string }>();
+  if (assigneeIds.length) {
+    const assignees = await prisma.user.findMany({
+      where: { id: { in: assigneeIds }, companyId: user.companyId },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    for (const a of assignees) {
+      const name = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "User";
+      assigneeMap.set(a.id, { name, initials: initialsFromName(name) });
+    }
+  }
+
   const items: Item[] = [];
   for (const d of expDocs) {
     const days = Math.ceil((d.expiresAt!.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
@@ -109,6 +137,9 @@ export async function GET() {
       dueDate: r.dueDate,
       dueTime: r.dueTime,
       urgency: r.urgency ?? (r.urgent ? "high" : "medium"),
+      assigneeId: r.assigneeId ?? null,
+      assigneeName: r.assigneeId ? assigneeMap.get(r.assigneeId)?.name ?? null : null,
+      assigneeInitials: r.assigneeId ? assigneeMap.get(r.assigneeId)?.initials ?? null : null,
     });
   }
   for (const d of stuckDeals) {
@@ -138,6 +169,7 @@ export async function POST(req: Request) {
     dueDate?: string | null; // YYYY-MM-DD
     dueTime?: string | null; // HH:MM
     urgency?: string | null;
+    assigneeId?: string | null;
     source?: string | null;
     link?: string | null;
   };
@@ -153,20 +185,48 @@ export async function POST(req: Request) {
   if (body.dueTime && !TIME_RE.test(body.dueTime)) {
     return NextResponse.json({ error: "Invalid time format (expected HH:MM)" }, { status: 400 });
   }
+  const notes = body.notes?.trim() || null;
+  const assigneeId = await resolveAssigneeId(body.assigneeId, user.companyId);
   const r = await prisma.wsReminder.create({
     data: {
       companyId: user.companyId,
       userId: user.id,
       title,
-      notes: body.notes?.trim() || null,
+      notes,
       tags,
       dueDate: body.dueDate || null,
       dueTime: body.dueTime || null,
       urgency,
       urgent: urgency === "high" || urgency === "urgent",
+      assigneeId,
       source: body.source ?? null,
       link: body.link ?? null,
     },
   });
+  await notifyReminderMentions({
+    companyId: user.companyId,
+    creatorId: user.id,
+    reminderId: r.id,
+    reminderTitle: title,
+    notes,
+  });
   return NextResponse.json({ id: r.id });
+}
+
+/**
+ * Validates an assignee id belongs to an active user in the same company.
+ * Returns the id when valid, null when empty/unset, and undefined to signal
+ * an invalid id that callers should reject (kept simple: invalid -> null).
+ */
+async function resolveAssigneeId(
+  raw: string | null | undefined,
+  companyId: string,
+): Promise<string | null> {
+  const id = (raw ?? "").trim();
+  if (!id) return null;
+  const u = await prisma.user.findFirst({
+    where: { id, companyId, active: true },
+    select: { id: true },
+  });
+  return u ? u.id : null;
 }

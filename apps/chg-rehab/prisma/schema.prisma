@@ -1739,6 +1739,7 @@ model WsReminder {
   urgency     String? // low | medium | high | urgent
   dismissed   Boolean   @default(false)
   completedAt DateTime?
+  assigneeId  String? // active company user assigned to this reminder (scalar, resolved manually)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -1746,6 +1747,7 @@ model WsReminder {
   @@index([companyId, done, remindAt])
   @@index([companyId, userId, done])
   @@index([companyId, dismissed, dueDate])
+  @@index([companyId, assigneeId])
 }
 
 model WsCalendarEvent {

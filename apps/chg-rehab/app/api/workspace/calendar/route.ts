@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 /**
  * GET /api/workspace/calendar?month=YYYY-MM — returns calendar events for the
  * given month, drawn from:
@@ -28,8 +35,11 @@ export async function GET(req: Request) {
   const start = new Date(Date.UTC(y, m - 1, 1));
   const end = new Date(Date.UTC(y, m, 1));
   const range = { gte: start, lt: end };
+  // Reminders store dueDate as a date-only string (YYYY-MM-DD); match the month
+  // by string prefix so there is no UTC/local drift.
+  const monthPrefix = `${y}-${String(m).padStart(2, "0")}-`;
 
-  const [tasks, closedDeals, openDeals, phases, docs, dists, manual, pmTasks] = await Promise.all([
+  const [tasks, closedDeals, openDeals, phases, docs, dists, manual, pmTasks, reminders] = await Promise.all([
     prisma.wsTask.findMany({
       where: { companyId: user.companyId, dueDate: range },
       select: { id: true, title: true, dueDate: true, priority: true },
@@ -89,9 +99,62 @@ export async function GET(req: Request) {
         list: { select: { id: true, space: { select: { id: true } } } },
       },
     }),
+    prisma.wsReminder.findMany({
+      where: {
+        companyId: user.companyId,
+        dismissed: false,
+        done: false,
+        dueDate: { startsWith: monthPrefix },
+      },
+      select: {
+        id: true,
+        title: true,
+        notes: true,
+        tags: true,
+        dueDate: true,
+        dueTime: true,
+        urgency: true,
+        assigneeId: true,
+      },
+    }),
   ]);
 
-  type Ev = { id: string; title: string; when: string; kind: string; link: string | null };
+  // Resolve assignee display names/initials for the month's reminders in one query.
+  const reminderAssigneeIds = Array.from(
+    new Set(reminders.map((r) => r.assigneeId).filter((x): x is string => Boolean(x))),
+  );
+  const reminderAssigneeMap = new Map<string, { name: string; initials: string }>();
+  if (reminderAssigneeIds.length) {
+    const assignees = await prisma.user.findMany({
+      where: { id: { in: reminderAssigneeIds }, companyId: user.companyId },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    for (const a of assignees) {
+      const name = [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email || "User";
+      reminderAssigneeMap.set(a.id, { name, initials: initialsFromName(name) });
+    }
+  }
+
+  type ReminderPayload = {
+    id: string;
+    title: string;
+    notes: string | null;
+    tags: string[];
+    dueDate: string | null;
+    dueTime: string | null;
+    urgency: string | null;
+    assigneeId: string | null;
+    assigneeName: string | null;
+    assigneeInitials: string | null;
+  };
+  type Ev = {
+    id: string;
+    title: string;
+    when: string;
+    kind: string;
+    link: string | null;
+    reminder?: ReminderPayload;
+  };
   const events: Ev[] = [];
 
   for (const t of tasks) {
@@ -144,6 +207,30 @@ export async function GET(req: Request) {
       when: t.dueDate.toISOString(),
       kind: "pm-task",
       link: `/pm/${t.list.space.id}/${t.list.id}`,
+    });
+  }
+  for (const r of reminders) {
+    if (!r.dueDate) continue;
+    // Local (no-TZ-suffix) timestamp so the client renders it on the correct
+    // calendar day regardless of the viewer's timezone.
+    events.push({
+      id: `reminder:${r.id}`,
+      title: r.title,
+      when: `${r.dueDate}T${r.dueTime ?? "00:00"}:00`,
+      kind: "reminder",
+      link: null,
+      reminder: {
+        id: r.id,
+        title: r.title,
+        notes: r.notes,
+        tags: r.tags ?? [],
+        dueDate: r.dueDate,
+        dueTime: r.dueTime,
+        urgency: r.urgency,
+        assigneeId: r.assigneeId ?? null,
+        assigneeName: r.assigneeId ? reminderAssigneeMap.get(r.assigneeId)?.name ?? null : null,
+        assigneeInitials: r.assigneeId ? reminderAssigneeMap.get(r.assigneeId)?.initials ?? null : null,
+      },
     });
   }
 

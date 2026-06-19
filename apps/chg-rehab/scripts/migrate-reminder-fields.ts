@@ -17,7 +17,9 @@ async function main() {
     `ALTER TABLE "WsReminder" ADD COLUMN IF NOT EXISTS "urgency" TEXT;`,
     `ALTER TABLE "WsReminder" ADD COLUMN IF NOT EXISTS "dismissed" BOOLEAN NOT NULL DEFAULT false;`,
     `ALTER TABLE "WsReminder" ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3);`,
+    `ALTER TABLE "WsReminder" ADD COLUMN IF NOT EXISTS "assigneeId" TEXT;`,
     `CREATE INDEX IF NOT EXISTS "WsReminder_companyId_dismissed_dueDate_idx" ON "WsReminder" ("companyId", "dismissed", "dueDate");`,
+    `CREATE INDEX IF NOT EXISTS "WsReminder_companyId_assigneeId_idx" ON "WsReminder" ("companyId", "assigneeId");`,
   ];
   for (const sql of statements) {
     process.stdout.write(`-> ${sql}\n`);

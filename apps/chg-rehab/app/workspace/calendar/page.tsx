@@ -22,16 +22,16 @@ export default function CalendarPage() {
         </button>
       </div>
       <div className={s.body}>
-        <CalendarTab />
+        <CalendarTab refreshKey={refreshKey} onReminderSaved={() => setRefreshKey((k) => k + 1)} />
         <div style={{ marginTop: 24 }}>
-          <RemindersTab refreshKey={refreshKey} />
+          <RemindersTab refreshKey={refreshKey} onChanged={() => setRefreshKey((k) => k + 1)} />
         </div>
       </div>
       <ReminderModal
         open={modalOpen}
         reminder={null}
         onClose={() => setModalOpen(false)}
-        onSaved={() => setRefreshKey((k) => k + 1)}
+        onSaved={() => { setModalOpen(false); setRefreshKey((k) => k + 1); }}
       />
     </div>
   );

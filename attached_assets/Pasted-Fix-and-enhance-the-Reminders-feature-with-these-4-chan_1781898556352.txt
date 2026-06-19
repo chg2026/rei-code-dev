@@ -1,0 +1,45 @@
+Fix and enhance the Reminders feature with these 4 changes:
+
+---
+
+**1. SHOW REMINDERS ON THE CALENDAR GRID**
+Reminders must appear as events directly on the calendar grid on their due date, just like tasks do.
+
+- Fetch reminders alongside tasks when the calendar loads
+- Render reminder events on the calendar with a distinct visual style vs tasks:
+  - Tasks: left border in blue, label shows task title
+  - Reminders: left border in orange/amber, label shows a 🔔 bell icon + reminder title
+- Both appear on the day cell matching their dueDate
+- Clicking a reminder event on the calendar opens the reminder edit modal (same as clicking in the Active Reminders list)
+
+---
+
+**2. ASSIGN A TEAM MEMBER TO A REMINDER**
+Add an "Assignee" field to the reminder creation/edit modal:
+
+- Field label: "Assign to" 
+- UI: searchable dropdown showing all team members in the workspace (fetch from /api/settings/team/members or equivalent)
+- Optional field — can leave unassigned
+- Store as `assigneeId` (user ID) on the reminder record
+- Add this column to the DB if not present (raw SQL + prisma generate)
+- When a reminder has an assignee, show their avatar/initials on the reminder row in the Active Reminders list and on the calendar event
+
+---
+
+**3. @MENTION TEAM MEMBERS IN NOTES**
+The Notes textarea in the reminder modal should support @mention:
+
+- As the user types @ followed by letters, show a small dropdown of matching team members
+- Selecting a member inserts @FirstName into the notes text
+- Store mentions as plain text with @Name in the notes string (no need for separate DB table)
+- When the reminder is saved, detect all @Name mentions in the notes, look up matching users by first name in the workspace, and create an in-app notification for each mentioned user
+
+---
+
+**4. IN-APP NOTIFICATION FOR @MENTIONS**
+When a user is @mentioned in a reminder's notes:
+
+- Create a notification record for that user in the existing notifications system (use whatever notification model/table already exists in the schema)
+- Notification text: "[Creator name] mentioned you in a reminder: [reminder title]"
+- The notification should appear in the existing notification bell (top nav) for the mentioned user
+- If no notification system exists yet, create a simple `Notification` model with: id, userId, message, read (boolean), createdAt — and a GET /api/notifications endpoint that returns unread notifications for the current user, and a PATCH /api/notifications/[id]/read endpoint. Add a badge count to the bell icon in the top nav.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { notifyReminderMentions } from "@/lib/workspace/reminderMentions";
 export const dynamic = "force-dynamic";
 
 const URGENCIES = new Set(["low", "medium", "high", "urgent"]);
@@ -21,6 +22,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     dueDate?: string | null;
     dueTime?: string | null;
     urgency?: string | null;
+    assigneeId?: string | null;
     dismissed?: boolean;
   };
 
@@ -51,6 +53,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     data.urgency = body.urgency;
     data.urgent = body.urgency === "high" || body.urgency === "urgent";
   }
+  if (body.assigneeId !== undefined) {
+    const id = (body.assigneeId ?? "").trim();
+    if (!id) {
+      data.assigneeId = null;
+    } else {
+      const u = await prisma.user.findFirst({
+        where: { id, companyId: user.companyId, active: true },
+        select: { id: true },
+      });
+      data.assigneeId = u ? u.id : null;
+    }
+  }
   if (body.dismissed === true) {
     data.dismissed = true;
     data.done = true;
@@ -59,6 +73,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const updated = await prisma.wsReminder.update({ where: { id }, data });
+
+  // Fire @mention notifications using the reminder's final notes/title.
+  const finalNotes = data.notes !== undefined ? (data.notes as string | null) : reminder.notes;
+  const finalTitle = (data.title as string | undefined) ?? reminder.title;
+  await notifyReminderMentions({
+    companyId: user.companyId,
+    creatorId: user.id,
+    reminderId: updated.id,
+    reminderTitle: finalTitle,
+    notes: finalNotes,
+  });
+
   return NextResponse.json({ ok: true, id: updated.id });
 }
 

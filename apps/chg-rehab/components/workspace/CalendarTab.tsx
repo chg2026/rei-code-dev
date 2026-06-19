@@ -4,8 +4,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import s from "./styles.module.css";
 import CreateTaskModal from "./CreateTaskModal";
+import ReminderModal, { ReminderDraft } from "./ReminderModal";
 
-type Ev = { id: string; title: string; when: string; kind: string; link: string | null };
+type ReminderPayload = {
+  id: string;
+  title: string;
+  notes: string | null;
+  tags: string[];
+  dueDate: string | null;
+  dueTime: string | null;
+  urgency: string | null;
+  assigneeId: string | null;
+  assigneeName?: string | null;
+  assigneeInitials?: string | null;
+};
+type Ev = { id: string; title: string; when: string; kind: string; link: string | null; reminder?: ReminderPayload };
 
 const KIND_LABELS: Record<string, string> = {
   task: "Task due",
@@ -16,6 +29,7 @@ const KIND_LABELS: Record<string, string> = {
   doc: "Document",
   distribution: "Distribution",
   event: "Event",
+  reminder: "Reminder",
 };
 
 const KIND_COLORS: Record<string, string> = {
@@ -27,18 +41,26 @@ const KIND_COLORS: Record<string, string> = {
   doc: "#ef4444",
   distribution: "#06b6d4",
   event: "#6b7280",
+  reminder: "#f97316",
 };
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function CalendarTab() {
+export default function CalendarTab({
+  refreshKey = 0,
+  onReminderSaved,
+}: {
+  refreshKey?: number;
+  onReminderSaved?: () => void;
+} = {}) {
   // Initialised on the client only (in useEffect) to avoid SSR/CSR TZ drift.
   const [cursor, setCursor] = useState<{ y: number; m: number } | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDate, setCreateDate] = useState<string | null>(null);
+  const [editingReminder, setEditingReminder] = useState<ReminderDraft | null>(null);
 
   useEffect(() => {
     const n = new Date();
@@ -54,7 +76,21 @@ export default function CalendarTab() {
       setEvents(data.events ?? []);
     } finally { setLoading(false); }
   }, [cursor]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshKey]);
+
+  const openReminder = useCallback((ev: Ev) => {
+    if (!ev.reminder) return;
+    setEditingReminder({
+      id: ev.reminder.id,
+      title: ev.reminder.title,
+      notes: ev.reminder.notes,
+      tags: ev.reminder.tags ?? [],
+      dueDate: ev.reminder.dueDate,
+      dueTime: ev.reminder.dueTime,
+      urgency: ev.reminder.urgency ?? "medium",
+      assigneeId: ev.reminder.assigneeId,
+    });
+  }, []);
 
   const { cells, byDay } = useMemo(() => {
     if (!cursor) return { cells: [] as { date: Date; inMonth: boolean }[], byDay: new Map<string, Ev[]>() };
@@ -139,6 +175,40 @@ export default function CalendarTab() {
                       {dayEvents.slice(0, 3).map((e) => {
                         const label = e.title.length > 22 ? `${e.title.slice(0, 22)}…` : e.title;
                         const chipStyle = { borderLeft: `3px solid ${KIND_COLORS[e.kind] ?? "#6366f1"}` };
+                        if (e.kind === "reminder" && e.reminder) {
+                          const initials = e.reminder.assigneeInitials;
+                          return (
+                            <button
+                              key={e.id}
+                              type="button"
+                              className={s.calEventChip}
+                              title={e.reminder.assigneeName ? `${e.title} · ${e.reminder.assigneeName}` : e.title}
+                              style={{ ...chipStyle, cursor: "pointer", background: "transparent", textAlign: "left", width: "100%", font: "inherit", display: "flex", alignItems: "center", gap: 4 }}
+                              onClick={(ev) => { ev.stopPropagation(); openReminder(e); }}
+                            >
+                              <span>🔔</span>
+                              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+                              {initials ? (
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: 14,
+                                    height: 14,
+                                    borderRadius: "50%",
+                                    background: "var(--marine, #2f5d8a)",
+                                    color: "#fff",
+                                    fontSize: 7,
+                                    fontWeight: 600,
+                                    flexShrink: 0,
+                                  }}
+                                >{initials}</span>
+                              ) : null}
+                            </button>
+                          );
+                        }
                         return e.link ? (
                           <Link
                             key={e.id}
@@ -198,6 +268,12 @@ export default function CalendarTab() {
           onClose={() => setCreateDate(null)}
         />
       )}
+      <ReminderModal
+        open={Boolean(editingReminder)}
+        reminder={editingReminder}
+        onClose={() => setEditingReminder(null)}
+        onSaved={() => { setEditingReminder(null); load(); onReminderSaved?.(); }}
+      />
     </div>
   );
 }
