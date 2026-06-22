@@ -3,11 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { billingBlockedResponse } from "@/lib/billing-gate";
 import { Prisma } from "@prisma/client";
+import { isTradeCategory } from "@/lib/tradeCategories";
 
 export const dynamic = "force-dynamic";
 
 type Body = {
   meta?: Record<string, unknown>;
+  title?: string | null;
+  website?: string | null;
+  tradeCategory?: string | null;
 };
 
 export async function PATCH(
@@ -43,9 +47,18 @@ export async function PATCH(
     Object.assign(mergedMeta, body.meta);
   }
 
+  const data: Prisma.ContactUpdateInput = {
+    meta: mergedMeta as Prisma.InputJsonValue,
+  };
+  if (body.title !== undefined) data.title = body.title?.trim() || null;
+  if (body.website !== undefined) data.website = body.website?.trim() || null;
+  if (body.tradeCategory !== undefined) {
+    data.tradeCategory = isTradeCategory(body.tradeCategory) ? body.tradeCategory : null;
+  }
+
   const updated = await prisma.contact.update({
     where: { id: contact.id },
-    data: { meta: mergedMeta as Prisma.InputJsonValue },
+    data,
   });
 
   await prisma.activityLogEntry.create({

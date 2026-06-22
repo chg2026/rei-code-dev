@@ -14,10 +14,11 @@ import { UnsubscribedTable, type UnsubscribedRow } from "./UnsubscribedTable";
 import { AddTenantModal } from "./AddTenantModal";
 import { AddContactModal } from "./AddContactModal";
 import { EditLeaseModal } from "./EditLeaseModal";
+import { TRADE_CATEGORY_OPTIONS, TRADE_CATEGORY_LABEL } from "@/lib/tradeCategories";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "contractors" | "vendors" | "inspectors" | "tenants" | "unsubscribed";
+type Tab = "contractors" | "vendors" | "inspectors" | "tenants" | "other" | "unsubscribed";
 type SP = { tab?: Tab; id?: string; q?: string; trade?: string; category?: string; status?: string };
 
 type ContactMeta = {
@@ -58,7 +59,12 @@ type LeaseMeta = {
   leaseDocFileKey?: string;
 };
 
-const TAB_TYPES: Record<Exclude<Tab, "unsubscribed">, ContactType[]> = {
+// Types that have a dedicated tab with a specialized detail panel. Everything
+// else (Other, Investor, Lender, Agent, Attorney, Partner, Employee, plus any
+// future type) is surfaced in the catch-all "Other" tab so it stays openable.
+const SPECIALIZED_TYPES: ContactType[] = ["Contractor", "Subcontractor", "Vendor", "Inspector", "Tenant"];
+
+const TAB_TYPES: Record<Exclude<Tab, "unsubscribed" | "other">, ContactType[]> = {
   contractors: ["Contractor", "Subcontractor"],
   vendors:     ["Vendor"],
   inspectors:  ["Inspector"],
@@ -94,6 +100,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
     vendors:     allContacts.filter((c) => TAB_TYPES.vendors.includes(c.type)).length,
     inspectors:  allContacts.filter((c) => TAB_TYPES.inspectors.includes(c.type)).length,
     tenants:     allContacts.filter((c) => TAB_TYPES.tenants.includes(c.type)).length,
+    other:       allContacts.filter((c) => !SPECIALIZED_TYPES.includes(c.type)).length,
   };
 
   // Compliance count for top-bar chip
@@ -105,9 +112,12 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
 
   const isAdmin = user.role === "Admin";
   const unsubscribedContacts = allContacts.filter((c) => c.emailOptOut);
-  const tabContacts = tab === "unsubscribed"
-    ? (isAdmin ? unsubscribedContacts : [])
-    : allContacts.filter((c) => TAB_TYPES[tab].includes(c.type));
+  const tabContacts =
+    tab === "unsubscribed"
+      ? (isAdmin ? unsubscribedContacts : [])
+      : tab === "other"
+      ? allContacts.filter((c) => !SPECIALIZED_TYPES.includes(c.type))
+      : allContacts.filter((c) => TAB_TYPES[tab].includes(c.type));
 
   // Apply text search across name/company/email/phone/trade
   const q = (sp.q ?? "").trim().toLowerCase();
@@ -117,11 +127,12 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   const filteredContacts = tabContacts.filter((c) => {
     const m = (c.meta || {}) as ContactMeta;
     if (q) {
-      const hay = [c.name, c.company, c.email, c.phone, c.trade, m.category]
+      const tradeCatLabel = c.tradeCategory ? TRADE_CATEGORY_LABEL[c.tradeCategory] : null;
+      const hay = [c.name, c.company, c.email, c.phone, c.trade, tradeCatLabel, c.title, m.category]
         .filter(Boolean).join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (trade && c.trade !== trade) return false;
+    if (trade && c.tradeCategory !== trade) return false;
     if (category && (m.category ?? "") !== category) return false;
     if (status && (m.status ?? "") !== status) return false;
     return true;
@@ -150,6 +161,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
               tab === "vendors"    ? "Vendor"    :
               tab === "inspectors" ? "Inspector" :
               tab === "tenants"    ? "Tenant"    :
+              tab === "other"      ? "Other"     :
               tab === "unsubscribed" ? "Other"   :
               "Contractor"
             } />
@@ -167,6 +179,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
             ["vendors",     "Vendors & Suppliers", counts.vendors],
             ["inspectors",  "Inspectors", counts.inspectors],
             ["tenants",     "Tenants", counts.tenants],
+            ["other",       "Other", counts.other],
             ...(isAdmin
               ? ([["unsubscribed", "Unsubscribed", unsubscribedContacts.length]] as [Tab, string, number][])
               : []),
@@ -199,6 +212,8 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
             isAdmin={isAdmin}
             canEdit={isAdmin || user.role === "ProjectManager"}
           />
+        ) : tab === "other" ? (
+          <OtherContactsTab contacts={filteredContacts} />
         ) : isAdmin ? (
           <UnsubscribedTab contacts={filteredContacts} />
         ) : (
@@ -232,7 +247,7 @@ async function ContractorsTab({
         showTrade
         showStatus
         placeholder="Search contractors…"
-        trades={["General Contractor", "Electrical", "Plumbing", "HVAC", "Flooring"]}
+        trades={TRADE_CATEGORY_OPTIONS}
       />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
@@ -289,7 +304,7 @@ async function ContractorsTab({
                       {c.company ? `${c.company} · ` : ""}{c.phone ?? c.email ?? ""}
                     </div>
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{c.trade ?? "—"}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{c.tradeCategory ? TRADE_CATEGORY_LABEL[c.tradeCategory] : (c.trade ?? "—")}</div>
                   <div style={{ display: "flex", gap: 3 }}>
                     <ComplianceChip label="COI" state={comp.insurance} />
                     <ComplianceChip label="W-9" state={{ ...comp.w9, expired: false, expiringSoon: false }} />
@@ -1267,6 +1282,65 @@ function TenantDetail({
         </DetailSection>
       )}
     </>
+  );
+}
+
+// ── Other tab (Investor, Lender, Agent, Attorney, Partner, Employee, ──
+//    Other — every type without a specialized tab). Rows link to the
+//    generic /contacts/[id] profile page, which renders all contact types.
+function OtherContactsTab({
+  contacts,
+}: { contacts: Awaited<ReturnType<typeof prisma.contact.findMany>> }) {
+  const sorted = [...contacts].sort((a, b) => a.name.localeCompare(b.name));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+      <FilterBar tab="other" placeholder="Search contacts…" />
+      <div style={{
+        display: "grid", gridTemplateColumns: "minmax(0,1fr) 130px 150px",
+        padding: "5px 12px", background: "var(--bg-secondary)",
+        borderBottom: "0.5px solid var(--border-lo)", flexShrink: 0,
+      }}>
+        <span className="col-lbl">Name / company</span>
+        <span className="col-lbl">Type</span>
+        <span className="col-lbl">Trade / category</span>
+      </div>
+      <div style={{ overflowY: "auto", flex: 1 }}>
+        {sorted.length === 0 && (
+          <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 11, textAlign: "center" }}>
+            No contacts here yet.
+          </div>
+        )}
+        {sorted.map((c) => (
+          <Link
+            key={c.id}
+            href={`/contacts/${c.id}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0,1fr) 130px 150px",
+              padding: "9px 12px",
+              borderBottom: "0.5px solid var(--border-lo)",
+              alignItems: "center",
+              textDecoration: "none",
+              color: "inherit",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {c.name}
+                {c.title ? <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}> · {c.title}</span> : null}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                {c.company ? `${c.company} · ` : ""}{c.phone ?? c.email ?? ""}
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{c.type}</div>
+            <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>
+              {c.tradeCategory ? TRADE_CATEGORY_LABEL[c.tradeCategory] : (c.trade ?? "—")}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 

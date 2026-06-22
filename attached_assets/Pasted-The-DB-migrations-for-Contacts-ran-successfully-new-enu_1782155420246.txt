@@ -1,0 +1,40 @@
+The DB migrations for Contacts ran successfully (new enum values and columns exist in the schema), but the frontend was never updated. Fix the frontend now:
+
+---
+
+**1. FIX: Can't open the 36 existing contacts**
+In `apps/chg-rehab/app/contacts/[id]/page.tsx` — find why clicking a contact doesn't open the detail page. Check if there's a type guard, redirect, or switch/if statement that only handles specific ContactType values and falls through for others. Fix it to handle ALL contact types: Contractor, Subcontractor, Vendor, Inspector, Tenant, Investor, Lender, Agent, Attorney, Partner, Employee, Other.
+
+---
+
+**2. FIX: Trade/specialty → replace free-text with dropdown**
+In `apps/chg-rehab/app/contacts/AddContactModal.tsx` (or wherever the add/edit contact form lives):
+
+Replace the free-text "Trade / specialty" input with a `<select>` dropdown bound to the new `tradeCategory` field. The options should be:
+General Contractor | Plumbing | Electrical | Roofing | HVAC | Framing | Drywall | Flooring | Painting | Concrete | Masonry | Landscaping | Demolition | Waterproofing | Insulation | Windows & Doors | Cabinetry | Tile | Foundation | Excavation | Fencing | Cleaning | Inspector | Title Company | Lender | Real Estate Agent | Attorney | Property Management | Other
+
+Map each label to its TradeCategory enum value (e.g. "General Contractor" → "GeneralContractor").
+
+When submitting the form, send `tradeCategory` (not `trade`) in the request body. Update the API route `apps/chg-rehab/app/api/contacts/route.ts` to read `tradeCategory` from the request body and save it to the Contact record.
+
+---
+
+**3. FIX: Contact type dropdown missing new types**
+In the AddContactModal, the Contact type dropdown should include all types:
+Contractor, Subcontractor, Vendor, Inspector, Tenant, Investor, Lender, Agent, Attorney, Partner, Employee, Other
+
+Add the missing ones: Investor, Lender, Agent, Attorney, Partner, Employee.
+
+---
+
+**4. FIX: "All trades" filter dropdown on the Contractors tab**
+In `apps/chg-rehab/app/contacts/page.tsx`, the "All trades" dropdown filter is broken because it was filtering on the old free-text `trade` field. Update it to filter on the new `tradeCategory` enum field. Populate the dropdown options from the same TradeCategory enum values listed above.
+
+---
+
+**5. ADD website and title fields to the Add Contact form**
+In AddContactModal, add two new optional fields:
+- "Job title / Role" → text input → saves to `title` field
+- "Website" → text input → saves to `website` field
+
+Add these to the PATCH handler in `apps/chg-rehab/app/api/contacts/[id]/route.ts` as well so they can be edited later.

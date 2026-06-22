@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { formatET } from "@/lib/datetime";
+import { TRADE_CATEGORY_LABEL } from "@/lib/tradeCategories";
 import {
   AddComplianceDocButton,
   RenewComplianceDocButton,
@@ -77,9 +78,28 @@ export default async function ContactProfilePage({
         <div className="body-main">
           <div className="sec-hd">Contact info</div>
           <div style={{ padding: 14, fontSize: 11, lineHeight: 1.7 }}>
-            {contact.trade && <div><strong>Trade:</strong> {contact.trade}</div>}
+            {contact.title && <div><strong>Title / role:</strong> {contact.title}</div>}
+            {(contact.tradeCategory || contact.trade) && (
+              <div>
+                <strong>Trade:</strong>{" "}
+                {contact.tradeCategory ? TRADE_CATEGORY_LABEL[contact.tradeCategory] : contact.trade}
+              </div>
+            )}
             {contact.email && <div><strong>Email:</strong> {contact.email}</div>}
             {contact.phone && <div><strong>Phone:</strong> {contact.phone}</div>}
+            {contact.website && (
+              <div>
+                <strong>Website:</strong>{" "}
+                <a
+                  href={contact.website.startsWith("http") ? contact.website : `https://${contact.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--blue-txt, #1d4ed8)" }}
+                >
+                  {contact.website}
+                </a>
+              </div>
+            )}
             {contact.address && <div><strong>Address:</strong> {contact.address}</div>}
             {contact.rating !== null && contact.rating !== undefined && (
               <div><strong>Rating:</strong> {"★".repeat(contact.rating)}{"☆".repeat(5 - contact.rating)}</div>

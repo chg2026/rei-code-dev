@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { billingBlockedResponse } from "@/lib/billing-gate";
 import { ContactType, Prisma } from "@prisma/client";
+import { isTradeCategory } from "@/lib/tradeCategories";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,9 @@ type Body = {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  title?: string | null;
+  website?: string | null;
+  tradeCategory?: string | null;
   notes?: string | null;
   meta?: Record<string, unknown> | null;
   lease?: LeasePayload | null;
@@ -49,12 +53,13 @@ function parseDecimal(
 }
 
 /**
- * Create a new Contact. Currently only supports `type: "Tenant"` from the
- * Tenants tab — this is the only contact type that has a UI "Add" affordance
- * today. Other types are still managed via the seed script / direct DB. When
- * creating a tenant the caller may also create or link a Lease in the same
- * request via the `lease` field. The Lease's `meta.contactId` is set to the
- * new contact's id so the Tenants list can resolve the tenant ↔ lease link.
+ * Create a new Contact of any allowed `type` (Tenant, Contractor,
+ * Subcontractor, Vendor, Inspector, Investor, Lender, Agent, Attorney,
+ * Partner, Employee, Other) from the AddContactModal. Non-tenant types are
+ * created and returned immediately. When `type: "Tenant"`, the caller may also
+ * create or link a Lease in the same request via the `lease` field; the
+ * Lease's `meta.contactId` is set to the new contact's id so the Tenants list
+ * can resolve the tenant ↔ lease link.
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -77,6 +82,12 @@ export async function POST(req: NextRequest) {
     ContactType.Subcontractor,
     ContactType.Vendor,
     ContactType.Inspector,
+    ContactType.Investor,
+    ContactType.Lender,
+    ContactType.Agent,
+    ContactType.Attorney,
+    ContactType.Partner,
+    ContactType.Employee,
     ContactType.Other,
   ];
 
@@ -101,6 +112,7 @@ export async function POST(req: NextRequest) {
     const companyVal = (typeof rawMeta.company === "string" ? rawMeta.company.trim() : null) || null;
     const { trade: _t, company: _c, ...restMeta } = rawMeta;
     const contactMeta = Object.keys(restMeta).length > 0 ? restMeta : undefined;
+    const tradeCategoryVal = isTradeCategory(body.tradeCategory) ? body.tradeCategory : null;
 
     const contact = await prisma.$transaction(async (tx) => {
       const c = await tx.contact.create({
@@ -110,6 +122,9 @@ export async function POST(req: NextRequest) {
           name,
           company: companyVal,
           trade: tradeVal,
+          tradeCategory: tradeCategoryVal,
+          title: body.title?.trim() || null,
+          website: body.website?.trim() || null,
           email: body.email?.trim() || null,
           phone: body.phone?.trim() || null,
           address: body.address?.trim() || null,
@@ -171,6 +186,9 @@ export async function POST(req: NextRequest) {
         companyId: user.companyId,
         type: ContactType.Tenant,
         name,
+        title: body.title?.trim() || null,
+        website: body.website?.trim() || null,
+        tradeCategory: isTradeCategory(body.tradeCategory) ? body.tradeCategory : null,
         email: body.email?.trim() || null,
         phone: body.phone?.trim() || null,
         address: body.address?.trim() || null,

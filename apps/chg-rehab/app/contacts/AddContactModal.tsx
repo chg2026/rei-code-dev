@@ -3,28 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { billingAwareErrorMessage } from "@/lib/billing-blocked-client";
-
-type ContactType = "Contractor" | "Vendor" | "Inspector" | "Tenant" | "Other";
+import type { ContactType, TradeCategory } from "@prisma/client";
+import { TRADE_CATEGORY_OPTIONS } from "@/lib/tradeCategories";
 
 const TYPE_OPTIONS: { value: ContactType; label: string }[] = [
-  { value: "Contractor",  label: "Contractor" },
-  { value: "Vendor",      label: "Vendor & Supplier" },
-  { value: "Inspector",   label: "Inspector" },
-  { value: "Tenant",      label: "Tenant" },
-  { value: "Other",       label: "Other" },
+  { value: "Contractor",    label: "Contractor" },
+  { value: "Subcontractor", label: "Subcontractor" },
+  { value: "Vendor",        label: "Vendor & Supplier" },
+  { value: "Inspector",     label: "Inspector" },
+  { value: "Tenant",        label: "Tenant" },
+  { value: "Investor",      label: "Investor" },
+  { value: "Lender",        label: "Lender" },
+  { value: "Agent",         label: "Agent" },
+  { value: "Attorney",      label: "Attorney" },
+  { value: "Partner",       label: "Partner" },
+  { value: "Employee",      label: "Employee" },
+  { value: "Other",         label: "Other" },
 ];
-
-const EXTRA_LABEL: Partial<Record<ContactType, string>> = {
-  Contractor: "Trade / specialty",
-  Vendor:     "Category",
-  Inspector:  "Discipline",
-};
-
-const EXTRA_PLACEHOLDER: Partial<Record<ContactType, string>> = {
-  Contractor: "e.g. Electrical, Plumbing, HVAC…",
-  Vendor:     "e.g. Lumber, Hardware, Paint…",
-  Inspector:  "e.g. Structural, Electrical, Plumbing…",
-};
 
 export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: ContactType }) {
   const [open, setOpen]           = useState(false);
@@ -37,13 +32,16 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
   const [company, setCompany] = useState("");
   const [email,   setEmail]   = useState("");
   const [phone,   setPhone]   = useState("");
-  const [trade,   setTrade]   = useState("");
+  const [title,   setTitle]   = useState("");
+  const [website, setWebsite] = useState("");
+  const [tradeCategory, setTradeCategory] = useState<TradeCategory | "">("");
   const [notes,   setNotes]   = useState("");
 
   function reset() {
     setContactType(defaultType);
     setName(""); setCompany(""); setEmail("");
-    setPhone(""); setTrade(""); setNotes(""); setErr(null);
+    setPhone(""); setTitle(""); setWebsite("");
+    setTradeCategory(""); setNotes(""); setErr(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -59,10 +57,12 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
           name: name.trim(),
           email: email.trim() || null,
           phone: phone.trim() || null,
+          title: title.trim() || null,
+          website: website.trim() || null,
+          tradeCategory: tradeCategory || null,
           notes: notes.trim() || null,
           meta: {
             ...(company.trim() ? { company: company.trim() } : {}),
-            ...(trade.trim()   ? { trade:   trade.trim()   } : {}),
           },
         }),
       });
@@ -80,9 +80,6 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
       setBusy(false);
     }
   }
-
-  const extraLabel       = EXTRA_LABEL[contactType];
-  const extraPlaceholder = EXTRA_PLACEHOLDER[contactType];
 
   return (
     <>
@@ -128,7 +125,7 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
                 <select
                   className="form-input"
                   value={contactType}
-                  onChange={(e) => { setContactType(e.target.value as ContactType); setTrade(""); }}
+                  onChange={(e) => setContactType(e.target.value as ContactType)}
                   style={{ width: "100%", boxSizing: "border-box" }}
                 >
                   {TYPE_OPTIONS.map((o) => (
@@ -187,20 +184,45 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
                 </div>
               </div>
 
-              {extraLabel && (
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                  Trade / category
+                </label>
+                <select
+                  className="form-input"
+                  value={tradeCategory}
+                  onChange={(e) => setTradeCategory(e.target.value as TradeCategory | "")}
+                  style={{ width: "100%", boxSizing: "border-box" }}
+                >
+                  <option value="">— Select —</option>
+                  {TRADE_CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>
-                    {extraLabel}
-                  </label>
+                  <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Job title / Role</label>
                   <input
                     className="form-input"
-                    value={trade}
-                    onChange={(e) => setTrade(e.target.value)}
-                    placeholder={extraPlaceholder}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Owner, Project Manager"
                     style={{ width: "100%", boxSizing: "border-box" }}
                   />
                 </div>
-              )}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Website</label>
+                  <input
+                    className="form-input"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://example.com"
+                    style={{ width: "100%", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
 
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Notes</label>

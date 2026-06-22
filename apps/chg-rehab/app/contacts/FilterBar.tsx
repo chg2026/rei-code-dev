@@ -5,7 +5,7 @@ import { useState, useEffect, useTransition } from "react";
 
 type Props = {
   tab: string;
-  trades?: string[];
+  trades?: { value: string; label: string }[];
   categories?: string[];
   showTrade?: boolean;
   showCategory?: boolean;
@@ -68,7 +68,7 @@ export function FilterBar({ tab, trades = [], categories = [], showTrade, showCa
           }}
         >
           <option value="">All trades</option>
-          {trades.map((t) => <option key={t} value={t}>{t}</option>)}
+          {trades.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       )}
       {showCategory && (
