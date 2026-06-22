@@ -2,17 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { billingBlockedResponse } from "@/lib/billing-gate";
-import { Prisma } from "@prisma/client";
+import { Prisma, ContactType } from "@prisma/client";
 import { isTradeCategory } from "@/lib/tradeCategories";
 
 export const dynamic = "force-dynamic";
 
 type Body = {
   meta?: Record<string, unknown>;
+  type?: string | null;
+  name?: string | null;
+  company?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  rating?: number | null;
   title?: string | null;
   website?: string | null;
   tradeCategory?: string | null;
 };
+
+const CONTACT_TYPES = new Set<string>(Object.values(ContactType));
 
 export async function PATCH(
   req: NextRequest,
@@ -50,6 +60,32 @@ export async function PATCH(
   const data: Prisma.ContactUpdateInput = {
     meta: mergedMeta as Prisma.InputJsonValue,
   };
+  if (body.name !== undefined) {
+    const trimmed = body.name?.trim();
+    if (!trimmed) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    data.name = trimmed;
+  }
+  if (body.type !== undefined && body.type !== null) {
+    if (!CONTACT_TYPES.has(body.type)) {
+      return NextResponse.json({ error: "Invalid contact type" }, { status: 400 });
+    }
+    data.type = body.type as ContactType;
+  }
+  if (body.company !== undefined) data.company = body.company?.trim() || null;
+  if (body.email !== undefined) data.email = body.email?.trim() || null;
+  if (body.phone !== undefined) data.phone = body.phone?.trim() || null;
+  if (body.address !== undefined) data.address = body.address?.trim() || null;
+  if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
+  if (body.rating !== undefined) {
+    if (body.rating === null) {
+      data.rating = null;
+    } else {
+      const r = Math.round(Number(body.rating));
+      data.rating = Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : null;
+    }
+  }
   if (body.title !== undefined) data.title = body.title?.trim() || null;
   if (body.website !== undefined) data.website = body.website?.trim() || null;
   if (body.tradeCategory !== undefined) {

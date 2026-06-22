@@ -29,10 +29,17 @@ type Body = {
   title?: string | null;
   website?: string | null;
   tradeCategory?: string | null;
+  rating?: number | null;
   notes?: string | null;
   meta?: Record<string, unknown> | null;
   lease?: LeasePayload | null;
 };
+
+function clampRating(v: number | null | undefined): number | null {
+  if (v == null) return null;
+  const r = Math.round(Number(v));
+  return Number.isFinite(r) ? Math.min(5, Math.max(1, r)) : null;
+}
 
 function parseDate(v: string | null | undefined): Date | null {
   if (!v) return null;
@@ -129,6 +136,7 @@ export async function POST(req: NextRequest) {
           phone: body.phone?.trim() || null,
           address: body.address?.trim() || null,
           notes: body.notes?.trim() || null,
+          rating: clampRating(body.rating),
           meta: contactMeta as Prisma.InputJsonValue | undefined,
         },
       });

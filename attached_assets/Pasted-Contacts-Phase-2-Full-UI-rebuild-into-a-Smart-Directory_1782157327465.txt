@@ -1,0 +1,111 @@
+Contacts Phase 2 — Full UI rebuild into a Smart Directory. Replace the current contacts page UI entirely while keeping all existing data and API routes intact.
+
+---
+
+**OVERALL LAYOUT**
+[Search bar — full width, AI-powered]          [+ Add contact]  [⊞ Grid  ☰ List  ▦ Table]
+
+[All] [Contractors] [Vendors] [Investors] [Lenders] [Agents] [Partners] [Employees] [Other]
+
+[All trades ▾]  [All statuses ▾]  [Sort by ▾]
+
+─────────────────────────────────────────────────────────────────────────────────
+
+[Contact cards / rows / table — depending on active view]
+
+[Side panel — slides in on click]
+
+---
+
+**1. VIEW TOGGLE — List / Table / Grid**
+
+Three views switchable by icons in the top right. Default: List.
+
+**List view** — each contact is a row:
+`[Avatar] [Name + title/role] [Company] [Trade badge] [Phone] [Email] [Type badge] [⋯ menu]`
+Clicking anywhere on the row opens the side panel.
+
+**Table view** — spreadsheet style with sortable columns:
+Name | Company | Type | Trade | Phone | Email | Location | Rating | Actions
+Each column header is clickable to sort A→Z / Z→A.
+
+**Grid view** — cards in a 3-4 column grid:
+Each card shows: avatar (initials if no photo), name, company, trade badge, phone, email, star rating (1-5), type badge.
+Clicking a card opens the side panel.
+
+---
+
+**2. FILTER TABS**
+Replace current tabs (Contractors/Vendors/Inspectors/Tenants/Unsubscribed) with:
+All | Contractors | Vendors | Investors | Lenders | Agents | Partners | Employees | Other
+
+"All" shows everyone. Each tab filters by ContactType. Show count badge on each tab.
+Keep the "Unsubscribed" section accessible but move it to a small link "View unsubscribed (n)" below the tabs, not a primary tab.
+
+---
+
+**3. SMART SEARCH BAR**
+Full-width search bar at the top with placeholder: "Search by name, company, trade, location..."
+
+Behavior:
+- As the user types, filter contacts client-side across: name, company, trade, email, phone, address fields
+- Support natural language shortcuts:
+  - If input contains "plumber" or "plumbing" → auto-apply trade filter = Plumbing
+  - If input contains "investor" → auto-apply type filter = Investor  
+  - If input contains "electrician" or "electrical" → trade = Electrical
+  - Do this for all TradeCategory values — map common words to enum values
+  - If input contains a city name → filter by address containing that city
+- Show result count: "Showing 12 of 36 contacts"
+- "Clear filters" button appears when any filter is active
+
+---
+
+**4. CONTACT SIDE PANEL**
+When a contact is clicked (row, card, or table row), a panel slides in from the right (400px wide). The main list stays visible on the left. Do NOT navigate to a new page.
+
+Side panel sections:
+
+**Header:**
+- Large avatar/initials circle
+- Name (bold, large)
+- Title/role (gray, smaller)
+- Company name
+- Type badge + Trade badge
+- Action buttons: [✉ Email] [📞 Call] [⋯ More]
+
+**Details section:**
+- Phone
+- Email  
+- Website (clickable link)
+- Address/Location
+- Rating (star display, 1-5)
+- Notes
+
+**Tags/Meta section:**
+- Any tags stored in meta
+
+**Activity section** (placeholder for now):
+- "No activity yet" — we'll build this later
+
+**Edit button** at top right of panel → opens the existing AddContactModal pre-filled with this contact's data for editing.
+
+Close panel: click X or click outside or press Escape.
+
+---
+
+**5. STYLING**
+Match existing CHG design system exactly:
+- Cream/warm background (#FAF9F7 or whatever the app uses)
+- Same font, same border-radius, same button styles
+- Trade badges: small pill with muted color (different color per trade category group — e.g. electrical=yellow, plumbing=blue, roofing=gray)
+- Type badges: small pill (Contractor=orange, Investor=green, Lender=purple, Agent=teal, etc.)
+- Side panel has a subtle shadow and slides in with a smooth transition (200ms ease)
+
+---
+
+**6. PRESERVE EXISTING FUNCTIONALITY**
+- Compliance docs (ComplianceDocManager) must still work — add a "Compliance" tab inside the side panel for Contractor/Subcontractor types
+- Email opt-out toggle must still work — add it inside the side panel
+- Bulk select (checkboxes) → bulk email opt-out still works
+- "+ Add contact" button and modal → unchanged
+- All existing API routes unchanged — this is frontend only

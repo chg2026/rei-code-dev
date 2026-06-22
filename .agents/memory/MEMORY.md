@@ -7,3 +7,4 @@
 - [Approval-folds-into-total fields lock](change-order-budget-locking.md) — when a one-time approval folds an amount into a derived total (Phase.budget), lock the source financial fields after; editing them later drifts the total.
 - [Attachment objectPath IDOR](objectpath-attachment-idor.md) — attachment-register routes must validate the minted `uploads/<uuid>` objectPath shape before storing/signing, or callers can sign others' objects.
 - [Invite acceptance flow](invite-acceptance-flow.md) — /api/invites/use must create the Prisma User inline (login's create-new path needs a user_profiles row; refreshFromSupabase doesn't); tenancy guard must precede any auth password mutation.
+- [CHG Rehab dev port](chg-rehab-dev-port.md) — dev workflow overrides PORT=5000; screenshot/curl CHG Rehab on 5000, not 3000 (3000's `Server` workflow needs a prior build).

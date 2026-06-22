@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { billingAwareErrorMessage } from "@/lib/billing-blocked-client";
 import type { ContactType, TradeCategory } from "@prisma/client";
@@ -21,27 +21,86 @@ const TYPE_OPTIONS: { value: ContactType; label: string }[] = [
   { value: "Other",         label: "Other" },
 ];
 
-export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: ContactType }) {
-  const [open, setOpen]           = useState(false);
-  const [busy, setBusy]           = useState(false);
-  const [err, setErr]             = useState<string | null>(null);
-  const [contactType, setContactType] = useState<ContactType>(defaultType);
+/** Subset of contact fields the edit form needs to pre-fill. */
+export type EditableContact = {
+  id: string;
+  type: ContactType;
+  name: string;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  title: string | null;
+  website: string | null;
+  tradeCategory: TradeCategory | null;
+  rating: number | null;
+  notes: string | null;
+};
+
+type Props = {
+  defaultType?: ContactType;
+  /** When provided, the modal runs in edit mode and PATCHes this contact. */
+  contact?: EditableContact | null;
+  /**
+   * Controlled mode: when `open` is provided the component renders no trigger
+   * button and the parent owns visibility via `open` / `onClose`. Used by the
+   * side panel's Edit button. When omitted the component renders its own
+   * "+ Add contact" trigger (uncontrolled add flow).
+   */
+  open?: boolean;
+  onClose?: () => void;
+};
+
+export function AddContactModal({ defaultType = "Contractor", contact = null, open, onClose }: Props) {
+  const isControlled = open !== undefined;
+  const isEdit = !!contact;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const visible = isControlled ? !!open : internalOpen;
+
+  const [busy, setBusy]               = useState(false);
+  const [err, setErr]                 = useState<string | null>(null);
+  const [contactType, setContactType] = useState<ContactType>(contact?.type ?? defaultType);
   const router = useRouter();
 
-  const [name,    setName]    = useState("");
-  const [company, setCompany] = useState("");
-  const [email,   setEmail]   = useState("");
-  const [phone,   setPhone]   = useState("");
-  const [title,   setTitle]   = useState("");
-  const [website, setWebsite] = useState("");
-  const [tradeCategory, setTradeCategory] = useState<TradeCategory | "">("");
-  const [notes,   setNotes]   = useState("");
+  const [name,    setName]    = useState(contact?.name ?? "");
+  const [company, setCompany] = useState(contact?.company ?? "");
+  const [email,   setEmail]   = useState(contact?.email ?? "");
+  const [phone,   setPhone]   = useState(contact?.phone ?? "");
+  const [address, setAddress] = useState(contact?.address ?? "");
+  const [title,   setTitle]   = useState(contact?.title ?? "");
+  const [website, setWebsite] = useState(contact?.website ?? "");
+  const [tradeCategory, setTradeCategory] = useState<TradeCategory | "">(contact?.tradeCategory ?? "");
+  const [rating,  setRating]  = useState<number>(contact?.rating ?? 0);
+  const [notes,   setNotes]   = useState(contact?.notes ?? "");
 
-  function reset() {
-    setContactType(defaultType);
-    setName(""); setCompany(""); setEmail("");
-    setPhone(""); setTitle(""); setWebsite("");
-    setTradeCategory(""); setNotes(""); setErr(null);
+  function fillFrom(c: EditableContact | null) {
+    setContactType(c?.type ?? defaultType);
+    setName(c?.name ?? "");
+    setCompany(c?.company ?? "");
+    setEmail(c?.email ?? "");
+    setPhone(c?.phone ?? "");
+    setAddress(c?.address ?? "");
+    setTitle(c?.title ?? "");
+    setWebsite(c?.website ?? "");
+    setTradeCategory(c?.tradeCategory ?? "");
+    setRating(c?.rating ?? 0);
+    setNotes(c?.notes ?? "");
+    setErr(null);
+  }
+
+  // Re-sync the form whenever a controlled modal opens with a (new) contact.
+  useEffect(() => {
+    if (visible) fillFrom(contact);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, contact?.id]);
+
+  function close() {
+    if (isControlled) {
+      onClose?.();
+    } else {
+      setInternalOpen(false);
+      fillFrom(null);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -49,30 +108,46 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
     if (!name.trim()) { setErr("Name is required."); return; }
     setBusy(true); setErr(null);
     try {
-      const res = await fetch("/api/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: contactType,
-          name: name.trim(),
-          email: email.trim() || null,
-          phone: phone.trim() || null,
-          title: title.trim() || null,
-          website: website.trim() || null,
-          tradeCategory: tradeCategory || null,
-          notes: notes.trim() || null,
-          meta: {
-            ...(company.trim() ? { company: company.trim() } : {}),
-          },
-        }),
-      });
+      const payload = {
+        type: contactType,
+        name: name.trim(),
+        company: company.trim() || null,
+        email: email.trim() || null,
+        phone: phone.trim() || null,
+        address: address.trim() || null,
+        title: title.trim() || null,
+        website: website.trim() || null,
+        tradeCategory: tradeCategory || null,
+        rating: rating > 0 ? rating : null,
+        notes: notes.trim() || null,
+      };
+      const res = isEdit
+        ? await fetch(`/api/contacts/${contact!.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/contacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              // The create route maps meta.company → the top-level column.
+              meta: { ...(company.trim() ? { company: company.trim() } : {}) },
+            }),
+          });
       const data = await res.json();
       if (!res.ok) {
-        setErr(billingAwareErrorMessage(res.status, data, data.error ?? "Failed to create contact."));
+        setErr(
+          billingAwareErrorMessage(
+            res.status,
+            data,
+            data.error ?? (isEdit ? "Failed to save changes." : "Failed to create contact.")
+          )
+        );
         return;
       }
-      setOpen(false);
-      reset();
+      close();
       router.refresh();
     } catch {
       setErr("Network error — please try again.");
@@ -83,25 +158,28 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
 
   return (
     <>
-      <button
-        className="btn-sm"
-        onClick={() => { reset(); setOpen(true); }}
-        style={{ whiteSpace: "nowrap" }}
-      >
-        + Add contact
-      </button>
+      {!isControlled && (
+        <button
+          className="btn-sm"
+          onClick={() => { fillFrom(null); setInternalOpen(true); }}
+          style={{ whiteSpace: "nowrap" }}
+        >
+          + Add contact
+        </button>
+      )}
 
-      {open && (
+      {visible && (
         <div
           style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 1100,
           }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setOpen(false); reset(); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) close(); }}
         >
           <div style={{
-            background: "#fff", borderRadius: 8, width: 420, maxWidth: "95vw",
+            background: "#fff", borderRadius: 8, width: 440, maxWidth: "95vw",
+            maxHeight: "92vh", overflow: "auto",
             boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
           }}>
             <div style={{
@@ -109,9 +187,9 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
               borderBottom: "0.5px solid var(--border-lo)",
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>Add contact</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{isEdit ? "Edit contact" : "Add contact"}</div>
               <button
-                onClick={() => { setOpen(false); reset(); }}
+                onClick={close}
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--text-tertiary)" }}
               >✕</button>
             </div>
@@ -185,6 +263,17 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
               </div>
 
               <div>
+                <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Address / Location</label>
+                <input
+                  className="form-input"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Street, city, state"
+                  style={{ width: "100%", boxSizing: "border-box" }}
+                />
+              </div>
+
+              <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>
                   Trade / category
                 </label>
@@ -225,6 +314,36 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
               </div>
 
               <div>
+                <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Rating</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRating(rating === n ? 0 : n)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        fontSize: 18, lineHeight: 1, padding: 0,
+                        color: n <= rating ? "#D9A406" : "var(--border-mid)",
+                      }}
+                      aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                    >
+                      {n <= rating ? "★" : "☆"}
+                    </button>
+                  ))}
+                  {rating > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setRating(0)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "var(--text-tertiary)", marginLeft: 4 }}
+                    >
+                      clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 4 }}>Notes</label>
                 <textarea
                   className="form-input"
@@ -246,7 +365,7 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
                 <button
                   type="button"
                   className="btn-sm"
-                  onClick={() => { setOpen(false); reset(); }}
+                  onClick={close}
                   disabled={busy}
                 >
                   Cancel
@@ -257,7 +376,7 @@ export function AddContactModal({ defaultType = "Contractor" }: { defaultType?: 
                   disabled={busy || !name.trim()}
                   style={{ minWidth: 100 }}
                 >
-                  {busy ? "Saving…" : "Add contact"}
+                  {busy ? "Saving…" : isEdit ? "Save changes" : "Add contact"}
                 </button>
               </div>
             </form>
