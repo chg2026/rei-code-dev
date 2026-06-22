@@ -1274,7 +1274,7 @@ function TenantDetail({
 function UnsubscribedTab({
   contacts,
 }: { contacts: Awaited<ReturnType<typeof prisma.contact.findMany>> }) {
-  const typeLabel: Record<ContactType, string> = {
+  const typeLabel: Partial<Record<ContactType, string>> = {
     Contractor:    "Contractor",
     Subcontractor: "Subcontractor",
     Vendor:        "Vendor",
@@ -1302,7 +1302,7 @@ function UnsubscribedTab({
       id: c.id,
       name: c.name,
       company: c.company,
-      typeLabel: typeLabel[c.type],
+      typeLabel: typeLabel[c.type] ?? c.type,
       email: c.email,
       emailOptOutAtLabel: c.emailOptOutAt ? formatET(c.emailOptOutAt, false) : "—",
       href,

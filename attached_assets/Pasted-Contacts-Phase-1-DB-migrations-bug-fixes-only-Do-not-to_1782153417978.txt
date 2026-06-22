@@ -1,0 +1,57 @@
+Contacts Phase 1 — DB migrations + bug fixes only. Do not touch the UI yet.
+
+---
+
+**1. FIX "Other" TYPE CONTACT CAN'T BE OPENED**
+In `apps/chg-rehab/app/contacts/[id]/page.tsx`, find why contacts with type "Other" can't be opened. Likely a type guard or switch statement that doesn't include the "Other" case. Fix it so all contact types can be viewed on the detail page.
+
+---
+
+**2. EXPAND ContactType ENUM**
+Add these new values to the ContactType enum in the Prisma schema:
+Investor, Lender, Agent, Attorney, Partner, Employee
+
+Use raw SQL to alter the enum (do NOT use prisma db push):
+```sql
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Investor';
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Lender';
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Agent';
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Attorney';
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Partner';
+ALTER TYPE "ContactType" ADD VALUE IF NOT EXISTS 'Employee';
+```
+Run via a migration script at `apps/chg-rehab/scripts/migrate-contact-types.ts` using the Prisma raw client, then run `npx prisma generate` in the chg-rehab workspace.
+
+---
+
+**3. ADD TradeCategory ENUM + REPLACE free-text trade field**
+Create a new `TradeCategory` enum in the schema with these values:
+GeneralContractor, Plumbing, Electrical, Roofing, HVAC, Framing, Drywall, Flooring, Painting, Concrete, Masonry, Landscaping, Demolition, Waterproofing, Insulation, Windows, Doors, Cabinetry, Tile, Foundation, Excavation, Fencing, Cleaning, Inspector, TitleCompany, Lender, RealEstateAgent, Attorney, PropertyManagement, Other
+
+Then:
+- Add a new column `tradeCategory TradeCategory?` to the Contact table
+- Keep the old `trade String?` column for now (do not drop it yet — we'll migrate data later)
+- Create raw SQL migration script at `apps/chg-rehab/scripts/migrate-trade-category.ts`:
+```sql
+CREATE TYPE "TradeCategory" AS ENUM ('GeneralContractor','Plumbing','Electrical','Roofing','HVAC','Framing','Drywall','Flooring','Painting','Concrete','Masonry','Landscaping','Demolition','Waterproofing','Insulation','Windows','Doors','Cabinetry','Tile','Foundation','Excavation','Fencing','Cleaning','Inspector','TitleCompany','Lender','RealEstateAgent','Attorney','PropertyManagement','Other');
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "tradeCategory" "TradeCategory";
+```
+Run the script, then `npx prisma generate`.
+
+---
+
+**4. ADD website AND title FIELDS**
+Add to Contact model in schema:
+- `website String?`
+- `title String?`  (job title / role, e.g. "Owner", "Project Manager")
+
+Raw SQL:
+```sql
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "website" TEXT;
+ALTER TABLE "Contact" ADD COLUMN IF NOT EXISTS "title" TEXT;
+```
+Add to migration script `apps/chg-rehab/scripts/migrate-contact-fields.ts`, run it, then `npx prisma generate`.
+
+---
+
+Run all 3 migration scripts, confirm no errors, then confirm the app compiles and deploys.

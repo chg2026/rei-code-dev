@@ -378,6 +378,9 @@ model Contact {
   phone         String?
   address       String?
   trade         String?
+  tradeCategory TradeCategory?
+  website       String?
+  title         String?
   rating        Int?
   notes         String?
   meta          Json?
@@ -715,6 +718,45 @@ enum ContactType {
   Vendor
   Inspector
   Tenant
+  Other
+  Investor
+  Lender
+  Agent
+  Attorney
+  Partner
+  Employee
+}
+
+enum TradeCategory {
+  GeneralContractor
+  Plumbing
+  Electrical
+  Roofing
+  HVAC
+  Framing
+  Drywall
+  Flooring
+  Painting
+  Concrete
+  Masonry
+  Landscaping
+  Demolition
+  Waterproofing
+  Insulation
+  Windows
+  Doors
+  Cabinetry
+  Tile
+  Foundation
+  Excavation
+  Fencing
+  Cleaning
+  Inspector
+  TitleCompany
+  Lender
+  RealEstateAgent
+  Attorney
+  PropertyManagement
   Other
 }
 
