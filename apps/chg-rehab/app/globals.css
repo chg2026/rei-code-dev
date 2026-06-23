@@ -106,11 +106,11 @@ body {
   flex-direction: column;
   gap: 14px;
   padding: 14px 12px 16px;
-  border-radius: 20px;
-  background: linear-gradient(165deg, rgba(255,255,255,0.80), rgba(245,244,240,0.62));
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
-  backdrop-filter: blur(20px) saturate(165%);
-  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow:
     0 18px 50px rgba(20,18,15,0.14),
     0 2px 8px rgba(20,18,15,0.06),

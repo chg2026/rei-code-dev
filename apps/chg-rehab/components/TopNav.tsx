@@ -111,16 +111,16 @@ type PmList = { id: string; name: string; color: string | null };
 type PmSpace = { id: string; name: string; color: string | null; lists: PmList[] };
 
 function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin: boolean; iconOnly: boolean }) {
-  const [open, setOpen] = useState(false);
   const [spaces, setSpaces] = useState<PmSpace[]>([]);
   const [openSpaces, setOpenSpaces] = useState<Set<string>>(new Set());
 
+  // Load departments on mount so they render directly under the section header.
   useEffect(() => {
-    if (!open) return;
     fetch("/api/pm/spaces")
       .then((r) => r.json())
-      .then((d) => setSpaces(d.spaces ?? []));
-  }, [open]);
+      .then((d) => setSpaces(d.spaces ?? []))
+      .catch(() => {});
+  }, []);
 
   // auto-open the space whose list is active
   useEffect(() => {
@@ -129,15 +129,13 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
       s.lists.some((l) => pathname.startsWith(`/pm/${s.id}/${l.id}`))
     );
     if (active) {
-      setOpen(true);
       setOpenSpaces((prev) => new Set([...prev, active.id]));
     }
   }, [spaces, pathname]);
 
-  const isPmActive = pathname.startsWith("/pm");
-
   // In collapsed/icon-only mode the tree is replaced by a single icon link.
   if (iconOnly) {
+    const isPmActive = pathname.startsWith("/pm");
     return (
       <Link
         href="/pm"
@@ -150,87 +148,64 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
   }
 
   return (
-    <div className="pm-nav-tree">
-      <div className={`nav-item pm-tree-toggle${isPmActive ? " active" : ""}`} style={{ display: "flex", alignItems: "center", padding: 0 }}>
-        <Link
-          href="/pm"
-          className="pm-tree-label"
-          style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", color: "inherit", textDecoration: "none" }}
-          onClick={() => setOpen(true)}
-        >
-          <LayoutGrid className="nav-icon" size={18} />
-          Company Departments
+    <div className="pm-nav-tree pm-tree-spaces">
+      {spaces.length === 0 && isAdmin && (
+        <Link href="/pm" className="nav-item pm-tree-empty">
+          + New Department
         </Link>
-        <button
-          type="button"
-          className="pm-tree-arrow-btn"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-label="Toggle spaces"
-          style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", padding: "0 8px" }}
-        >
-          <span className={`pm-tree-arrow${open ? " open" : ""}`}>›</span>
-        </button>
-      </div>
-
-      {open && (
-        <div className="pm-tree-spaces">
-          {spaces.length === 0 && isAdmin && (
-            <Link href="/pm" className="nav-item pm-tree-empty">
-              + New Department
-            </Link>
-          )}
-          {spaces.map((space) => {
-            const spaceOpen = openSpaces.has(space.id);
-            return (
-              <div key={space.id}>
-                <button
-                  className="nav-item pm-space-row"
-                  onClick={() =>
-                    setOpenSpaces((prev) => {
-                      const next = new Set(prev);
-                      next.has(space.id) ? next.delete(space.id) : next.add(space.id);
-                      return next;
-                    })
-                  }
-                >
-                  <span
-                    className="pm-space-dot"
-                    style={{ background: space.color ?? "#6366f1" }}
-                  />
-                  <span className="pm-space-name">{space.name}</span>
-                  <span className={`pm-tree-arrow${spaceOpen ? " open" : ""}`}>›</span>
-                </button>
-                {spaceOpen && (
-                  <div className="pm-space-lists">
-                    {space.lists.map((list) => {
-                      const href = `/pm/${space.id}/${list.id}`;
-                      return (
-                        <Link
-                          key={list.id}
-                          href={href}
-                          className={`nav-item pm-list-item${pathname.startsWith(href) ? " active" : ""}`}
-                        >
-                          <span
-                            className="pm-list-dot"
-                            style={{ background: list.color ?? "#9ca3af" }}
-                          />
-                          {list.name}
-                        </Link>
-                      );
-                    })}
-                    <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list">
-                      + New List
+      )}
+      {spaces.map((space) => {
+        const spaceOpen = openSpaces.has(space.id);
+        const spaceActive = pathname.startsWith(`/pm/${space.id}`);
+        return (
+          <div key={space.id}>
+            <button
+              className={`nav-item pm-space-row${spaceActive ? " active" : ""}`}
+              onClick={() =>
+                setOpenSpaces((prev) => {
+                  const next = new Set(prev);
+                  next.has(space.id) ? next.delete(space.id) : next.add(space.id);
+                  return next;
+                })
+              }
+            >
+              <span
+                className="pm-space-dot"
+                style={{ background: space.color ?? "#6366f1" }}
+              />
+              <span className="pm-space-name">{space.name}</span>
+              <span className={`pm-tree-arrow${spaceOpen ? " open" : ""}`}>›</span>
+            </button>
+            {spaceOpen && (
+              <div className="pm-space-lists">
+                {space.lists.map((list) => {
+                  const href = `/pm/${space.id}/${list.id}`;
+                  return (
+                    <Link
+                      key={list.id}
+                      href={href}
+                      className={`nav-item pm-list-item${pathname.startsWith(href) ? " active" : ""}`}
+                    >
+                      <span
+                        className="pm-list-dot"
+                        style={{ background: list.color ?? "#9ca3af" }}
+                      />
+                      {list.name}
                     </Link>
-                  </div>
-                )}
+                  );
+                })}
+                <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list">
+                  + New List
+                </Link>
               </div>
-            );
-          })}
-          <Link href="/pm" className="nav-item pm-manage-link">
-            Manage spaces ›
-          </Link>
-        </div>
+            )}
+          </div>
+        );
+      })}
+      {spaces.length > 0 && (
+        <Link href="/pm" className="nav-item pm-manage-link">
+          Manage departments ›
+        </Link>
       )}
     </div>
   );
