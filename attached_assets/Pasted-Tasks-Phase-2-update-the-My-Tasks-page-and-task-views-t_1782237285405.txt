@@ -1,0 +1,56 @@
+Tasks Phase 2 — update the My Tasks page and task views to fully integrate Company Departments. The spaceId field was added to WsTask in the previous step.
+
+---
+
+**1. MY TASKS PAGE — department badge on every task row**
+In the My Tasks page (`/workspace/tasks`), each task row should show a small colored department badge next to the task name:
+- Fetch the department name for each task (join WsTask → PmSpace via spaceId)
+- Badge style: small pill, use the PmSpace color as the background (or a muted version), white text with the department name
+- Tasks without a department (old tasks): show a gray "No department" badge
+- Make sure the server query that fetches WsTasks includes the related PmSpace (use Prisma `include: { space: true }`)
+
+---
+
+**2. MY TASKS PAGE — department filter**
+Add a "Department" filter dropdown above the task list, alongside the existing Mine/All/Assigned out chips:
+- Dropdown: "All departments" (default) + one option per PmSpace
+- When selected, filters the task list to only show tasks from that department
+- Filter works client-side (no new API call needed if all tasks are already loaded)
+- The filter persists if you switch between Mine/All/Assigned out
+
+---
+
+**3. TASK CREATION MODAL — department shown prominently**
+In the task creation modal (the one opened by "+ New task"):
+- The "Department" dropdown should appear as the FIRST field (before task name)
+- Label: "Department *" (asterisk = required)
+- If the user tries to save without selecting a department, show inline error: "Please select a department"
+- The dropdown should show department color dot + name for each option
+- Pre-select the department if the user is already viewing a filtered department
+
+---
+
+**4. TASK DETAIL / EDIT VIEW — department editable**
+When clicking a task to open its detail panel or edit view:
+- Show the department field with the current department name + colored dot
+- Allow changing the department from the detail view (dropdown, same options)
+- Saving department change calls `PATCH /api/ws-tasks/[id]` with `{ spaceId: newId }`
+- Update the API handler to accept and save spaceId changes
+
+---
+
+**5. CALENDAR PAGE — color-code tasks by department**
+On the Calendar page (`/workspace/calendar`):
+- Tasks displayed on the calendar grid should use the department color for their left border (instead of the generic blue)
+- This makes it easy to see which tasks belong to which department at a glance
+- Reminders keep their amber/orange color — only tasks change
+- Add a small legend at the top of the calendar: colored dots with department names
+
+---
+
+**6. DEPARTMENT PAGE — each department has its own task board**
+When clicking a department in the sidebar under "Company Departments", it should show that department's tasks in a board/list view:
+- URL: `/pm/[spaceId]` (this likely already exists as the PM space view)
+- Make sure WsTasks with that spaceId also appear here alongside PmTasks
+- If the existing PM space view already shows PmTasks (via PmList), add a separate "Quick Tasks" section showing WsTasks assigned to this space
+- Label it clearly: "Quick Tasks" vs the existing list-based PmTasks below
