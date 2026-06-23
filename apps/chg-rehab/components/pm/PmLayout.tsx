@@ -10,6 +10,7 @@ export default function PmLayout({
   selectedListId,
   tasks,
   statuses,
+  isAdmin = false,
 }: {
   spaces: PmSpaceWithLists[];
   selectedSpaceId?: string;
@@ -17,10 +18,11 @@ export default function PmLayout({
   tasks?: PmTaskRow[];
   statuses?: PmStatus[];
   lists?: PmListLite[];
+  isAdmin?: boolean;
 }) {
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      <PmSidebar spaces={spaces} selectedSpaceId={selectedSpaceId} selectedListId={selectedListId} />
+      <PmSidebar spaces={spaces} selectedSpaceId={selectedSpaceId} selectedListId={selectedListId} isAdmin={isAdmin} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {selectedListId && statuses ? (
           <PmListView tasks={tasks ?? []} statuses={statuses} listId={selectedListId} spaceId={selectedSpaceId ?? ""} />

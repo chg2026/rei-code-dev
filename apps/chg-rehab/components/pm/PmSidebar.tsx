@@ -18,10 +18,12 @@ export default function PmSidebar({
   spaces,
   selectedSpaceId,
   selectedListId,
+  isAdmin = false,
 }: {
   spaces: PmSpaceWithLists[];
   selectedSpaceId?: string;
   selectedListId?: string;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
@@ -61,8 +63,10 @@ export default function PmSidebar({
   return (
     <aside style={{ width: 220, flexShrink: 0, background: "var(--bg-secondary)", borderRight: "0.5px solid var(--border-lo)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 14px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", letterSpacing: 0.2 }}>Project Manager</span>
-        <button type="button" onClick={() => setCreatingSpace(true)} title="New Space" style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "none", cursor: "pointer", fontWeight: 600 }}>+ New</button>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", letterSpacing: 0.2 }}>Company Departments</span>
+        {isAdmin ? (
+          <button type="button" onClick={() => setCreatingSpace(true)} title="New Department" style={{ fontSize: 12, color: "var(--marine)", background: "transparent", border: "none", cursor: "pointer", fontWeight: 600 }}>+ New</button>
+        ) : null}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 12px" }}>

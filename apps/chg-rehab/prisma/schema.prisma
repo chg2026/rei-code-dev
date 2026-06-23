@@ -1623,6 +1623,7 @@ model WsTask {
   linkType        String? // "deal" | "project"
   linkId          String?
   linkLabel       String? // denormalised display label e.g. "210 Harbour Ln (Rehab)"
+  spaceId         String? // Company Department (PmSpace) this task belongs to
   sourceMessageId String?   @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
@@ -1630,6 +1631,7 @@ model WsTask {
   company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy     User            @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
   assignee      User?           @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  space         PmSpace?        @relation("WsTaskSpace", fields: [spaceId], references: [id], onDelete: SetNull)
   sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
   comments      WsTaskComment[]
   attachments   WsTaskAttachment[]
@@ -1642,6 +1644,7 @@ model WsTask {
   @@index([companyId, assigneeId, done])
   @@index([companyId, createdById, done])
   @@index([parentTaskId])
+  @@index([companyId, spaceId])
 }
 
 model WsTaskActivity {
@@ -1822,6 +1825,7 @@ model PmSpace {
   lists     PmList[]
   statuses  PmStatus[]
   tags      PmTag[]
+  wsTasks   WsTask[]   @relation("WsTaskSpace")
 
   @@index([companyId])
 }

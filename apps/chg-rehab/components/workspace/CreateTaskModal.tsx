@@ -39,6 +39,8 @@ export default function CreateTaskModal({
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("Medium");
   const [dueDate, setDueDate] = useState<string>(initialDueDate ?? "");
   const [linkValue, setLinkValue] = useState<string>("");
+  const [spaceId, setSpaceId] = useState<string>("");
+  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [links, setLinks] = useState<{ deals: LinkItem[]; projects: LinkItem[] }>({ deals: [], projects: [] });
   const [busy, setBusy] = useState(false);
@@ -53,13 +55,16 @@ export default function CreateTaskModal({
     setPriority("Medium");
     setDueDate(initialDueDate ?? "");
     setLinkValue("");
+    setSpaceId("");
     setErr(null);
     Promise.all([
       fetch("/api/workspace/mentions").then((r) => r.json()).catch(() => ({ users: [] })),
       fetch("/api/workspace/links").then((r) => r.json()).catch(() => ({ deals: [], projects: [] })),
-    ]).then(([m, l]) => {
+      fetch("/api/pm/spaces").then((r) => r.json()).catch(() => ({ spaces: [] })),
+    ]).then(([m, l, sp]) => {
       setMentions(m.users ?? []);
       setLinks({ deals: l.deals ?? [], projects: l.projects ?? [] });
+      setSpaces((sp.spaces ?? []).map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })));
     });
   }, [open, initialTitle, initialDueDate]);
 
@@ -78,6 +83,10 @@ export default function CreateTaskModal({
       setErr("Task name is required.");
       return;
     }
+    if (!spaceId) {
+      setErr("Department is required.");
+      return;
+    }
     setBusy(true);
     try {
       const r = await fetch("/api/workspace/tasks", {
@@ -88,6 +97,7 @@ export default function CreateTaskModal({
           assigneeId: assigneeId || null,
           priority,
           dueDate: dueDate || null,
+          spaceId,
           linkType: initialLinkType ?? linkParts?.type ?? null,
           linkId: initialLinkId ?? linkParts?.id ?? null,
           linkLabel: initialLinkLabel ?? linkParts?.label ?? null,
@@ -103,7 +113,7 @@ export default function CreateTaskModal({
     } finally {
       setBusy(false);
     }
-  }, [title, assigneeId, priority, dueDate, linkParts, initialLinkType, initialLinkId, initialLinkLabel, sourceMessageId, onCreated, onClose]);
+  }, [title, assigneeId, priority, dueDate, spaceId, linkParts, initialLinkType, initialLinkId, initialLinkLabel, sourceMessageId, onCreated, onClose]);
 
   const selectedAssignee = mentions.find((m) => m.id === assigneeId) ?? null;
   const assigneeQ = assigneeQuery.replace(/^@/, "").toLowerCase();
@@ -136,6 +146,13 @@ export default function CreateTaskModal({
               placeholder="e.g. Follow up with seller on 210 Harbour Ln"
               autoFocus
             />
+          </div>
+          <div className={s.field}>
+            <label className={s.fieldLabel}>Department</label>
+            <select className={s.fieldSelect} value={spaceId} onChange={(e) => setSpaceId(e.target.value)}>
+              <option value="">Select a department…</option>
+              {spaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+            </select>
           </div>
           <div className={s.field}>
             <label className={s.fieldLabel}>Assign to</label>
@@ -254,7 +271,7 @@ export default function CreateTaskModal({
         </div>
         <div className={s.modalFoot}>
           <button type="button" className={`${s.btn} ${s.ghost}`} onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className={s.btn} onClick={submit} disabled={busy || !title.trim()}>
+          <button type="button" className={s.btn} onClick={submit} disabled={busy || !title.trim() || !spaceId}>
             {busy ? "Creating…" : "Create task"}
           </button>
         </div>

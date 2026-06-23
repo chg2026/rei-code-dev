@@ -55,6 +55,8 @@ export default function TaskDetailPanel({
   const [cDue, setCDue] = useState("");
   const [cDescription, setCDescription] = useState("");
   const [cAssignee, setCAssignee] = useState<TeamMember | null>(null);
+  const [cSpaceId, setCSpaceId] = useState("");
+  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
   const [creating, setCreating] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +72,14 @@ export default function TaskDetailPanel({
     fetch("/api/workspace/mentions")
       .then(r => (r.ok ? r.json() : { users: [] }))
       .then(d => setMembers(d.users ?? []))
+      .catch(() => undefined);
+  }, []);
+
+  // Load company departments for the create-mode picker.
+  useEffect(() => {
+    fetch("/api/pm/spaces")
+      .then(r => (r.ok ? r.json() : { spaces: [] }))
+      .then(d => setSpaces((d.spaces ?? []).map((x: { id: string; name: string }) => ({ id: x.id, name: x.name }))))
       .catch(() => undefined);
   }, []);
 
@@ -148,7 +158,7 @@ export default function TaskDetailPanel({
 
   const submitCreate = async () => {
     const title = cTitle.trim();
-    if (!title || creating) return;
+    if (!title || !cSpaceId || creating) return;
     setCreating(true);
     const r = await fetch("/api/workspace/tasks", {
       method: "POST",
@@ -158,6 +168,7 @@ export default function TaskDetailPanel({
         priority: cPriority,
         dueDate: cDue || null,
         assigneeId: cAssignee?.id ?? null,
+        spaceId: cSpaceId,
         linkType: linkType ?? null,
         linkId: linkId ?? null,
         linkLabel: linkLabel ?? null,
@@ -220,6 +231,14 @@ export default function TaskDetailPanel({
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitCreate(); } }}
               placeholder="Task title…"
             />
+          </div>
+          <div>
+            <label style={labelStyle}>Department</label>
+            <select className="input" style={{ width: "100%" }} value={cSpaceId}
+              onChange={e => setCSpaceId(e.target.value)}>
+              <option value="">Select a department…</option>
+              {spaces.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+            </select>
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <div style={{ flex: 1 }}>
@@ -284,7 +303,7 @@ export default function TaskDetailPanel({
         </div>
         <div style={footStyle}>
           <button type="button" className="btn-sm" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-sm btn-primary" onClick={submitCreate} disabled={!cTitle.trim() || creating}>
+          <button type="button" className="btn-sm btn-primary" onClick={submitCreate} disabled={!cTitle.trim() || !cSpaceId || creating}>
             {creating ? "Creating…" : "Create task"}
           </button>
         </div>

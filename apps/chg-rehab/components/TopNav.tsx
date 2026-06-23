@@ -39,8 +39,8 @@ const BASE_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "Project Manager",
-    items: [{ href: "/pm", label: "Project Manager" }],
+    label: "Company Departments",
+    items: [{ href: "/pm", label: "Company Departments" }],
   },
   {
     label: "Goals",
@@ -78,7 +78,7 @@ const DashboardIcon = () => (
 type PmList = { id: string; name: string; color: string | null };
 type PmSpace = { id: string; name: string; color: string | null; lists: PmList[] };
 
-function PmNavTree({ pathname }: { pathname: string }) {
+function PmNavTree({ pathname, isAdmin }: { pathname: string; isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const [spaces, setSpaces] = useState<PmSpace[]>([]);
   const [openSpaces, setOpenSpaces] = useState<Set<string>>(new Set());
@@ -113,7 +113,7 @@ function PmNavTree({ pathname }: { pathname: string }) {
           style={{ flex: 1, display: "block", padding: "inherit", color: "inherit", textDecoration: "none" }}
           onClick={() => setOpen(true)}
         >
-          Project Manager
+          Company Departments
         </Link>
         <button
           type="button"
@@ -129,9 +129,9 @@ function PmNavTree({ pathname }: { pathname: string }) {
 
       {open && (
         <div className="pm-tree-spaces">
-          {spaces.length === 0 && (
+          {spaces.length === 0 && isAdmin && (
             <Link href="/pm" className="nav-item pm-tree-empty">
-              + New Space
+              + New Department
             </Link>
           )}
           {spaces.map((space) => {
@@ -192,6 +192,7 @@ function PmNavTree({ pathname }: { pathname: string }) {
 
 export default function TopNav({ user, companyName }: { user: SessionUser; companyName?: string | null }) {
   const pathname = usePathname();
+  const isAdmin = user.role === "Admin";
 
   // Admin section is built per-render so the Super Admin tab can be
   // appended only for users with the platform-wide flag.
@@ -230,7 +231,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
               </div>
             ) : null}
             {section.items.map((item) => {
-              if (item.href === "/pm") return <PmNavTree key="/pm" pathname={pathname} />;
+              if (item.href === "/pm") return <PmNavTree key="/pm" pathname={pathname} isAdmin={isAdmin} />;
               const active = isActive(item.href);
               const isDashboard = item.href === DASHBOARD.href;
               return (

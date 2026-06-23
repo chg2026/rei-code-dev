@@ -49,6 +49,7 @@ export async function GET(req: Request) {
     include: {
       assignee: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
       createdBy: { select: { id: true, firstName: true, lastName: true } },
+      space: { select: { id: true, name: true, color: true } },
     },
   });
 
@@ -63,6 +64,7 @@ export async function GET(req: Request) {
       linkType: t.linkType,
       linkId: t.linkId,
       linkLabel: t.linkLabel,
+      space: t.space ? { id: t.space.id, name: t.space.name, color: t.space.color } : null,
       assignee: t.assignee
         ? {
             id: t.assignee.id,
@@ -98,9 +100,22 @@ export async function POST(req: Request) {
     linkLabel?: string | null;
     sourceMessageId?: string | null;
     parentTaskId?: string | null;
+    spaceId?: string | null;
   };
   const title = (body.title ?? "").trim();
   if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
+
+  // Validate the department (PmSpace) belongs to the same company. Optional at
+  // the API level so subtasks and message-conversions (which don't carry a
+  // department) keep working; the create forms enforce it for top-level tasks.
+  let spaceId: string | null = null;
+  if (body.spaceId) {
+    const space = await prisma.pmSpace.findFirst({
+      where: { id: body.spaceId, companyId: user.companyId },
+      select: { id: true },
+    });
+    if (space) spaceId = space.id;
+  }
 
   // Validate parent task (for subtasks) belongs to the same company.
   let parentTaskId: string | null = null;
@@ -158,6 +173,7 @@ export async function POST(req: Request) {
       linkType: body.linkType ?? null,
       linkId: body.linkId ?? null,
       linkLabel: body.linkLabel ?? null,
+      spaceId,
       sourceMessageId,
       parentTaskId,
     },

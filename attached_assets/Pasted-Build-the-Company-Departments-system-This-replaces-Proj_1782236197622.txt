@@ -1,0 +1,63 @@
+Build the Company Departments system. This replaces "Project Manager" throughout the app. Do all of the following:
+
+---
+
+**1. DELETE old spaces, CREATE Braindump**
+Write and run a script at `apps/chg-rehab/scripts/migrate-departments.ts` that uses the Prisma client to:
+- Find all PmSpaces for this company
+- Delete the spaces named "Construction", "Marketing", "Property Management List" (cascade will delete their PmLists and PmTasks — this is intentional, confirmed by user)
+- Check if a space named "Braindump" exists — if not, create it with color "#6366f1" and order 0
+- Log what was deleted and created
+
+Run the script after writing it.
+
+---
+
+**2. RENAME "Project Manager" → "Company Departments" everywhere in the UI**
+Search for every occurrence of "Project Manager" text in the frontend (page titles, nav labels, section headers, breadcrumbs) and replace with "Company Departments". Do a global find-and-replace across `apps/chg-rehab/`. Do NOT rename any DB models, API routes, or Prisma schema fields — only visible UI text strings.
+
+---
+
+**3. LOCK space creation/deletion/rename to admins only**
+In `app/api/pm/spaces/route.ts` (POST — create space):
+- Add an admin check: read the current user's profile, check `isAccountAdmin === true || isSuperAdmin === true`. If not admin, return 403 "Only admins can manage departments."
+
+In `app/api/pm/spaces/[id]/route.ts` (PATCH — rename, DELETE — delete):
+- Add the same admin check to both handlers.
+
+In the UI, hide the `PmCreateSpace` button and any inline "add space" controls from non-admin users. Check `useAuth()` for `isAccountAdmin` or `isSuperAdmin` before rendering those controls.
+
+---
+
+**4. ADD "Company Departments" tab in Admin Settings**
+In `app/admin/AdminTabStrip.tsx`, add a new tab: "Departments" (value: "departments").
+In `app/admin/Client.tsx`, add a new panel for the "departments" tab that renders a new component: `app/admin/DepartmentsPanel.tsx`.
+
+Build `DepartmentsPanel.tsx` as a client component that:
+- Fetches all PmSpaces via `GET /api/pm/spaces` on load
+- Displays them in a list: [color dot] [name] [rename button ✏️] [delete button 🗑️]
+- "Rename" → inline edit: click ✏️, name becomes an input, save with Enter or a checkmark button → calls `PATCH /api/pm/spaces/[id]` with `{ name: newName }`
+- "Delete" → confirmation dialog: "Delete [name]? All tasks inside will be permanently deleted." → on confirm calls `DELETE /api/pm/spaces/[id]`
+- "+ New Department" button at bottom → input appears → on Enter calls `POST /api/pm/spaces` with `{ name, color: "#6366f1" }`
+- After any mutation, refresh the list
+- Style to match the existing admin panel design (same card/table style as other admin tabs)
+
+---
+
+**5. ADD departmentId to WsTask (mandatory on creation)**
+Find the WsTask model in the Prisma schema. Add a field:
+`spaceId String?` with a relation to PmSpace (nullable at DB level — existing tasks won't have it).
+
+Run raw SQL:
+```sql
+ALTER TABLE "WsTask" ADD COLUMN IF NOT EXISTS "spaceId" TEXT REFERENCES "PmSpace"(id) ON DELETE SET NULL;
+```
+Then update schema.prisma to add the relation and run `npx prisma generate`.
+
+In the task creation modal (wherever "+ New task" creates a WsTask):
+- Add a required "Department" dropdown field showing all PmSpaces (fetch from `/api/pm/spaces`)
+- The field is required in the form validation — cannot submit without selecting a department
+- Save the selected spaceId when creating the task
+- On the task list (My Tasks page), show a small department badge on each task row
+
+Update `POST /api/ws-tasks` (or whatever the WsTask create route is) to accept and save `spaceId`.

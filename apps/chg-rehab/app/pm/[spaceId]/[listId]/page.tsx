@@ -102,6 +102,7 @@ export default async function PmListPage({
       tasks={tasks}
       statuses={statuses}
       lists={space.lists.map((l) => ({ id: l.id, name: l.name, color: l.color, order: l.order }))}
+      isAdmin={user.role === "Admin"}
     />
   );
 }

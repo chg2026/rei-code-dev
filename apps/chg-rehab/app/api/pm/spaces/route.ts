@@ -34,6 +34,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "Admin") {
+    return NextResponse.json({ error: "Only admins can manage departments." }, { status: 403 });
+  }
 
   const body = (await req.json().catch(() => ({}))) as { name?: string; color?: string; icon?: string };
   const name = (body.name ?? "").trim();

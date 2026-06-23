@@ -11,6 +11,7 @@ import {
 import { getUnsubscribeLinkDiagnostic } from "@/lib/contactUnsubscribe";
 import AdminClient from "./Client";
 import AdminTabStrip from "./AdminTabStrip";
+import DepartmentsPanel from "./DepartmentsPanel";
 import InvestorPortalShell from "./investor-portal/InvestorPortalShell";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,19 @@ export default async function AdminPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role !== "Admin") redirect("/");
+
+  if (tab === "departments") {
+    return (
+      <Suspense fallback={null}>
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+          <AdminTabStrip current={tab} />
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <DepartmentsPanel />
+          </div>
+        </div>
+      </Suspense>
+    );
+  }
 
   if (INVESTOR_TABS.has(tab)) {
     const [investors, offerings, distributions, capitalCalls] = await Promise.all([

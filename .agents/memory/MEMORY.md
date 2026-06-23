@@ -8,3 +8,4 @@
 - [Attachment objectPath IDOR](objectpath-attachment-idor.md) — attachment-register routes must validate the minted `uploads/<uuid>` objectPath shape before storing/signing, or callers can sign others' objects.
 - [Invite acceptance flow](invite-acceptance-flow.md) — /api/invites/use must create the Prisma User inline (login's create-new path needs a user_profiles row; refreshFromSupabase doesn't); tenancy guard must precede any auth password mutation.
 - [CHG Rehab dev port](chg-rehab-dev-port.md) — dev workflow overrides PORT=5000; screenshot/curl CHG Rehab on 5000, not 3000 (3000's `Server` workflow needs a prior build).
+- [Company Departments == PmSpace](chg-rehab-departments.md) — UI "Company Departments"/"Department" is the PmSpace model + /pm route; admin-only space CRUD; WsTask.spaceId required at form, optional at API.

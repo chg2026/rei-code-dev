@@ -59,6 +59,7 @@ export default async function PmSpacePage({ params }: { params: Promise<{ spaceI
       selectedSpaceId={spaceId}
       statuses={statuses}
       lists={space.lists.map((l) => ({ id: l.id, name: l.name, color: l.color, order: l.order }))}
+      isAdmin={user.role === "Admin"}
     />
   );
 }

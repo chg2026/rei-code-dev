@@ -77,12 +77,12 @@ export default async function PmPage() {
     <div style={{ background: BG, minHeight: "100%", padding: "28px 32px", color: INK }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Project Manager</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Company Departments</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b6b6b" }}>
             Spaces, lists, and the tasks you own across the company.
           </p>
         </div>
-        <PmNewSpaceButton />
+        {user.role === "Admin" ? <PmNewSpaceButton /> : null}
       </div>
 
       <section style={{ marginBottom: 32 }}>

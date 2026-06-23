@@ -11,6 +11,9 @@ async function ownedSpace(companyId: string, spaceId: string) {
 export async function PATCH(req: Request, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "Admin") {
+    return NextResponse.json({ error: "Only admins can manage departments." }, { status: 403 });
+  }
   const { spaceId } = await params;
   if (!(await ownedSpace(user.companyId, spaceId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -33,6 +36,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ spaceI
 export async function DELETE(_req: Request, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "Admin") {
+    return NextResponse.json({ error: "Only admins can manage departments." }, { status: 403 });
+  }
   const { spaceId } = await params;
   if (!(await ownedSpace(user.companyId, spaceId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

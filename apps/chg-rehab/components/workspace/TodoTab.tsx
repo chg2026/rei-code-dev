@@ -11,6 +11,7 @@ type Task = {
   dueDate: string | null;
   done: boolean;
   linkLabel: string | null;
+  space: { id: string; name: string; color: string | null } | null;
   assignee: { id: string; name: string; initials: string } | null;
 };
 
@@ -126,6 +127,12 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                 </div>
               </div>
               <div className={s.rowRight}>
+                {t.space ? (
+                  <span
+                    className={s.pill}
+                    style={{ background: `${t.space.color ?? "#6366f1"}1a`, color: t.space.color ?? "#6366f1" }}
+                  >{t.space.name}</span>
+                ) : null}
                 {t.assignee ? (
                   <span className={s.avatarChip}>
                     <span className={s.avatar}>{t.assignee.initials}</span>
@@ -150,7 +157,7 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
           {pmTasks.length > 0 ? (
             <>
               <div style={{ fontSize: 11, color: "var(--stone)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "20px 0 8px" }}>
-                Project Manager Tasks
+                Company Departments Tasks
               </div>
               {pmTasks.map((t) => (
                 <div key={t.id} className={s.row} style={t.done ? { opacity: 0.6 } : undefined}>
