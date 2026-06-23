@@ -19,9 +19,6 @@ export default async function PmSpacePage({ params }: { params: Promise<{ spaceI
   });
   if (!space) redirect("/pm");
 
-  // Jump straight to the first list when the space has any.
-  if (space.lists.length > 0) redirect(`/pm/${spaceId}/${space.lists[0].id}`);
-
   const spacesRaw = await prisma.pmSpace.findMany({
     where: { companyId: user.companyId },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -59,6 +56,7 @@ export default async function PmSpacePage({ params }: { params: Promise<{ spaceI
       selectedSpaceId={spaceId}
       statuses={statuses}
       lists={space.lists.map((l) => ({ id: l.id, name: l.name, color: l.color, order: l.order }))}
+      quickTasksSpaceId={spaceId}
       isAdmin={user.role === "Admin"}
     />
   );

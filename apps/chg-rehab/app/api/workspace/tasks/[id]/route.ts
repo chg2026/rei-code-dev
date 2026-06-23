@@ -7,7 +7,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const body = await req.json().catch(() => ({})) as { done?: boolean; title?: string; priority?: string; dueDate?: string | null; description?: string | null; assigneeId?: string | null };
+  const body = await req.json().catch(() => ({})) as { done?: boolean; title?: string; priority?: string; dueDate?: string | null; description?: string | null; assigneeId?: string | null; spaceId?: string | null };
 
   const existing = await prisma.wsTask.findFirst({
     where: { id, companyId: user.companyId },
@@ -15,6 +15,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data: Record<string, unknown> = {};
+  if (typeof body.spaceId !== "undefined") {
+    if (body.spaceId === null) {
+      data.spaceId = null;
+    } else {
+      const space = await prisma.pmSpace.findFirst({
+        where: { id: body.spaceId, companyId: user.companyId },
+        select: { id: true },
+      });
+      if (space) data.spaceId = space.id;
+    }
+  }
   if (typeof body.done === "boolean") {
     data.done = body.done;
     data.doneAt = body.done ? new Date() : null;
@@ -97,6 +108,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     where: { id, companyId: user.companyId },
     include: {
       assignee: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
+      space: { select: { id: true, name: true, color: true } },
       subtasks: {
         select: { id: true, title: true, done: true, priority: true },
         orderBy: { createdAt: "asc" },
@@ -116,6 +128,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       description: task.description ?? null, linkLabel: task.linkLabel ?? null,
       linkType: task.linkType ?? null, linkId: task.linkId ?? null,
       createdAt: task.createdAt.toISOString(),
+      space: task.space ? { id: task.space.id, name: task.space.name, color: task.space.color } : null,
       assignee: task.assignee ? {
         id: task.assignee.id,
         name: [task.assignee.firstName, task.assignee.lastName].filter(Boolean).join(" ") || task.assignee.email || "User",

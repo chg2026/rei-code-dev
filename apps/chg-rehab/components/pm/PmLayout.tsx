@@ -2,6 +2,7 @@
 
 import PmSidebar from "./PmSidebar";
 import PmListView from "./PmListView";
+import SpaceQuickTasks from "./SpaceQuickTasks";
 import type { PmListLite, PmSpaceWithLists, PmStatus, PmTaskRow } from "./types";
 
 export default function PmLayout({
@@ -10,6 +11,7 @@ export default function PmLayout({
   selectedListId,
   tasks,
   statuses,
+  quickTasksSpaceId,
   isAdmin = false,
 }: {
   spaces: PmSpaceWithLists[];
@@ -18,6 +20,7 @@ export default function PmLayout({
   tasks?: PmTaskRow[];
   statuses?: PmStatus[];
   lists?: PmListLite[];
+  quickTasksSpaceId?: string;
   isAdmin?: boolean;
 }) {
   return (
@@ -26,6 +29,13 @@ export default function PmLayout({
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {selectedListId && statuses ? (
           <PmListView tasks={tasks ?? []} statuses={statuses} listId={selectedListId} spaceId={selectedSpaceId ?? ""} />
+        ) : quickTasksSpaceId ? (
+          <div style={{ flex: 1, overflowY: "auto", paddingBottom: 24 }}>
+            <SpaceQuickTasks spaceId={quickTasksSpaceId} />
+            <div style={{ maxWidth: 640, margin: "16px auto 0", width: "100%", padding: "0 24px", color: "var(--text-tertiary)", fontSize: 13, textAlign: "center" }}>
+              Select a list from the sidebar to view its board, or create one.
+            </div>
+          </div>
         ) : (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", fontSize: 14, textAlign: "center", padding: 24 }}>
             {selectedSpaceId ? "Select a list to view tasks, or create one from the sidebar." : "Select or create a space to get started."}

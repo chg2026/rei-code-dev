@@ -1,0 +1,117 @@
+Rebuild the global sidebar as a liquid glass, floating, resizable, collapsible navigation. This is a visual and structural redesign — keep all nav links and sections exactly the same, only change how the sidebar looks and behaves.
+
+---
+
+**1. FIND THE GLOBAL SIDEBAR**
+Find the global navigation sidebar component (the one with sections: MY WORKSPACE, DEALS, PORTFOLIO, COMPANY DEPARTMENTS, PEOPLE, ADMIN, ACCOUNT). It's likely in `components/Sidebar.tsx`, `components/Navigation.tsx`, or referenced in `app/layout.tsx`. Read it fully before making changes.
+
+---
+
+**2. LIQUID GLASS VISUAL STYLE**
+Apply these CSS styles to the sidebar container:
+
+```css
+/* Liquid glass effect */
+background: rgba(255, 255, 255, 0.12);
+backdrop-filter: blur(24px) saturate(180%);
+-webkit-backdrop-filter: blur(24px) saturate(180%);
+border: 1px solid rgba(255, 255, 255, 0.25);
+border-radius: 16px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+```
+
+The sidebar should have:
+- 8px margin from the top, bottom, and left edges of the viewport (so it floats — not flush against the edge)
+- `position: fixed` with `top: 8px`, `left: 8px`, `bottom: 8px` (full height minus margins)
+- `z-index: 40`
+- The main content area gets `margin-left` equal to `sidebarWidth + 16px` (sidebar width + left margin + gap) — this is what makes it push content
+
+The app's root layout needs to apply this margin dynamically. Use a CSS variable `--sidebar-width` set on `:root` via JavaScript so the content area can use `margin-left: calc(var(--sidebar-width) + 16px)`.
+
+Nav section labels (MY WORKSPACE, DEALS, etc.) stay the same but style them:
+- Font: 10px uppercase, letter-spacing: 0.08em, color: rgba(0,0,0,0.4)
+
+Nav items:
+- Active item: `background: rgba(255,255,255,0.5)`, rounded-lg
+- Hover: `background: rgba(255,255,255,0.3)`
+- Text color: rgba(0,0,0,0.75)
+
+---
+
+**3. RESIZABLE — drag right edge to resize**
+Add a drag handle: a 4px-wide invisible div on the right edge of the sidebar. 
+
+```tsx
+const MIN_WIDTH = 60;   // collapsed icon-only mode
+const MAX_WIDTH = 340;
+const DEFAULT_WIDTH = 240;
+```
+
+On `mousedown` on the handle → start tracking `mousemove` on `document` → update width = `event.clientX - 8` (subtract left margin). On `mouseup` → stop tracking. Clamp width between MIN_WIDTH and MAX_WIDTH.
+
+When width drops below 100px → automatically enter collapsed/icon mode (see #4).
+When width goes above 100px from icon mode → automatically expand.
+
+Save width to `localStorage` key `chg-sidebar-width` on mouseup. Read it on mount to restore.
+
+---
+
+**4. COLLAPSIBLE — icon-only mode**
+When collapsed (width ≤ 100px or toggle button clicked):
+
+- Hide all text labels, section headers, and sub-items
+- Show only one icon per main nav item (60px wide sidebar)
+- Use these icons (lucide-react):
+  - Dashboard → LayoutDashboard
+  - My Tasks → CheckSquare
+  - Calendar → Calendar
+  - Messages → MessageSquare
+  - Pipeline → GitBranch
+  - Underwriting → FileSearch
+  - Property Record → Home
+  - Rehab Manager → Hammer
+  - Warehouse → Warehouse
+  - Finance → DollarSign
+  - Documents Hub → FolderOpen
+  - Company Departments → Building2
+  - Goals → Target
+  - Contacts → Users
+  - Contractor Portal → HardHat
+  - Investor Portal → TrendingUp
+  - Team → UserPlus
+  - Admin Settings → Settings
+  - Profile Settings → User
+
+- Each icon is centered, 40px × 40px click target
+- Tooltip on hover showing the nav item name (use `title` attribute or a small tooltip div)
+- The sidebar width in icon mode = 60px (just icons, no text)
+- A small toggle button at the top of the sidebar (chevron right/left icon) to manually expand/collapse
+
+---
+
+**5. SMOOTH ANIMATIONS**
+```css
+transition: width 200ms ease, margin-left 200ms ease;
+```
+Apply to both the sidebar and the main content margin.
+
+When collapsing: labels fade out (opacity 0, 100ms), then width shrinks.
+When expanding: width grows, then labels fade in.
+
+Use CSS: `.sidebar-label { transition: opacity 150ms ease; }` and set `opacity: 0` when collapsed.
+
+---
+
+**6. TOGGLE BUTTON**
+At the top of the sidebar, add a small circular button (24px, glass style):
+- When expanded: shows `<` chevron (click to collapse)
+- When collapsed: shows `>` chevron (click to expand)
+- Position: top-right corner of the sidebar, slightly overlapping the edge
+- On click: toggle between `DEFAULT_WIDTH` and `60px`, save to localStorage
+
+---
+
+**7. PRESERVE ALL FUNCTIONALITY**
+- All nav links, section groupings, active states, and sub-items (like Company Departments expand/collapse) must work exactly as before
+- The Company Departments section with expandable department items must still work in both expanded and icon mode
+- Mobile: if viewport < 768px, sidebar defaults to collapsed icon mode automatically

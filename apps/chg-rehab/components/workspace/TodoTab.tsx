@@ -45,12 +45,23 @@ function fmtDate(iso: string | null) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
+export default function TodoTab({ refreshKey, onDeptChange }: { refreshKey?: number; onDeptChange?: (spaceId: string) => void }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
+  const [dept, setDept] = useState<string>("");
+  const [spaces, setSpaces] = useState<{ id: string; name: string; color: string | null }[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [pmTasks, setPmTasks] = useState<PmTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/pm/spaces")
+      .then((r) => (r.ok ? r.json() : { spaces: [] }))
+      .then((d) => setSpaces((d.spaces ?? []).map((x: { id: string; name: string; color?: string | null }) => ({ id: x.id, name: x.name, color: x.color ?? null }))))
+      .catch(() => undefined);
+  }, []);
+
+  const changeDept = (id: string) => { setDept(id); onDeptChange?.(id); };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,12 +99,17 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
     });
   };
 
-  const open = tasks.filter((t) => !t.done);
-  const done = tasks.filter((t) => t.done);
+  const selectedSpace = spaces.find((sp) => sp.id === dept) ?? null;
+  const visibleTasks = dept ? tasks.filter((t) => t.space?.id === dept) : tasks;
+  const visiblePmTasks = dept
+    ? (selectedSpace ? pmTasks.filter((t) => t.spaceName === selectedSpace.name) : [])
+    : pmTasks;
+  const open = visibleTasks.filter((t) => !t.done);
+  const done = visibleTasks.filter((t) => t.done);
 
   return (
     <div>
-      <div className={s.filterBar}>
+      <div className={s.filterBar} style={{ alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         {FILTERS.map((f) => (
           <button
             key={f.id}
@@ -104,10 +120,25 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
             {f.label}
           </button>
         ))}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          {selectedSpace ? (
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: selectedSpace.color ?? "#6366f1", display: "inline-block" }} />
+          ) : null}
+          <select
+            className={s.fieldSelect}
+            style={{ width: "auto", minWidth: 160, padding: "6px 8px" }}
+            value={dept}
+            onChange={(e) => changeDept(e.target.value)}
+            aria-label="Filter by department"
+          >
+            <option value="">All departments</option>
+            {spaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+          </select>
+        </div>
       </div>
       {loading ? (
         <div className={s.empty}>Loading…</div>
-      ) : open.length === 0 && done.length === 0 && pmTasks.length === 0 ? (
+      ) : open.length === 0 && done.length === 0 && visiblePmTasks.length === 0 ? (
         <div className={s.empty}>No tasks yet. Click <strong>+ New task</strong> to create one.</div>
       ) : (
         <>
@@ -132,7 +163,9 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
                     className={s.pill}
                     style={{ background: `${t.space.color ?? "#6366f1"}1a`, color: t.space.color ?? "#6366f1" }}
                   >{t.space.name}</span>
-                ) : null}
+                ) : (
+                  <span className={`${s.pill} ${s.pillGrey}`}>No department</span>
+                )}
                 {t.assignee ? (
                   <span className={s.avatarChip}>
                     <span className={s.avatar}>{t.assignee.initials}</span>
@@ -154,12 +187,12 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
               >✕</button>
             </div>
           ))}
-          {pmTasks.length > 0 ? (
+          {visiblePmTasks.length > 0 ? (
             <>
               <div style={{ fontSize: 11, color: "var(--stone)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "20px 0 8px" }}>
                 Company Departments Tasks
               </div>
-              {pmTasks.map((t) => (
+              {visiblePmTasks.map((t) => (
                 <div key={t.id} className={s.row} style={t.done ? { opacity: 0.6 } : undefined}>
                   <span
                     role="checkbox"

@@ -15,6 +15,8 @@ export async function GET(req: Request) {
   // Top-level lists never include subtasks — they live only inside their parent.
   const where: Record<string, unknown> = { companyId: user.companyId, parentTaskId: null };
   if (!includeDone) where.done = false;
+  const spaceFilter = url.searchParams.get("spaceId");
+  if (spaceFilter) where.spaceId = spaceFilter;
   if (filter === "mine") where.assigneeId = user.id;
   if (filter === "assigned-out") {
     where.createdById = user.id;

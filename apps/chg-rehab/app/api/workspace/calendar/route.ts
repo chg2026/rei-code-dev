@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   const [tasks, closedDeals, openDeals, phases, docs, dists, manual, pmTasks, reminders] = await Promise.all([
     prisma.wsTask.findMany({
       where: { companyId: user.companyId, dueDate: range },
-      select: { id: true, title: true, dueDate: true, priority: true },
+      select: { id: true, title: true, dueDate: true, priority: true, space: { select: { color: true } } },
     }),
     // Actual closings recorded in this month (history).
     prisma.pipelineDeal.findMany({
@@ -153,12 +153,13 @@ export async function GET(req: Request) {
     when: string;
     kind: string;
     link: string | null;
+    color?: string | null;
     reminder?: ReminderPayload;
   };
   const events: Ev[] = [];
 
   for (const t of tasks) {
-    if (t.dueDate) events.push({ id: `task:${t.id}`, title: t.title, when: t.dueDate.toISOString(), kind: "task", link: "/command-center" });
+    if (t.dueDate) events.push({ id: `task:${t.id}`, title: t.title, when: t.dueDate.toISOString(), kind: "task", link: "/command-center", color: t.space?.color ?? null });
   }
 
   for (const d of openDeals) {

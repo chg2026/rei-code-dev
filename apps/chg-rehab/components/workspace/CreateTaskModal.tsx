@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import s from "./styles.module.css";
+import DepartmentSelect, { type DepartmentOption } from "@/components/workspace/DepartmentSelect";
 
 export type CreateTaskModalProps = {
   open: boolean;
@@ -12,6 +13,7 @@ export type CreateTaskModalProps = {
   initialLinkType?: string;
   initialLinkId?: string;
   initialLinkLabel?: string;
+  initialSpaceId?: string;
   sourceMessageId?: string | null;
 };
 
@@ -29,6 +31,7 @@ export default function CreateTaskModal({
   initialLinkType,
   initialLinkId,
   initialLinkLabel,
+  initialSpaceId = "",
   sourceMessageId = null,
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState(initialTitle);
@@ -39,8 +42,9 @@ export default function CreateTaskModal({
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("Medium");
   const [dueDate, setDueDate] = useState<string>(initialDueDate ?? "");
   const [linkValue, setLinkValue] = useState<string>("");
-  const [spaceId, setSpaceId] = useState<string>("");
-  const [spaces, setSpaces] = useState<{ id: string; name: string }[]>([]);
+  const [spaceId, setSpaceId] = useState<string>(initialSpaceId);
+  const [spaceError, setSpaceError] = useState(false);
+  const [spaces, setSpaces] = useState<DepartmentOption[]>([]);
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [links, setLinks] = useState<{ deals: LinkItem[]; projects: LinkItem[] }>({ deals: [], projects: [] });
   const [busy, setBusy] = useState(false);
@@ -55,7 +59,8 @@ export default function CreateTaskModal({
     setPriority("Medium");
     setDueDate(initialDueDate ?? "");
     setLinkValue("");
-    setSpaceId("");
+    setSpaceId(initialSpaceId);
+    setSpaceError(false);
     setErr(null);
     Promise.all([
       fetch("/api/workspace/mentions").then((r) => r.json()).catch(() => ({ users: [] })),
@@ -64,9 +69,9 @@ export default function CreateTaskModal({
     ]).then(([m, l, sp]) => {
       setMentions(m.users ?? []);
       setLinks({ deals: l.deals ?? [], projects: l.projects ?? [] });
-      setSpaces((sp.spaces ?? []).map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })));
+      setSpaces((sp.spaces ?? []).map((x: { id: string; name: string; color?: string | null }) => ({ id: x.id, name: x.name, color: x.color ?? null })));
     });
-  }, [open, initialTitle, initialDueDate]);
+  }, [open, initialTitle, initialDueDate, initialSpaceId]);
 
   const linkParts = useMemo(() => {
     if (!linkValue) return null;
@@ -79,12 +84,13 @@ export default function CreateTaskModal({
 
   const submit = useCallback(async () => {
     setErr(null);
-    if (!title.trim()) {
-      setErr("Task name is required.");
+    if (!spaceId) {
+      setSpaceError(true);
+      setErr("Please select a department");
       return;
     }
-    if (!spaceId) {
-      setErr("Department is required.");
+    if (!title.trim()) {
+      setErr("Task name is required.");
       return;
     }
     setBusy(true);
@@ -138,6 +144,18 @@ export default function CreateTaskModal({
         </div>
         <div className={s.modalBody}>
           <div className={s.field}>
+            <label className={s.fieldLabel}>Department *</label>
+            <DepartmentSelect
+              spaces={spaces}
+              value={spaceId}
+              onChange={(id) => { setSpaceId(id); setSpaceError(false); if (err === "Please select a department") setErr(null); }}
+              invalid={spaceError}
+            />
+            {spaceError && (
+              <div className={s.error} style={{ marginTop: 4 }}>Please select a department</div>
+            )}
+          </div>
+          <div className={s.field}>
             <label className={s.fieldLabel}>Task name</label>
             <input
               className={s.fieldInput}
@@ -146,13 +164,6 @@ export default function CreateTaskModal({
               placeholder="e.g. Follow up with seller on 210 Harbour Ln"
               autoFocus
             />
-          </div>
-          <div className={s.field}>
-            <label className={s.fieldLabel}>Department</label>
-            <select className={s.fieldSelect} value={spaceId} onChange={(e) => setSpaceId(e.target.value)}>
-              <option value="">Select a department…</option>
-              {spaces.map((sp) => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
-            </select>
           </div>
           <div className={s.field}>
             <label className={s.fieldLabel}>Assign to</label>
@@ -271,7 +282,7 @@ export default function CreateTaskModal({
         </div>
         <div className={s.modalFoot}>
           <button type="button" className={`${s.btn} ${s.ghost}`} onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className={s.btn} onClick={submit} disabled={busy || !title.trim() || !spaceId}>
+          <button type="button" className={s.btn} onClick={submit} disabled={busy || !title.trim()}>
             {busy ? "Creating…" : "Create task"}
           </button>
         </div>

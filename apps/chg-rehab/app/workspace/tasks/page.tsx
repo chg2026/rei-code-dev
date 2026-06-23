@@ -9,6 +9,7 @@ export default function MyTasksPage() {
   const [creatingTask, setCreatingTask] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeDept, setActiveDept] = useState("");
 
   const onTaskCreated = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -24,11 +25,12 @@ export default function MyTasksPage() {
         </div>
       </div>
       <div className={s.body}>
-        <TodoTab refreshKey={refreshKey} />
+        <TodoTab refreshKey={refreshKey} onDeptChange={setActiveDept} />
       </div>
       {creatingTask && (
         <TaskDetailPanel
           mode="create"
+          initialSpaceId={activeDept || undefined}
           onCreated={(id) => { setCreatingTask(false); setDetailTaskId(id); onTaskCreated(); }}
           onClose={() => setCreatingTask(false)}
         />

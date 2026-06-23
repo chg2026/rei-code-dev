@@ -18,7 +18,8 @@ type ReminderPayload = {
   assigneeName?: string | null;
   assigneeInitials?: string | null;
 };
-type Ev = { id: string; title: string; when: string; kind: string; link: string | null; reminder?: ReminderPayload };
+type Ev = { id: string; title: string; when: string; kind: string; link: string | null; color?: string | null; reminder?: ReminderPayload };
+type SpaceLite = { id: string; name: string; color: string | null };
 
 const KIND_LABELS: Record<string, string> = {
   task: "Task due",
@@ -61,10 +62,18 @@ export default function CalendarTab({
   const [loading, setLoading] = useState(true);
   const [createDate, setCreateDate] = useState<string | null>(null);
   const [editingReminder, setEditingReminder] = useState<ReminderDraft | null>(null);
+  const [spaces, setSpaces] = useState<SpaceLite[]>([]);
 
   useEffect(() => {
     const n = new Date();
     setCursor({ y: n.getFullYear(), m: n.getMonth() + 1 });
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/pm/spaces")
+      .then((r) => (r.ok ? r.json() : { spaces: [] }))
+      .then((d) => setSpaces((d.spaces ?? []).map((x: { id: string; name: string; color?: string | null }) => ({ id: x.id, name: x.name, color: x.color ?? null }))))
+      .catch(() => undefined);
   }, []);
 
   const load = useCallback(async () => {
@@ -136,6 +145,21 @@ export default function CalendarTab({
   return (
     <div className={s.calWrap}>
       <div>
+        {spaces.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "0 0 10px", fontSize: 12, color: "var(--quill)" }}>
+            <span style={{ fontWeight: 600 }}>Departments:</span>
+            {spaces.map((sp) => (
+              <span key={sp.id} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: sp.color ?? "#6366f1", display: "inline-block" }} />
+                {sp.name}
+              </span>
+            ))}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: KIND_COLORS.reminder, display: "inline-block" }} />
+              Reminder
+            </span>
+          </div>
+        ) : null}
         <div className={s.calGrid}>
           <div className={s.calNav}>
             <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => {
@@ -174,7 +198,7 @@ export default function CalendarTab({
                     <div className={s.calDots}>
                       {dayEvents.slice(0, 3).map((e) => {
                         const label = e.title.length > 22 ? `${e.title.slice(0, 22)}…` : e.title;
-                        const chipStyle = { borderLeft: `3px solid ${KIND_COLORS[e.kind] ?? "#6366f1"}` };
+                        const chipStyle = { borderLeft: `3px solid ${e.color ?? KIND_COLORS[e.kind] ?? "#6366f1"}` };
                         if (e.kind === "reminder" && e.reminder) {
                           const initials = e.reminder.assigneeInitials;
                           return (
@@ -247,7 +271,7 @@ export default function CalendarTab({
           ) : upcoming.map((e) => {
             const d = new Date(e.when);
             const content = (
-              <div style={{ padding: "8px 0 8px 10px", borderBottom: "1px solid var(--border-1)", borderLeft: `3px solid ${KIND_COLORS[e.kind] ?? "var(--marine)"}`, marginBottom: 2 }}>
+              <div style={{ padding: "8px 0 8px 10px", borderBottom: "1px solid var(--border-1)", borderLeft: `3px solid ${e.color ?? KIND_COLORS[e.kind] ?? "var(--marine)"}`, marginBottom: 2 }}>
                 <div style={{ fontSize: 12, color: "var(--quill)" }}>
                   {d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {KIND_LABELS[e.kind] ?? e.kind}
                 </div>
