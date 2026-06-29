@@ -1,0 +1,165 @@
+Full task management UI + data model overhaul. Read the current WsTask model and My Tasks page before making changes, then implement everything below.
+
+---
+
+**PART 1 — DATA MODEL**
+
+**1a. Multiple assignees**
+Check if WsTask already has a WsTaskAssignee junction table. If not:
+- Create model WsTaskAssignee: id, taskId (FK → WsTask cascade), userId (FK → User cascade), assignedAt DateTime
+- Raw SQL: CREATE TABLE "WsTaskAssignee" (id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, "taskId" TEXT NOT NULL REFERENCES "WsTask"(id) ON DELETE CASCADE, "userId" TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE, "assignedAt" TIMESTAMPTZ DEFAULT now(), UNIQUE("taskId","userId"));
+- Add relation to WsTask schema: `assignees WsTaskAssignee[]`
+- Run migration + prisma generate
+- Keep any existing single assigneeId field for now, we'll migrate data
+
+**1b. Task status enum**
+Replace boolean "completed" with a status field. Add to schema:
+enum WsTaskStatus { NotStarted InProgress InReview Done Cancelled }
+Raw SQL:
+```sql
+CREATE TYPE "WsTaskStatus" AS ENUM ('NotStarted','InProgress','InReview','Done','Cancelled');
+ALTER TABLE "WsTask" ADD COLUMN IF NOT EXISTS "status" "WsTaskStatus" DEFAULT 'NotStarted';
+```
+Run migration + prisma generate.
+
+**1c. Private "My Workspace" tasks**
+```sql
+ALTER TABLE "WsTask" ADD COLUMN IF NOT EXISTS "isPrivate" BOOLEAN DEFAULT false;
+```
+Private tasks: visible only to creator, no department required.
+Run migration + prisma generate.
+
+---
+
+**PART 2 — API UPDATES**
+
+Update `POST /api/workspace/tasks`:
+- Accept `assigneeIds: string[]` (array of user IDs) — create WsTaskAssignee rows for each
+- Accept `status: WsTaskStatus` (default NotStarted)
+- Accept `isPrivate: boolean` (default false)
+
+Update `PATCH /api/workspace/tasks/[id]`:
+- Accept `assigneeIds: string[]` — diff against existing assignees, add/remove accordingly
+- Accept `status: WsTaskStatus`
+- Accept `isPrivate: boolean`
+
+Update `GET /api/workspace/tasks`:
+- Include `assignees: { user: { id, name, avatarUrl } }[]` in response
+- Include `status`, `isPrivate`, `space: { id, name, color }` in response
+- Add query param `?view=all|private|assignedOut`
+  - all: all non-private tasks for the company where user is assignee or creator
+  - private: isPrivate=true AND createdById=currentUser
+  - assignedOut: tasks created by currentUser assigned to others (existing behavior)
+- Add query param `?userId=` to filter by specific assignee
+
+---
+
+**PART 3 — MY TASKS PAGE FULL REBUILD**
+
+Replace the current My Tasks page entirely. Keep the same route `/workspace/tasks`.
+
+**3a. Top bar**
+[☰ List] [⊞ Board]    [All] [My Workspace] [Assigned out]    [Filter by person ▾] [+ New task]
+
+**3b. LIST VIEW — "All" tab**
+Tasks grouped by department. Each group:
+
+Department header row:
+`[●colored dot] [DEPARTMENT NAME in caps] [count badge]  [chevron to collapse]`
+Use the PmSpace color for the dot and a very light tint of that color as the row background.
+
+Task rows under each department:
+[ ] Task name          [status pill ▾]  [priority flag]  [assignee avatars]  [due date]  [⋯]
+
+Columns:
+- Checkbox (replaced by status — clicking opens dropdown, NOT marking complete)
+- Task name (click → opens task detail modal)
+- Status pill: colored dropdown — NotStarted=gray, InProgress=blue, InReview=amber, Done=green, Cancelled=red
+- Priority: flag icon — Urgent=red, High=orange, Medium=yellow, Low=gray
+- Assignees: stacked avatar circles (initials if no photo), up to 3 shown + "+N" overflow
+- Due date: formatted "Jun 23" with red color if overdue
+- ⋯ menu: Edit, Duplicate, Delete
+
+Tasks with no department: grouped under "No Department" header in gray.
+
+Filter by person: dropdown showing all team members → filters rows to show only tasks where that person is an assignee.
+
+**3c. LIST VIEW — "My Workspace" tab**
+Shows only tasks where `isPrivate=true AND createdById=currentUser`.
+Same columns but no Department grouping — just a flat list.
+Label at top: "Your private workspace — only you can see these tasks"
+No department badge/color on these tasks.
+When creating a task in this view, `isPrivate` is automatically set to true.
+
+**3d. LIST VIEW — "Assigned out" tab**
+Tasks created by current user assigned to other people. Unchanged from current behavior.
+
+**3e. BOARD VIEW — columns by department**
+Each department = one column (like the screenshot shared).
+
+Column header: `[●] DEPARTMENT NAME  [count]  [⋯]  [+]`
+Color: department color as pill/badge background (same as ClickUp screenshot style).
+
+Task cards:
+┌─────────────────────────────┐
+
+│ Task name (2 lines max)     │
+
+│                             │
+
+│ [icons: priority date flag] │
+
+│ [status pill] [avatars]     │
+
+└─────────────────────────────┘
+Card style: white/cream background, subtle shadow, 12px border radius, left border in department color (4px).
+Status pill: small, colored, bottom left of card.
+Assignee avatars: bottom right, stacked, 24px circles.
+Priority badge only shows if Urgent or High.
+"+ Add Task" button at bottom of each column.
+
+Drag-and-drop between columns: moving a card to a different department column updates the task's spaceId. (Use HTML5 drag events or a simple implementation — no external DnD library needed.)
+
+**3f. TASK DETAIL MODAL — liquid glass**
+Clicking any task name opens a modal (not a new page). Full-screen overlay with:
+backdrop: rgba(0,0,0,0.3) blur(4px)
+
+modal: background rgba(255,255,255,0.85), backdrop-filter blur(20px), border-radius 20px, max-width 640px
+
+Modal sections:
+- Top: Department badge (colored) | Status dropdown | Priority dropdown
+- Title: large editable text field
+- Assignees: avatar row with "+ Add" button → dropdown of team members to add/remove
+- Due date picker
+- Description/Notes: rich text area
+- Department: dropdown (shows all PmSpaces)
+- Private toggle: "Only visible to me" toggle (sets isPrivate)
+- Activity/Comments section at bottom (placeholder for now)
+
+Save button + X close button.
+Pressing Escape closes modal.
+
+---
+
+**PART 4 — "+ New Task" MODAL**
+Update the existing task creation modal:
+- Department: required dropdown (first field) — shows all PmSpaces + "My Workspace (private)" option
+- If "My Workspace (private)" selected: sets isPrivate=true, hides department field
+- Task name: required
+- Status: dropdown (default: Not Started)
+- Priority: dropdown (default: Low)
+- Assignees: multi-select with search — type name, select from list, shows avatar chips
+- Due date: date picker
+- Notes: textarea
+
+---
+
+**PART 5 — STYLING**
+Match CHG brand:
+- Cream/warm base (#FAF9F7 or app default)
+- Rounded corners everywhere (8-12px for rows, 12-16px for cards/modals)
+- Department colors: use the PmSpace.color value from DB — don't hardcode colors
+- Status colors: NotStarted=#94a3b8, InProgress=#3b82f6, InReview=#f59e0b, Done=#22c55e, Cancelled=#ef4444
+- Font: same as rest of app
+- No heavy borders — use subtle shadows and background tints instead
+- Active tab underline in the brand color

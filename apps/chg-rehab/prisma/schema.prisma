@@ -99,6 +99,7 @@ model User {
   wsTaskComments          WsTaskComment[]              @relation("WsTaskCommentAuthor")
   wsTaskAttachments       WsTaskAttachment[]           @relation("WsTaskAttachmentUploader")
   wsTaskActivity          WsTaskActivity[]             @relation("WsTaskActivityUser")
+  wsTaskAssignees         WsTaskAssignee[]             @relation("WsTaskAssigneeUser")
   pmTaskAttachments       PmTaskAttachment[]           @relation("PmTaskAttachmentUploader")
   pmTasksCreated          PmTask[]                     @relation("PmTaskCreator")
   pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
@@ -1616,10 +1617,12 @@ model WsTask {
   assigneeId      String?
   title           String
   description     String?
-  priority        String    @default("Medium") // Urgent | Medium | Low
+  priority        String    @default("Medium") // Urgent | High | Medium | Low
   dueDate         DateTime?
   done            Boolean   @default(false)
   doneAt          DateTime?
+  status          WsTaskStatus @default(NotStarted)
+  isPrivate       Boolean      @default(false)
   linkType        String? // "deal" | "project"
   linkId          String?
   linkLabel       String? // denormalised display label e.g. "210 Harbour Ln (Rehab)"
@@ -1635,6 +1638,7 @@ model WsTask {
   sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
   comments      WsTaskComment[]
   attachments   WsTaskAttachment[]
+  assignees     WsTaskAssignee[]
   parentTaskId  String?
   parentTask    WsTask?            @relation("WsSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
   subtasks      WsTask[]           @relation("WsSubtasks")
@@ -1645,6 +1649,27 @@ model WsTask {
   @@index([companyId, createdById, done])
   @@index([parentTaskId])
   @@index([companyId, spaceId])
+}
+
+enum WsTaskStatus {
+  NotStarted
+  InProgress
+  InReview
+  Done
+  Cancelled
+}
+
+model WsTaskAssignee {
+  id         String   @id @default(cuid())
+  taskId     String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  task WsTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User   @relation("WsTaskAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
 }
 
 model WsTaskActivity {
