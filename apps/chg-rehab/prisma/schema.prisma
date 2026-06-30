@@ -2018,6 +2018,7 @@ model Invoice {
   project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   attachments    InvoiceAttachment[]
   jobTypes       InvoiceJobType[]
+  stages         InvoiceStage[]
 
   @@index([projectId])
 }
@@ -2044,6 +2045,24 @@ model InvoiceAttachment {
   size       Int      @default(0)
   createdAt  DateTime @default(now())
   invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoiceStage {
+  id           String    @id @default(cuid())
+  invoiceId    String
+  name         String
+  description  String?
+  percentage   Decimal?  @db.Decimal(5, 2)
+  amount       Decimal   @db.Decimal(14, 2)
+  status       String    @default("Pending")
+  triggerEvent String?
+  dueDate      DateTime? @db.Date
+  paidAt       DateTime?
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  invoice      Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
 }

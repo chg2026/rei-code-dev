@@ -53,3 +53,76 @@ export async function parseJobTypes(
   }
   return { ok: true, rows };
 }
+
+export type ParsedStage = {
+  id: string | null;
+  name: string;
+  description: string | null;
+  percentage: Prisma.Decimal | null;
+  amount: Prisma.Decimal;
+  status: string;
+  triggerEvent: string | null;
+  dueDate: Date | null;
+  order: number;
+};
+
+/**
+ * Validate the `stages` payload (milestone payment schedule). Each row carries a
+ * name, an amount, optional percentage / trigger / due date, and a status
+ * (Pending | Paid). When an `id` is present the caller should update that row,
+ * otherwise create a new one. Returns the parsed rows or an error message.
+ */
+export function parseStages(
+  raw: unknown
+): { ok: true; rows: ParsedStage[] } | { ok: false; error: string } {
+  if (raw == null) return { ok: true, rows: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: "stages must be an array" };
+
+  const rows: ParsedStage[] = [];
+  let index = 0;
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      return { ok: false, error: "Invalid stage row" };
+    }
+    const rec = item as Record<string, unknown>;
+    const name = typeof rec.name === "string" ? rec.name.trim() : "";
+    if (!name) return { ok: false, error: "Each payment stage needs a name" };
+
+    let amount: Prisma.Decimal;
+    try {
+      amount = new Prisma.Decimal(rec.amount as Prisma.Decimal.Value);
+    } catch {
+      return { ok: false, error: "Each payment stage needs a valid amount" };
+    }
+
+    let percentage: Prisma.Decimal | null = null;
+    if (rec.percentage != null && rec.percentage !== "") {
+      try {
+        percentage = new Prisma.Decimal(rec.percentage as Prisma.Decimal.Value);
+      } catch {
+        return { ok: false, error: "Invalid percentage on a payment stage" };
+      }
+    }
+
+    const status = rec.status === "Paid" ? "Paid" : "Pending";
+    const description =
+      typeof rec.description === "string" && rec.description.trim()
+        ? rec.description.trim()
+        : null;
+    const triggerEvent =
+      typeof rec.triggerEvent === "string" && rec.triggerEvent.trim()
+        ? rec.triggerEvent.trim()
+        : null;
+    let dueDate: Date | null = null;
+    if (rec.dueDate) {
+      const d = new Date(rec.dueDate as string);
+      if (!Number.isNaN(d.getTime())) dueDate = d;
+    }
+    const order = typeof rec.order === "number" ? rec.order : index;
+    const id = typeof rec.id === "string" && rec.id ? rec.id : null;
+
+    rows.push({ id, name, description, percentage, amount, status, triggerEvent, dueDate, order });
+    index++;
+  }
+  return { ok: true, rows };
+}

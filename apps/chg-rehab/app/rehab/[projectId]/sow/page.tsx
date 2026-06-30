@@ -93,6 +93,7 @@ export default async function SowPage({
             <span className="col-label">Dates</span>
             <span className="col-label" style={{ textAlign: "right" }}>Estimated</span>
             <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
+            <span className="col-label">Status</span>
           </div>
           {project.phases.map((p, idx) => {
             const section = sections[idx];
@@ -106,6 +107,30 @@ export default async function SowPage({
             const incompleteChecklist =
               p.checklistItems.length > 0 &&
               p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
+
+            // Actual spend for this phase comes from Phase.actual (kept in sync
+            // by recomputePhaseActuals on every invoice / stage write).
+            const estimated = Number(p.budget ?? 0);
+            const actual = p.actual == null ? null : Number(p.actual);
+            const hasActual = actual != null && actual > 0;
+            let actualDisplay: string;
+            let actualColor: string;
+            if (actual == null && p.status === PhaseStatus.NotStarted) {
+              actualDisplay = "—";
+              actualColor = "var(--text-tertiary)";
+            } else if (hasActual && actual > estimated) {
+              actualDisplay = `$${(actual as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              actualColor = "var(--red-txt, #B42318)";
+            } else if (hasActual && p.status === PhaseStatus.Done) {
+              actualDisplay = `$${(actual as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              actualColor = "var(--green-txt, #067647)";
+            } else if (hasActual) {
+              actualDisplay = `$${(actual as number).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              actualColor = "var(--text-secondary)";
+            } else {
+              actualDisplay = "$0.00";
+              actualColor = "var(--text-tertiary)";
+            }
             return (
               <SowPhase
                 key={p.id}
@@ -127,6 +152,9 @@ export default async function SowPage({
                     </span>
                     <span style={{ fontSize: 11, fontWeight: 500, textAlign: "right" }}>
                       {fmt$(Number(p.budget ?? 0))}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: actualColor }}>
+                      {actualDisplay}
                     </span>
                     <PhaseStatusSelect
                       phaseId={p.id}

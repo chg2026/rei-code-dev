@@ -7,6 +7,7 @@ import { formatET } from "@/lib/datetime";
 import DocUploadButton from "@/components/rehab/DocUploadButton";
 import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
 import { prisma } from "@/lib/prisma";
+import { computePhaseActuals } from "@/lib/rehab/invoiceActuals";
 import { DrawStatus, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -32,27 +33,23 @@ export default async function BudgetPage({
   const canUploadDocs = await can(user, "documents", "edit");
   const invoiceDocs = project.documents.filter((d) => (d.category ?? "").toLowerCase() === "invoice");
 
-  // Per-phase actual spend is pulled directly from invoices: every
-  // InvoiceJobType.amount whose parent invoice is Paid, grouped by phaseId.
-  // This is the source of truth for the Actual / Variance / Spend-by-phase
-  // figures (Phase.actual is also kept in sync by recomputePhaseActuals on
-  // every invoice write, but reading invoices here keeps the page correct
-  // even for data that predates that helper).
+  // Per-phase actual spend is computed by the shared helper so that staged
+  // (milestone) payments are handled identically to the SOW tab: an unstaged
+  // Paid invoice rolls its job-type amounts into the phase, while a staged
+  // invoice only counts its Paid stages (allocated across job types). The
+  // helper is the single source of truth — Phase.actual is kept in sync with
+  // it by recomputePhaseActuals on every invoice / stage write.
+  const actualsMap = await computePhaseActuals(project.id);
   const invoiceRows = await prisma.invoice.findMany({
     where: { projectId: project.id },
     include: { jobTypes: { orderBy: { createdAt: "asc" } } },
     orderBy: { date: "desc" },
   });
-  const paidActualByPhase = new Map<string, number>();
   const invoicesByPhase = new Map<string, BudgetPhaseRow["invoices"]>();
   for (const inv of invoiceRows) {
-    const isPaid = inv.status === "Paid";
     for (const jt of inv.jobTypes) {
       if (!jt.phaseId) continue;
       const amt = Number(jt.amount);
-      if (isPaid) {
-        paidActualByPhase.set(jt.phaseId, (paidActualByPhase.get(jt.phaseId) ?? 0) + amt);
-      }
       const list = invoicesByPhase.get(jt.phaseId) ?? [];
       list.push({
         id: `${inv.id}:${jt.id}`,
@@ -65,7 +62,7 @@ export default async function BudgetPage({
       invoicesByPhase.set(jt.phaseId, list);
     }
   }
-  const phaseActual = (phaseId: string) => paidActualByPhase.get(phaseId) ?? 0;
+  const phaseActual = (phaseId: string) => Number(actualsMap.get(phaseId) ?? 0);
 
   const budget = Number(project.budget ?? 0);
   const totalSpent = project.draws

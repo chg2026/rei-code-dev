@@ -23,6 +23,19 @@ export type InvoiceJobTypeDTO = {
   notes: string | null;
 };
 
+export type InvoiceStageDTO = {
+  id: string;
+  name: string;
+  description: string | null;
+  percentage: number | null;
+  amount: number;
+  status: string;
+  triggerEvent: string | null;
+  dueDate: string | null;
+  paidAt: string | null;
+  order: number;
+};
+
 export type InvoiceDTO = {
   id: string;
   vendor: string;
@@ -32,6 +45,7 @@ export type InvoiceDTO = {
   classification: string;
   status: string;
   jobTypes: InvoiceJobTypeDTO[];
+  stages: InvoiceStageDTO[];
   notes: string | null;
   attachments: InvoiceAttachmentDTO[];
 };
@@ -39,6 +53,8 @@ export type InvoiceDTO = {
 type PhaseLite = { id: string; number: number; name: string };
 
 type JobTypeRow = { phaseId: string; amount: string; notes: string };
+
+type StageRow = { id: string | null; name: string; percentage: string; status: string };
 
 const CLASSIFICATIONS = ["Labor", "Materials", "Permit", "Dumpster", "Utility", "Other"];
 const STATUSES = ["Unpaid", "Pending", "Paid"];
@@ -65,11 +81,20 @@ type FormState = {
   classification: string;
   status: string;
   jobTypes: JobTypeRow[];
+  stagesEnabled: boolean;
+  stages: StageRow[];
   notes: string;
 };
 
 function emptyJobTypeRow(): JobTypeRow {
   return { phaseId: "", amount: "", notes: "" };
+}
+
+function defaultStageRows(): StageRow[] {
+  return [
+    { id: null, name: "Deposit", percentage: "50", status: "Pending" },
+    { id: null, name: "Final payment", percentage: "50", status: "Pending" },
+  ];
 }
 
 function emptyForm(): FormState {
@@ -81,6 +106,8 @@ function emptyForm(): FormState {
     classification: "Other",
     status: "Unpaid",
     jobTypes: [emptyJobTypeRow()],
+    stagesEnabled: false,
+    stages: [],
     notes: "",
   };
 }
@@ -101,6 +128,18 @@ function formFromInvoice(inv: InvoiceDTO): FormState {
             notes: jt.notes ?? "",
           }))
         : [emptyJobTypeRow()],
+    stagesEnabled: inv.stages.length > 0,
+    stages: inv.stages.map((s) => ({
+      id: s.id,
+      name: s.name,
+      percentage:
+        s.percentage != null
+          ? String(s.percentage)
+          : inv.amount > 0
+            ? String(Math.round((s.amount / inv.amount) * 10000) / 100)
+            : "",
+      status: s.status,
+    })),
     notes: inv.notes ?? "",
   };
 }
@@ -247,6 +286,30 @@ export default function InvoicesClient({
         return;
       }
     }
+    // Build the payment schedule. Each stage's dollar amount is derived from its
+    // percentage of the invoice total.
+    const stageRows = form.stagesEnabled
+      ? form.stages
+          .filter((s) => s.name.trim() !== "" || s.percentage.trim() !== "")
+          .map((s, i) => {
+            const pct = s.percentage.trim() === "" ? 0 : Number(s.percentage);
+            return {
+              id: s.id,
+              name: s.name.trim() || `Stage ${i + 1}`,
+              percentage: s.percentage.trim() === "" ? null : pct,
+              amount: Math.round(((amountNum * pct) / 100) * 100) / 100,
+              status: s.status,
+              order: i,
+            };
+          })
+      : [];
+    for (const s of stageRows) {
+      if (s.percentage != null && (Number.isNaN(s.percentage) || s.percentage < 0)) {
+        setError("Enter a valid percentage for each payment stage");
+        return;
+      }
+    }
+
     const payload = {
       vendor: form.vendor.trim(),
       invoiceNumber: form.invoiceNumber.trim() || null,
@@ -255,6 +318,7 @@ export default function InvoicesClient({
       classification: form.classification,
       status: form.status,
       jobTypes: jobTypeRows,
+      stages: stageRows,
       notes: form.notes.trim() || null,
     };
 
@@ -367,6 +431,24 @@ export default function InvoicesClient({
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Delete failed");
+      }
+    });
+  }
+
+  function updateStageStatus(inv: InvoiceDTO, stageId: string, status: string) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch(`${apiBase}/${inv.id}/stages/${stageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) throw new Error((await res.json())?.error ?? "Update failed");
+        await refresh();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Update failed");
       }
     });
   }
@@ -546,6 +628,63 @@ export default function InvoicesClient({
                 </div>
               ))}
 
+              {selected.stages.length > 0 && (
+                <>
+                  <div className="sb-hd" style={{ padding: "12px 0 6px" }}>
+                    Payment schedule ({selected.stages.length})
+                  </div>
+                  {(() => {
+                    const total = selected.stages.reduce((a, s) => a + s.amount, 0);
+                    const paid = selected.stages
+                      .filter((s) => s.status === "Paid")
+                      .reduce((a, s) => a + s.amount, 0);
+                    const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+                    return (
+                      <div style={{ marginBottom: 8 }}>
+                        <div className="stage-progress">
+                          <div className="stage-progress-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--text-tertiary)", marginTop: 3 }}>
+                          <span>{fmt$(paid)} paid</span>
+                          <span>{pct}% of {fmt$(total)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {selected.stages.map((s) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "5px 0",
+                        borderBottom: "0.5px solid var(--border-lo)",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 11 }}>{s.name}</div>
+                        <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
+                          {s.percentage != null ? `${s.percentage}% · ` : ""}{fmt$(s.amount)}
+                          {s.paidAt ? ` · paid ${s.paidAt.slice(0, 10)}` : ""}
+                        </div>
+                      </div>
+                      <select
+                        value={s.status}
+                        onChange={(e) => updateStageStatus(selected, s.id, e.target.value)}
+                        disabled={pending}
+                        className="cell-tag"
+                        style={{ ...statusStyle(s.status === "Paid" ? "Paid" : "Pending"), border: "none", padding: "2px 6px", fontSize: 10 }}
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Paid">Paid</option>
+                      </select>
+                    </div>
+                  ))}
+                </>
+              )}
+
               <div className="sb-hd" style={{ padding: "12px 0 6px" }}>
                 Attachments ({selected.attachments.length})
               </div>
@@ -696,6 +835,8 @@ function InvoiceForm({
 
       <JobTypesEditor form={form} setForm={setForm} phases={phases} pending={pending} field={field} lbl={lbl} />
 
+      <StagesEditor form={form} setForm={setForm} pending={pending} field={field} lbl={lbl} />
+
       <label style={lbl}>Notes</label>
       <textarea
         style={{ ...field, minHeight: 56, resize: "vertical" }}
@@ -825,6 +966,172 @@ function JobTypesEditor({
   );
 }
 
+const STAGE_PRESETS: { label: string; rows: () => StageRow[] }[] = [
+  { label: "50 / 50", rows: defaultStageRows },
+  {
+    label: "50 / 25 / 25",
+    rows: () => [
+      { id: null, name: "Deposit", percentage: "50", status: "Pending" },
+      { id: null, name: "Progress", percentage: "25", status: "Pending" },
+      { id: null, name: "Final payment", percentage: "25", status: "Pending" },
+    ],
+  },
+];
+
+function StagesEditor({
+  form,
+  setForm,
+  pending,
+  field,
+  lbl,
+}: {
+  form: FormState;
+  setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  pending: boolean;
+  field: React.CSSProperties;
+  lbl: React.CSSProperties;
+}) {
+  const invoiceTotal = form.amount.trim() === "" ? 0 : Number(form.amount) || 0;
+
+  const setEnabled = (on: boolean) =>
+    setForm((f) => ({
+      ...f,
+      stagesEnabled: on,
+      stages: on && f.stages.length === 0 ? defaultStageRows() : f.stages,
+    }));
+  const applyPreset = (rows: StageRow[]) =>
+    setForm((f) => ({ ...f, stages: rows }));
+  const updateRow = (idx: number, patch: Partial<StageRow>) =>
+    setForm((f) => ({
+      ...f,
+      stages: f.stages.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    }));
+  const addRow = () =>
+    setForm((f) => ({
+      ...f,
+      stages: [...f.stages, { id: null, name: "", percentage: "", status: "Pending" }],
+    }));
+  const removeRow = (idx: number) =>
+    setForm((f) => ({ ...f, stages: f.stages.filter((_, i) => i !== idx) }));
+
+  const pctTotal = form.stages.reduce(
+    (sum, r) => sum + (r.percentage.trim() === "" ? 0 : Number(r.percentage) || 0),
+    0
+  );
+  const pctOff = Math.abs(pctTotal - 100) > 0.005;
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={form.stagesEnabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          disabled={pending}
+          style={{ width: "auto", margin: 0 }}
+        />
+        Payment schedule (stage payments)
+      </label>
+
+      {form.stagesEnabled && (
+        <>
+          <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+            {STAGE_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                className="btn-sm"
+                onClick={() => applyPreset(p.rows())}
+                disabled={pending}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {form.stages.map((r, idx) => {
+            const pct = r.percentage.trim() === "" ? 0 : Number(r.percentage) || 0;
+            const amt = Math.round(((invoiceTotal * pct) / 100) * 100) / 100;
+            return (
+              <div
+                key={idx}
+                style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "0.5px solid var(--border-lo)" }}
+              >
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    placeholder="Stage name"
+                    style={{ ...field, marginBottom: 4, flex: 1 }}
+                    value={r.name}
+                    onChange={(e) => updateRow(idx, { name: e.target.value })}
+                    disabled={pending}
+                  />
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={() => removeRow(idx)}
+                    disabled={pending}
+                    aria-label="Remove stage"
+                    style={{ marginBottom: 4 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, width: 110 }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="%"
+                      style={{ ...field, marginBottom: 4, width: 70 }}
+                      value={r.percentage}
+                      onChange={(e) => updateRow(idx, { percentage: e.target.value })}
+                      disabled={pending}
+                    />
+                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>%</span>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: 600 }}>
+                    {fmt$(amt)}
+                  </div>
+                  <select
+                    style={{ ...field, marginBottom: 4, width: 90 }}
+                    value={r.status}
+                    onChange={(e) => updateRow(idx, { status: e.target.value })}
+                    disabled={pending}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Paid">Paid</option>
+                  </select>
+                </div>
+              </div>
+            );
+          })}
+
+          <button type="button" className="btn-sm" onClick={addRow} disabled={pending} style={{ marginBottom: 6 }}>
+            + Add stage
+          </button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 10,
+              color: pctOff ? "var(--amber-txt)" : "var(--text-tertiary)",
+            }}
+          >
+            <span>Schedule total</span>
+            <span style={{ fontWeight: 600 }}>{pctTotal.toFixed(2)}%</span>
+          </div>
+          {pctOff && (
+            <div style={{ fontSize: 9, color: "var(--amber-txt)", marginTop: 2 }}>
+              Stage percentages add up to {pctTotal.toFixed(2)}%, not 100%.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 type RawInvoice = {
   id: string;
   vendor: string;
@@ -838,6 +1145,18 @@ type RawInvoice = {
     phaseId: string | null;
     amount: string | number;
     notes: string | null;
+  }>;
+  stages?: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    percentage: string | number | null;
+    amount: string | number;
+    status: string;
+    triggerEvent: string | null;
+    dueDate: string | null;
+    paidAt: string | null;
+    order: number;
   }>;
   notes: string | null;
   attachments: InvoiceAttachmentDTO[];
@@ -857,6 +1176,18 @@ function normalizeInvoice(raw: RawInvoice): InvoiceDTO {
       phaseId: jt.phaseId,
       amount: Number(jt.amount),
       notes: jt.notes,
+    })),
+    stages: (raw.stages ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      percentage: s.percentage == null ? null : Number(s.percentage),
+      amount: Number(s.amount),
+      status: s.status,
+      triggerEvent: s.triggerEvent,
+      dueDate: s.dueDate ? s.dueDate.slice(0, 10) : null,
+      paidAt: s.paidAt,
+      order: s.order,
     })),
     notes: raw.notes,
     attachments: (raw.attachments ?? []).map((a) => ({

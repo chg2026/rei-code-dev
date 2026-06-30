@@ -517,8 +517,8 @@ a.ov-kpi.link:hover{background:var(--bg-secondary);}
 .view-btn:hover{background:var(--blue-bg);border-color:var(--marine);color:var(--marine);}
 
 /* ── SOW SPECIFIC ── */
-.sow-hd{display:grid;grid-template-columns:22px minmax(0,1fr) 52px 100px 65px 68px;gap:4px;padding:5px 10px;background:var(--bg-secondary);border-bottom:0.5px solid var(--border-lo);}
-.sow-phase{display:grid;grid-template-columns:22px minmax(0,1fr) 52px 100px 65px 68px;gap:4px;padding:7px 10px;border-bottom:0.5px solid var(--border-lo);cursor:pointer;align-items:center;background:var(--bg-secondary);}
+.sow-hd{display:grid;grid-template-columns:22px minmax(0,1fr) 52px 100px 65px 72px 92px;gap:4px;padding:5px 10px;background:var(--bg-secondary);border-bottom:0.5px solid var(--border-lo);}
+.sow-phase{display:grid;grid-template-columns:22px minmax(0,1fr) 52px 100px 65px 72px 92px;gap:4px;padding:7px 10px;border-bottom:0.5px solid var(--border-lo);cursor:pointer;align-items:center;background:var(--bg-secondary);}
 .sow-phase:hover{background:var(--bg-tertiary);}
 .pnum{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;flex-shrink:0;}
 .pn-g{background:var(--green-bg);color:var(--green-txt);}
@@ -534,6 +534,10 @@ a.ov-kpi.link:hover{background:var(--bg-secondary);}
 .li-est{font-size:10px;color:var(--text-secondary);text-align:right;}
 .li-act-g{font-size:10px;font-weight:500;color:var(--green);text-align:right;}
 .li-act-a{font-size:10px;font-weight:500;color:var(--amber);text-align:right;}
+
+/* ── STAGE PAYMENT PROGRESS ── */
+.stage-progress{height:6px;border-radius:3px;background:var(--bg-secondary);border:0.5px solid var(--border-lo);overflow:hidden;}
+.stage-progress-fill{height:100%;background:var(--green-txt);border-radius:3px;transition:width 0.2s ease;}
 
 /* ── CHECKLIST SPECIFIC ── */
 .cl-ph-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-secondary);cursor:pointer;border-bottom:0.5px solid var(--border-lo);}

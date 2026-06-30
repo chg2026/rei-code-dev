@@ -23,6 +23,7 @@ export default async function InvoicesPage({
     include: {
       attachments: { orderBy: { createdAt: "asc" } },
       jobTypes: { orderBy: { createdAt: "asc" } },
+      stages: { orderBy: { order: "asc" } },
     },
     orderBy: { date: "desc" },
   });
@@ -40,6 +41,18 @@ export default async function InvoicesPage({
       phaseId: jt.phaseId,
       amount: Number(jt.amount),
       notes: jt.notes,
+    })),
+    stages: inv.stages.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      percentage: s.percentage == null ? null : Number(s.percentage),
+      amount: Number(s.amount),
+      status: s.status,
+      triggerEvent: s.triggerEvent,
+      dueDate: s.dueDate ? s.dueDate.toISOString().slice(0, 10) : null,
+      paidAt: s.paidAt ? s.paidAt.toISOString() : null,
+      order: s.order,
     })),
     notes: inv.notes,
     attachments: inv.attachments.map((a) => ({

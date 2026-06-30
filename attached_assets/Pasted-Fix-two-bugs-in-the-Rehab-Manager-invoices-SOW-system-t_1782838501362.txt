@@ -1,0 +1,136 @@
+Fix two bugs in the Rehab Manager invoices/SOW system, then add stage payments. Do them in order.
+
+---
+
+**BUG FIX 1 — SOW "Actual" column not reading invoices**
+
+In `app/rehab/[projectId]/sow/page.tsx`, the Actual column currently fakes the value (shows estimated when phase is Done, "—" otherwise). It never reads invoices.
+
+Fix: fetch `Phase.actual` alongside the existing phase data. The `Phase` model already has an `actual Decimal?` field that is kept in sync by `recomputePhaseActuals` on every invoice write.
+
+In the SOW page server component, update the Prisma query that fetches phases to include `actual` in the select. Then in the UI:
+- Phase row Actual column: show `Phase.actual` formatted as currency (e.g. "$7,000.00"), or "$0" if null/zero
+- If actual > 0 but phase is not Done: show the amount in a muted color (spend recorded but phase not complete)
+- If actual > estimated: show in red (over budget)
+- If actual > 0 and phase is Done: show in green
+- Keep the "—" only when actual is null AND phase is Not Started
+
+This makes the SOW reflect real invoice spend per phase.
+
+---
+
+**BUG FIX 2 — Job type amount not pre-filling when editing invoice**
+
+In the Edit Invoice form (visible in the screenshot), when editing an existing invoice, the Job Type row shows amount = 0 instead of the saved amount. The `InvoiceJobType.amount` is stored correctly in the DB but not being passed to the edit form.
+
+Find the edit invoice component/modal and fix the job type rows to pre-fill with the existing `InvoiceJobType.amount` values when loaded for editing. The form should show the actual saved amounts, not 0.
+
+---
+
+**NEW FEATURE — Stage Payments**
+
+Contractors are often paid in milestones (e.g., 50% on completion, 25% on inspection, 25% on final). Add a payment schedule to invoices.
+
+**DB migration:**
+Create a new model `InvoiceStage`:
+```sql
+CREATE TABLE "InvoiceStage" (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  "invoiceId" TEXT NOT NULL REFERENCES "Invoice"(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  percentage DECIMAL(5,2),
+  amount DECIMAL(14,2) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Pending',
+  "triggerEvent" TEXT,
+  "dueDate" DATE,
+  "paidAt" TIMESTAMPTZ,
+  "order" INT NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX ON "InvoiceStage"("invoiceId");
+```
+
+Add to Prisma schema:
+model InvoiceStage {
+
+id          String    @id @default(cuid())
+
+invoiceId   String
+
+invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+name        String
+
+description String?
+
+percentage  Decimal?  @db.Decimal(5,2)
+
+amount      Decimal   @db.Decimal(14,2)
+
+status      String    @default("Pending")
+
+triggerEvent String?
+
+dueDate     DateTime? @db.Date
+
+paidAt      DateTime?
+
+order       Int       @default(0)
+
+createdAt   DateTime  @default(now())
+
+}
+Add `stages InvoiceStage[]` to the Invoice model.
+Run migration + prisma generate.
+
+**API updates:**
+- `GET /api/rehab/[projectId]/invoices`: include `stages` in the response
+- `POST /api/rehab/[projectId]/invoices`: accept optional `stages` array, create InvoiceStage rows
+- `PATCH /api/rehab/[projectId]/invoices/[invoiceId]`: accept `stages`, upsert them (match by id if existing, create if new, delete removed ones)
+- New route `PATCH /api/rehab/[projectId]/invoices/[invoiceId]/stages/[stageId]`: update a single stage status (Pending → Paid) and set paidAt = now()
+
+**UI — Add/Edit Invoice form:**
+Add a "Payment Schedule" section below the Job Types section.
+
+Toggle: "Split into payment stages" (off by default).
+
+When toggled ON, show:
+- A list of stage rows:
+[Stage name] [Trigger description] [% or $] [Amount auto-calc] [Status] [Remove]
+- Each row: 
+  - Name input (e.g. "Initial payment", "On inspection", "Final payment")  
+  - Trigger input (e.g. "50% upon work completion")
+  - Percentage input (0-100) → auto-calculates amount from invoice total
+  - Amount shown read-only (= percentage × invoice total)
+  - Status: Pending / Paid dropdown
+- Percentages must sum to 100% — show a warning if they don't
+- "Add stage" button adds a new row
+- Preset buttons: [2 stages: 50/50] [3 stages: 50/25/25] [Custom]
+
+**UI — Invoice detail panel (right side panel in Invoices tab):**
+If an invoice has stages, show a "Payment Schedule" section in the detail panel:
+PAYMENT SCHEDULE
+
+─────────────────────────────────
+
+● Initial payment     50%   $3,500   [Pending ▾]
+
+● On inspection       25%   $1,750   [Pending ▾]
+
+● Final payment       25%   $1,750   [Pending ▾]
+
+─────────────────────────────────
+
+$7,000  (total)
+
+Each status pill is a dropdown: Pending → Paid (clicking Paid sets paidAt = now()).
+When all stages are Paid, the invoice status automatically updates to Paid.
+Show a progress bar: "X of N stages paid — $Y of $Z".
+
+**Budget & SOW actual tracking with stages:**
+When an invoice has stages:
+- Only count the amount of PAID stages toward `Phase.actual` (not the full invoice amount)
+- Update `recomputePhaseActuals` in `lib/rehab/invoiceActuals.ts` to handle staged invoices:
+  - If invoice has no stages: use invoice amount when status=Paid (current behavior)
+  - If invoice has stages: sum only the `InvoiceStage.amount` rows where `status="Paid"`, regardless of invoice-level status

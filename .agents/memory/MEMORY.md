@@ -11,3 +11,4 @@
 - [CSS var ancestor shadowing](css-var-ancestor-shadowing.md) — a JS-set --var on documentElement is shadowed if a wrapper (.app-shell) also declares it; put the default on :root only.
 - [Company Departments == PmSpace](chg-rehab-departments.md) — UI "Company Departments"/"Department" is the PmSpace model + /pm route; admin-only space CRUD; WsTask.spaceId required at form, optional at API.
 - [WsTask multi-assignee dual-write](wstask-multi-assignee-dual-write.md) — WsTask keeps legacy assigneeId/done in lockstep with junction+status enum; private tasks must never carry a department.
+- [Invoice stage payments](invoice-stage-payments.md) — staged invoices count only Paid stages, allocated proportionally by job-type amount; invoice<->stage status sync must be two-way.

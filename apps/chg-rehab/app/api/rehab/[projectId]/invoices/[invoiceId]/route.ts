@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseJobTypes } from "@/lib/rehab/invoice-utils";
+import { parseJobTypes, parseStages } from "@/lib/rehab/invoice-utils";
 import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
 import {
   InvoiceClassification,
@@ -106,6 +106,16 @@ export async function PATCH(
     }
   }
 
+  // Stages (payment schedule) — upsert by id, delete the ones that were removed,
+  // and preserve paidAt on rows that stay Paid.
+  let parsedStages: ReturnType<typeof parseStages> | null = null;
+  if ("stages" in body) {
+    parsedStages = parseStages(body.stages);
+    if (!parsedStages.ok) {
+      return NextResponse.json({ error: parsedStages.error }, { status: 400 });
+    }
+  }
+
   // Phases affected by this change = the existing rows' phases plus any new ones.
   const existing = await prisma.invoiceJobType.findMany({
     where: { invoiceId: resolved.invoiceId },
@@ -129,12 +139,54 @@ export async function PATCH(
         if (r.phaseId) affectedPhaseIds.add(r.phaseId);
       }
     }
+
+    if (parsedStages && parsedStages.ok) {
+      const existingStages = await tx.invoiceStage.findMany({
+        where: { invoiceId: resolved.invoiceId },
+      });
+      const existingById = new Map(existingStages.map((s) => [s.id, s]));
+      const keptIds = new Set(
+        parsedStages.rows
+          .filter((r) => r.id && existingById.has(r.id))
+          .map((r) => r.id as string)
+      );
+      const removed = existingStages.filter((s) => !keptIds.has(s.id)).map((s) => s.id);
+      if (removed.length) {
+        await tx.invoiceStage.deleteMany({ where: { id: { in: removed } } });
+      }
+      let order = 0;
+      for (const r of parsedStages.rows) {
+        const prev = r.id ? existingById.get(r.id) : undefined;
+        const paidAt =
+          r.status === "Paid" ? prev?.paidAt ?? new Date() : null;
+        const fields = {
+          name: r.name,
+          description: r.description,
+          percentage: r.percentage,
+          amount: r.amount,
+          status: r.status,
+          triggerEvent: r.triggerEvent,
+          dueDate: r.dueDate,
+          order: order++,
+          paidAt,
+        };
+        if (prev) {
+          await tx.invoiceStage.update({ where: { id: prev.id }, data: fields });
+        } else {
+          await tx.invoiceStage.create({
+            data: { invoiceId: resolved.invoiceId, ...fields },
+          });
+        }
+      }
+    }
+
     return tx.invoice.update({
       where: { id: resolved.invoiceId },
       data,
       include: {
         attachments: { orderBy: { createdAt: "asc" } },
         jobTypes: { orderBy: { createdAt: "asc" } },
+        stages: { orderBy: { order: "asc" } },
       },
     });
   });

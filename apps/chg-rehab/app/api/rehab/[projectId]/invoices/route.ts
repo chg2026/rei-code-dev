@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
-import { parseJobTypes } from "@/lib/rehab/invoice-utils";
+import { parseJobTypes, parseStages } from "@/lib/rehab/invoice-utils";
 import {
   InvoiceClassification,
   InvoiceStatus,
@@ -41,6 +41,7 @@ export async function GET(
     include: {
       attachments: { orderBy: { createdAt: "asc" } },
       jobTypes: { orderBy: { createdAt: "asc" } },
+      stages: { orderBy: { order: "asc" } },
     },
     orderBy: { date: "desc" },
   });
@@ -87,6 +88,11 @@ export async function POST(
   const parsed = await parseJobTypes(body.jobTypes, project.id);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  const parsedStages = parseStages(body.stages);
+  if (!parsedStages.ok) {
+    return NextResponse.json({ error: parsedStages.error }, { status: 400 });
+  }
+
   const invoice = await prisma.invoice.create({
     data: {
       projectId: project.id,
@@ -107,10 +113,24 @@ export async function POST(
           notes: r.notes,
         })),
       },
+      stages: {
+        create: parsedStages.rows.map((s, i) => ({
+          name: s.name,
+          description: s.description,
+          percentage: s.percentage,
+          amount: s.amount,
+          status: s.status,
+          triggerEvent: s.triggerEvent,
+          dueDate: s.dueDate,
+          order: s.order ?? i,
+          paidAt: s.status === "Paid" ? new Date() : null,
+        })),
+      },
     },
     include: {
       attachments: true,
       jobTypes: { orderBy: { createdAt: "asc" } },
+      stages: { orderBy: { order: "asc" } },
     },
   });
 
