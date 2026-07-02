@@ -61,7 +61,7 @@ async function loadProfileInitial(
   role: string,
   firstName?: string | null,
   lastName?: string | null,
-): Promise<ProfileTabInitial> {
+): Promise<Omit<ProfileTabInitial, "phoneNumber" | "phoneVerified" | "timezone">> {
   const admin = getSupabaseAdminClient();
   const { data } = await admin
     .from("user_profiles")
@@ -143,6 +143,9 @@ export default async function AccountPage({
         notifyQuietOverride: true,
         notifyQuietStart: true,
         notifyQuietEnd: true,
+        phoneNumber: true,
+        phoneVerified: true,
+        timezone: true,
       },
     }),
     loadProfileInitial(user.id, user.email ?? null, user.role, user.firstName, user.lastName),
@@ -178,7 +181,14 @@ export default async function AccountPage({
       role={user.role}
     >
       {tab === "profile" ? (
-        <ProfileTab initial={profileInitial} />
+        <ProfileTab
+          initial={{
+            ...profileInitial,
+            phoneNumber: dbUser?.phoneNumber ?? null,
+            phoneVerified: dbUser?.phoneVerified ?? false,
+            timezone: dbUser?.timezone ?? null,
+          }}
+        />
       ) : (
         <AccountClient
           userName={userName}

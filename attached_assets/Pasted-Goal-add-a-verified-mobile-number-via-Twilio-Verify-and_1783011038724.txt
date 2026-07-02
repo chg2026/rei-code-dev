@@ -1,0 +1,22 @@
+Goal: add a verified mobile number (via Twilio Verify) and a timezone to the user's account profile, for use by SMS reminders. Read each file before changing it — do not guess. Do not touch the existing general "Phone" field, the password logic, or any other feature.
+1. Install the Twilio library into apps/chg-rehab (add the twilio npm package).
+2. Create apps/chg-rehab/lib/twilio.ts — a lazy Twilio helper (don't construct the client at import time, so the app boots without creds). It reads TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID. Export:
+
+normalizeUsPhone(raw: string): string | null — returns E.164 for a valid US number (10 digits → +1XXXXXXXXXX; also accept an existing +1XXXXXXXXXX); returns null if not a valid US mobile.
+startPhoneVerification(phoneE164: string) — calls client.verify.v2.services(VERIFY_SID).verifications.create({ to: phoneE164, channel: "sms" }).
+checkPhoneVerification(phoneE164, code): Promise<boolean> — calls verificationChecks.create({ to, code }) and returns true only when status === "approved".
+isVerifyConfigured(): boolean.
+
+3. Create POST /api/account/phone/send-code (apps/chg-rehab/app/api/account/phone/send-code/route.ts): require getCurrentUser(); read { phone }; normalizeUsPhone it (400 with a clear message if invalid); call startPhoneVerification; return { ok: true, phone: <normalized> }. Wrap Twilio calls in try/catch and return a friendly error.
+4. Create POST /api/account/phone/verify-code (.../phone/verify-code/route.ts): require auth; read { phone, code }; normalize; call checkPhoneVerification; if approved, prisma.user.update({ where: { id: user.id }, data: { phoneNumber: <normalized>, phoneVerified: true, phoneVerifiedAt: new Date() } }) and return { ok: true }; if not approved, 400 "That code is invalid or expired."
+5. Create PUT /api/account/timezone (.../account/timezone/route.ts): require auth; read { timezone }; validate it's a real IANA zone (e.g. Intl.supportedValuesOf("timeZone").includes(...) or a try/catch with Intl.DateTimeFormat); save to prisma.user.update({ where: { id: user.id }, data: { timezone } }); return { ok: true }.
+6. Surface current values in the profile: find how ProfileTab receives its initial prop (trace app/account/page.tsx / Client.tsx), and extend that data source to also load phoneNumber, phoneVerified, and timezone from the Prisma User row and pass them into ProfileTab. Update ProfileTabInitial accordingly.
+7. Add a "Text Reminders" card to ProfileTab.tsx, styled to match the existing cards/inputs in that file:
+
+A Mobile number input (US). If phoneVerified is true, show the saved number with a green "Verified" pill and a "Change number" link that resets the flow.
+If not verified: a "Send code" button → calls send-code → then reveal a 6-digit code input and a "Verify" button → calls verify-code → on success show the "Verified" pill and refresh.
+A small consent line under the input: "By verifying, you agree to receive automated text reminders at this number. Msg & data rates may apply. Reply STOP to opt out."
+A Timezone dropdown (IANA zones). Default the selection to the saved timezone, or if none, to the browser's zone via Intl.DateTimeFormat().resolvedOptions().timeZone. Saving calls PUT /api/account/timezone.
+Use the existing toast/flash pattern for success/error, and match input heights and styling already used in the file.
+
+8. Do not modify the existing general "Phone" field or its save path. When done, run the app's typecheck/build for apps/chg-rehab and confirm it compiles.

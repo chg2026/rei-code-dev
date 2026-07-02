@@ -43,6 +43,7 @@
     "react-dom": "^19.2.5"
   },
   "dependencies": {
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "twilio": "^6.0.2"
   }
 }

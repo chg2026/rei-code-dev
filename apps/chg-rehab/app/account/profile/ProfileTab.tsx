@@ -13,7 +13,31 @@ export type ProfileTabInitial = {
   planTier: string | null;
   role: string;
   profileScore: number | null;
+  phoneNumber: string | null;
+  phoneVerified: boolean;
+  timezone: string | null;
 };
+
+const FALLBACK_TIMEZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+];
+
+function listTimezones(): string[] {
+  try {
+    if (typeof Intl.supportedValuesOf === "function") {
+      return Intl.supportedValuesOf("timeZone");
+    }
+  } catch {
+    // fall through
+  }
+  return FALLBACK_TIMEZONES;
+}
 
 export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) {
   const router = useRouter();
@@ -25,6 +49,25 @@ export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) 
   const [pwNew, setPwNew] = useState("");
   const [pwConfirm, setPwConfirm] = useState("");
   const [changingPw, setChangingPw] = useState(false);
+
+  // Text Reminders (verified mobile via Twilio Verify) + timezone
+  const [smsVerified, setSmsVerified] = useState(initial.phoneVerified);
+  const [smsSavedPhone, setSmsSavedPhone] = useState(initial.phoneNumber ?? "");
+  const [smsPhone, setSmsPhone] = useState(initial.phoneNumber ?? "");
+  const [smsCode, setSmsCode] = useState("");
+  const [smsCodeSent, setSmsCodeSent] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsChecking, setSmsChecking] = useState(false);
+  const [timezones] = useState<string[]>(() => listTimezones());
+  const [timezone, setTimezone] = useState<string>(() => {
+    if (initial.timezone) return initial.timezone;
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+    } catch {
+      return "America/New_York";
+    }
+  });
+  const [savingTz, setSavingTz] = useState(false);
 
   const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
   const flash = (kind: "ok" | "err", msg: string) => {
@@ -83,6 +126,80 @@ export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) 
       flash("err", err instanceof Error ? err.message : "Failed to update password");
     } finally {
       setChangingPw(false);
+    }
+  }
+
+  async function handleSendCode() {
+    setSmsSending(true);
+    try {
+      const res = await fetch("/api/account/phone/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: smsPhone }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        phone?: string;
+        error?: string;
+      };
+      if (!res.ok || !j.ok) throw new Error(j.error || "Couldn't send the code");
+      if (j.phone) setSmsPhone(j.phone);
+      setSmsCodeSent(true);
+      setSmsCode("");
+      flash("ok", "Code sent — check your phone");
+    } catch (err) {
+      flash("err", err instanceof Error ? err.message : "Couldn't send the code");
+    } finally {
+      setSmsSending(false);
+    }
+  }
+
+  async function handleVerifyCode() {
+    setSmsChecking(true);
+    try {
+      const res = await fetch("/api/account/phone/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: smsPhone, code: smsCode }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) throw new Error(j.error || "That code is invalid or expired.");
+      setSmsVerified(true);
+      setSmsSavedPhone(smsPhone);
+      setSmsCodeSent(false);
+      setSmsCode("");
+      flash("ok", "Phone verified");
+      router.refresh();
+    } catch (err) {
+      flash("err", err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setSmsChecking(false);
+    }
+  }
+
+  function handleChangeNumber() {
+    setSmsVerified(false);
+    setSmsCodeSent(false);
+    setSmsCode("");
+    setSmsPhone("");
+  }
+
+  async function handleSaveTimezone() {
+    setSavingTz(true);
+    try {
+      const res = await fetch("/api/account/timezone", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) throw new Error(j.error || "Couldn't save timezone");
+      flash("ok", "Timezone saved");
+      router.refresh();
+    } catch (err) {
+      flash("err", err instanceof Error ? err.message : "Couldn't save timezone");
+    } finally {
+      setSavingTz(false);
     }
   }
 
@@ -229,6 +346,148 @@ export default function ProfileTab({ initial }: { initial: ProfileTabInitial }) 
           </div>
         </div>
       </form>
+
+      <div style={cardStyle}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600 }}>Text Reminders</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <label style={labelStyle}>Mobile number (US)</label>
+            {smsVerified ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  style={{
+                    ...inputStyle,
+                    background: "var(--bg-mid, #f9fafb)",
+                    color: "var(--text-tertiary, #6b7280)",
+                    flex: 1,
+                    width: "auto",
+                  }}
+                  value={smsSavedPhone}
+                  disabled
+                  readOnly
+                />
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: "#166534",
+                    background: "#dcfce7",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: 999,
+                    padding: "3px 10px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ✓ Verified
+                </span>
+                <button
+                  type="button"
+                  onClick={handleChangeNumber}
+                  style={{
+                    background: "none",
+                    border: 0,
+                    padding: 0,
+                    fontSize: 12,
+                    color: "var(--text-secondary, #374151)",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Change number
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <input
+                    type="tel"
+                    style={{ ...inputStyle, flex: 1, width: "auto" }}
+                    value={smsPhone}
+                    onChange={(e) => setSmsPhone(e.target.value)}
+                    autoComplete="tel-national"
+                    placeholder="(555) 123-4567"
+                    disabled={smsSending || smsChecking}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={smsSending || !smsPhone.trim()}
+                    style={{
+                      ...btnStyle,
+                      opacity: smsSending || !smsPhone.trim() ? 0.5 : 1,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {smsSending ? "Sending…" : smsCodeSent ? "Resend code" : "Send code"}
+                  </button>
+                </div>
+                {smsCodeSent && (
+                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                    <input
+                      inputMode="numeric"
+                      maxLength={6}
+                      style={{ ...inputStyle, flex: 1, width: "auto", letterSpacing: 2 }}
+                      value={smsCode}
+                      onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, ""))}
+                      placeholder="6-digit code"
+                      autoComplete="one-time-code"
+                      disabled={smsChecking}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={smsChecking || smsCode.length !== 6}
+                      style={{
+                        ...btnStyle,
+                        opacity: smsChecking || smsCode.length !== 6 ? 0.5 : 1,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {smsChecking ? "Verifying…" : "Verify"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            <div style={{ fontSize: 11, color: "var(--text-tertiary, #6b7280)", marginTop: 6 }}>
+              By verifying, you agree to receive automated text reminders at this number. Msg
+              &amp; data rates may apply. Reply STOP to opt out.
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Timezone</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <select
+                style={{ ...inputStyle, flex: 1, width: "auto" }}
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                disabled={savingTz}
+              >
+                {!timezones.includes(timezone) && (
+                  <option value={timezone}>{timezone}</option>
+                )}
+                {timezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveTimezone}
+                disabled={savingTz}
+                style={{ ...btnStyle, opacity: savingTz ? 0.5 : 1, whiteSpace: "nowrap" }}
+              >
+                {savingTz ? "Saving…" : "Save timezone"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div style={cardStyle}>
         <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Account information</h3>
