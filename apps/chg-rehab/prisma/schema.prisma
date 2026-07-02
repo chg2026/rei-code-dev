@@ -63,6 +63,7 @@ model Company {
   pmStatuses           PmStatus[]
   pmTags               PmTag[]
   pmTasks              PmTask[]
+  smsSchedules         WsReminderSms[]
 }
 
 model User {
@@ -80,6 +81,10 @@ model User {
   notifyQuietStart        String?
   notifyQuietEnd          String?
   notifyQuietOverride     Boolean                      @default(false)
+  phoneNumber             String? // US mobile number in E.164 format (e.g. +15551234567)
+  phoneVerified           Boolean                      @default(false)
+  phoneVerifiedAt         DateTime?
+  timezone                String                       @default("America/New_York") // IANA timezone
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @default(now()) @updatedAt
   activityEntries         ActivityLogEntry[]
@@ -105,6 +110,7 @@ model User {
   pmAssignments           PmTaskAssignee[]             @relation("PmAssignments")
   pmComments              PmComment[]                  @relation("PmComments")
   pmActivity              PmActivity[]                 @relation("PmActivityLog")
+  smsSchedules            WsReminderSms[]
 
   @@index([companyId])
   @@index([companyId, active])
@@ -1814,10 +1820,35 @@ model WsReminder {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  smsSchedules WsReminderSms[]
+
   @@index([companyId, done, remindAt])
   @@index([companyId, userId, done])
   @@index([companyId, dismissed, dueDate])
   @@index([companyId, assigneeId])
+}
+
+model WsReminderSms {
+  id            String    @id @default(cuid())
+  companyId     String
+  reminderId    String
+  userId        String? // the recipient
+  scheduledFor  DateTime // exact UTC moment to send the text
+  leadLabel     String? // human label, e.g. "1 hour before"
+  minutesBefore Int // offset used to compute scheduledFor
+  status        String    @default("pending") // pending | sent | failed | canceled
+  sentAt        DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+  createdAt     DateTime  @default(now())
+
+  reminder WsReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  company  Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user     User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledFor])
+  @@index([reminderId])
+  @@index([companyId])
 }
 
 model WsCalendarEvent {
