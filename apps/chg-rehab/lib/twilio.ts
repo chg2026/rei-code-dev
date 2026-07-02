@@ -5,6 +5,7 @@
  * app boots cleanly when TWILIO_* credentials are absent. Callers should gate
  * on isVerifyConfigured() before starting a verification.
  */
+import twilio from "twilio";
 import type { Twilio } from "twilio";
 
 let cachedClient: Twilio | null = null;
@@ -26,10 +27,8 @@ function getClient(): Twilio {
     throw new Error("Twilio Verify is not configured");
   }
   if (!cachedClient) {
-    // Lazy require so the SDK is only loaded (and the client only built) when
-    // a verification is actually requested.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const twilio = require("twilio") as typeof import("twilio");
+    // The client is only constructed here — never at import time — so the app
+    // still boots with no Twilio creds set.
     cachedClient = twilio(
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_AUTH_TOKEN

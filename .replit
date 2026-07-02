@@ -49,6 +49,10 @@ args = "Investor Portal"
 task = "workflow.run"
 args = "Contractor Portal"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "build-chg-rehab"
+
 [[workflows.workflow]]
 name = "CHG Rehab"
 author = "agent"
@@ -96,6 +100,17 @@ waitForPort = 3003
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "build-chg-rehab"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build --workspace=apps/chg-rehab"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 3000
