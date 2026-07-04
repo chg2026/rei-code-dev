@@ -43,15 +43,10 @@ export default async function OverviewPage({
   const meta = parseProjectMeta(project.meta);
   const budget = Number(project.budget ?? 0);
 
-  // Current spend = paid (released) draws.
-  const paidDraws = project.draws.filter(
-    (d) => d.status === DrawStatus.Paid || d.status === DrawStatus.Approved
-  );
-  const totalSpent = paidDraws.reduce((acc, d) => acc + Number(d.amount), 0);
-
   // Parallel aggregates: invoice spend/outstanding, pending change orders,
   // contractor assignments, property meta (acquisition cost), activity feed.
   const [
+    paidInvoiceAgg,
     laborAgg,
     materialAgg,
     outstandingAgg,
@@ -60,6 +55,10 @@ export default async function OverviewPage({
     propertyRow,
     allActivity,
   ] = await Promise.all([
+    prisma.invoice.aggregate({
+      where: { projectId: project.id, status: InvoiceStatus.Paid },
+      _sum: { amount: true },
+    }),
     prisma.invoice.aggregate({
       where: {
         projectId: project.id,
@@ -98,6 +97,9 @@ export default async function OverviewPage({
     loadProjectActivity(user.companyId, 200),
   ]);
 
+  // Current spend = Job-to-Date = sum of Paid invoices. Draws remain the
+  // contractor payout ledger but are no longer the source of "Current spend".
+  const totalSpent = Number(paidInvoiceAgg._sum.amount ?? 0);
   const laborSpend = Number(laborAgg._sum.amount ?? 0);
   const materialSpend = Number(materialAgg._sum.amount ?? 0);
   const outstandingAmount = Number(outstandingAgg._sum.amount ?? 0);
