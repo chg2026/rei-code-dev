@@ -71,6 +71,9 @@ export default async function BudgetPage({
   // payout ledger but are no longer the source of "Total spent".
   const paidInvoices = invoiceRows.filter((inv) => inv.status === InvoiceStatus.Paid);
   const totalSpent = paidInvoices.reduce((acc, inv) => acc + Number(inv.amount), 0);
+  // Committed = every invoice regardless of status (Unpaid, Pending, Paid).
+  const totalCommitted = invoiceRows.reduce((acc, inv) => acc + Number(inv.amount), 0);
+  const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
   // Projected final: not-started phases contribute their budget, in-flight or
   // completed phases contribute their invoice-derived actual (which may exceed
   // budget for cost overruns). When a phase has no paid invoices yet we fall
@@ -80,7 +83,9 @@ export default async function BudgetPage({
     const actualN = phaseActual(p.id);
     return acc + (p.status === PhaseStatus.NotStarted ? budgetN : actualN || budgetN);
   }, 0);
-  const remaining = Math.max(0, budget - totalSpent);
+  // Remaining is measured against commitments, not just paid spend: what's
+  // left of the phase budgets after every invoice (any status) is accounted.
+  const remaining = phaseBudgetTotal - totalCommitted;
   const overage = projected - budget;
   const pendingBalance = project.draws
     .filter((d) => d.status === DrawStatus.Pending)
@@ -118,6 +123,7 @@ export default async function BudgetPage({
       actualLabor: Number(breakdown?.labor ?? 0),
       actualMaterials: Number(breakdown?.materials ?? 0),
       actualOther: Number(breakdown?.other ?? 0),
+      committed: Number(breakdown?.committed ?? 0),
       drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
       drawLabel: draw
         ? drawPaid
@@ -136,8 +142,9 @@ export default async function BudgetPage({
       <div className="kpi-strip">
         <div className="kpi-card"><div className="kpi-label">Approved budget</div><div className="kpi-val">{fmt$(budget)}</div><div className="kpi-sub">Signed {formatET(project.startDate, false)}</div></div>
         <div className="kpi-card"><div className="kpi-label">Total spent</div><div className="kpi-val green">{fmt$(totalSpent)}</div><div className="kpi-sub">{paidInvoices.length} invoices paid</div></div>
+        <div className="kpi-card"><div className="kpi-label">Committed</div><div className="kpi-val">{fmt$(totalCommitted)}</div><div className="kpi-sub">{invoiceRows.length} invoices, all statuses</div></div>
         <div className="kpi-card"><div className="kpi-label">Projected final</div><div className={`kpi-val ${overage > 0 ? "amber" : ""}`}>{fmt$(projected)}</div>{overage !== 0 && <div className="kpi-badge" style={overage > 0 ? { background: "var(--amber-bg)", color: "var(--amber-txt)" } : { background: "var(--green-bg)", color: "var(--green-txt)" }}>{overage > 0 ? `+${fmt$(overage)} over` : `${fmt$(overage)} under`}</div>}</div>
-        <div className="kpi-card"><div className="kpi-label">Remaining</div><div className="kpi-val">{fmt$(remaining)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).length} draws pending</div></div>
+        <div className="kpi-card"><div className="kpi-label">Remaining</div><div className="kpi-val" style={remaining < 0 ? { color: "var(--red-txt)" } : undefined}>{fmt$(remaining)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).length} draws pending</div></div>
         <div className="kpi-card"><div className="kpi-label">Contractor balance</div><div className={`kpi-val ${pendingBalance > 0 ? "amber" : ""}`}>{fmt$(pendingBalance)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).map(d => `Draw #${d.number}`).join(" + ") || "—"}</div></div>
       </div>
 

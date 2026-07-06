@@ -21,6 +21,7 @@ export type BudgetPhaseRow = {
   status: string;
   budget: number;
   actual: number;
+  committed: number;
   laborBudget: number;
   materialsBudget: number;
   actualLabor: number;
@@ -32,7 +33,7 @@ export type BudgetPhaseRow = {
   invoices: BudgetPhaseInvoice[];
 };
 
-const GRID = "minmax(0,1fr) 68px 70px 70px 130px 92px";
+const GRID = "minmax(0,1fr) 68px 70px 70px 70px 130px 92px";
 
 export default function BudgetPhaseRows({
   phases,
@@ -49,6 +50,7 @@ export default function BudgetPhaseRows({
       <div className="data-hd" style={{ gridTemplateColumns: GRID }}>
         <span className="col-label">Job Type</span>
         <span className="col-label" style={{ textAlign: "right" }}>Budget</span>
+        <span className="col-label" style={{ textAlign: "right" }}>Committed</span>
         <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
         <span className="col-label" style={{ textAlign: "right" }}>Variance</span>
         <span className="col-label">Status</span>
@@ -57,19 +59,26 @@ export default function BudgetPhaseRows({
       {phases.map((p) => {
         const b = p.budget;
         const a = p.actual;
-        const v = a - b;
+        const c = p.committed;
+        // Variance is measured against commitments: negative = over-committed.
+        const v = b - c;
         const isOpen = !!expanded[p.id];
         const notStarted = p.status === "NotStarted";
+        const comCol = notStarted ? (
+          <span style={{ color: "var(--text-tertiary)" }}>—</span>
+        ) : (
+          <span>{fmt$(c)}</span>
+        );
         const actCol = notStarted ? (
           <span style={{ color: "var(--text-tertiary)" }}>—</span>
         ) : (
-          <span style={{ fontWeight: 500, color: v > 0 ? "var(--amber)" : "var(--green)" }}>{fmt$(a)}</span>
+          <span style={{ fontWeight: 500, color: a > b ? "var(--amber)" : "var(--green)" }}>{fmt$(a)}</span>
         );
         const varCol = notStarted ? (
           <span style={{ color: "var(--text-tertiary)" }}>—</span>
         ) : (
-          <span style={{ color: v > 0 ? "var(--amber)" : "var(--green)" }}>
-            {v > 0 ? `+${fmt$(v)}` : v < 0 ? `${fmt$(v)}` : "$0"}
+          <span style={{ color: v < 0 ? "var(--red-txt)" : "var(--green)" }}>
+            {v < 0 ? `${fmt$(v)}` : v > 0 ? `+${fmt$(v)}` : "$0"}
           </span>
         );
         return (
@@ -103,6 +112,7 @@ export default function BudgetPhaseRows({
                 </button>
               </div>
               <div style={{ textAlign: "right", fontSize: 11 }}>{fmt$(b)}</div>
+              <div style={{ textAlign: "right", fontSize: 11 }}>{comCol}</div>
               <div style={{ textAlign: "right", fontSize: 11 }}>{actCol}</div>
               <div style={{ textAlign: "right", fontSize: 10 }}>{varCol}</div>
               <div>

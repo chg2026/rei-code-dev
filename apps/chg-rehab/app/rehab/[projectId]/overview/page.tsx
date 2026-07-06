@@ -47,6 +47,7 @@ export default async function OverviewPage({
   // contractor assignments, property meta (acquisition cost), activity feed.
   const [
     paidInvoiceAgg,
+    allInvoiceAgg,
     laborAgg,
     materialAgg,
     outstandingAgg,
@@ -57,6 +58,11 @@ export default async function OverviewPage({
   ] = await Promise.all([
     prisma.invoice.aggregate({
       where: { projectId: project.id, status: InvoiceStatus.Paid },
+      _sum: { amount: true },
+    }),
+    // Committed = every invoice regardless of payment status.
+    prisma.invoice.aggregate({
+      where: { projectId: project.id },
       _sum: { amount: true },
     }),
     prisma.invoice.aggregate({
@@ -100,6 +106,7 @@ export default async function OverviewPage({
   // Current spend = Job-to-Date = sum of Paid invoices. Draws remain the
   // contractor payout ledger but are no longer the source of "Current spend".
   const totalSpent = Number(paidInvoiceAgg._sum.amount ?? 0);
+  const totalCommitted = Number(allInvoiceAgg._sum.amount ?? 0);
   const laborSpend = Number(laborAgg._sum.amount ?? 0);
   const materialSpend = Number(materialAgg._sum.amount ?? 0);
   const outstandingAmount = Number(outstandingAgg._sum.amount ?? 0);
@@ -110,7 +117,10 @@ export default async function OverviewPage({
   const completedPhases = project.phases.filter((p) => p.status === PhaseStatus.Done).length;
   const rehabPct = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
   const budgetPct = budget > 0 ? Math.round((totalSpent / budget) * 100) : 0;
-  const budgetRemaining = budget - totalSpent;
+  // Remaining is measured against commitments (all invoices, any status),
+  // matching the Budget & Costs tab: phase budgets minus Committed.
+  const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
+  const budgetRemaining = phaseBudgetTotal - totalCommitted;
 
   const targetEnd = project.endDate;
   const now = Date.now();
