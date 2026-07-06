@@ -7,7 +7,10 @@ import { Prisma } from "@prisma/client";
  * Recognised spend per invoice:
  *   - No stages: the invoice's job-type amounts count when the invoice is Paid
  *     (the long-standing behaviour — each InvoiceJobType.amount rolls into its
- *     phase).
+ *     phase). If every job-type amount is $0 but at least one job type is
+ *     tagged to a phase, the invoice's full amount is split evenly across the
+ *     tagged phases instead (never both). Paid invoices with no phase-tagged
+ *     job types remain unallocated.
  *   - Has stages: only the Paid stages count, regardless of the invoice-level
  *     status. The paid-stage total is allocated across the invoice's job types
  *     proportionally to each job type's amount, so a partially-paid staged
@@ -53,9 +56,30 @@ export async function computePhaseActuals(
       }
     } else {
       if (inv.status !== "Paid") continue;
-      for (const jt of inv.jobTypes) {
-        if (!jt.phaseId) continue;
-        add(jt.phaseId, new Prisma.Decimal(jt.amount));
+      const allocated = inv.jobTypes.reduce(
+        (sum, jt) => sum.plus(jt.amount),
+        new Prisma.Decimal(0)
+      );
+      if (allocated.greaterThan(0)) {
+        for (const jt of inv.jobTypes) {
+          if (!jt.phaseId) continue;
+          add(jt.phaseId, new Prisma.Decimal(jt.amount));
+        }
+      } else {
+        // Fallback: job types tag phases but carry $0 amounts — spread the
+        // invoice total evenly across the tagged phases instead. Invoices
+        // with no phase-tagged job types stay unallocated.
+        const phaseIds = Array.from(
+          new Set(
+            inv.jobTypes
+              .map((jt) => jt.phaseId)
+              .filter((p): p is string => !!p)
+          )
+        );
+        if (phaseIds.length > 0) {
+          const share = new Prisma.Decimal(inv.amount).div(phaseIds.length);
+          for (const phaseId of phaseIds) add(phaseId, share);
+        }
       }
     }
   }
