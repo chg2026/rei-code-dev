@@ -1,8 +1,30 @@
 import { prisma } from "../prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, InvoiceClassification } from "@prisma/client";
 
 /**
- * Compute Phase."actual" for every phase in a project from invoice spend.
+ * Per-phase actual spend, bucketed by the invoice's classification:
+ * Labor → labor, Materials → materials, everything else (Permit / Dumpster /
+ * Utility / Other) → other. total is always labor + materials + other.
+ */
+export type PhaseActualBreakdown = {
+  labor: Prisma.Decimal;
+  materials: Prisma.Decimal;
+  other: Prisma.Decimal;
+  total: Prisma.Decimal;
+};
+
+type Bucket = "labor" | "materials" | "other";
+
+const bucketOf = (c: InvoiceClassification): Bucket =>
+  c === InvoiceClassification.Labor
+    ? "labor"
+    : c === InvoiceClassification.Materials
+      ? "materials"
+      : "other";
+
+/**
+ * Compute per-phase actual spend for every phase in a project from invoice
+ * spend, broken down by cost type (see PhaseActualBreakdown).
  *
  * Recognised spend per invoice:
  *   - No stages: the invoice's job-type amounts count when the invoice is Paid
@@ -16,27 +38,38 @@ import { Prisma } from "@prisma/client";
  *     proportionally to each job type's amount, so a partially-paid staged
  *     invoice contributes a partial actual to each phase it touches.
  *
- * Returns a map of phaseId -> recognised actual (Decimal).
+ * Every amount an invoice contributes lands in the bucket matching that
+ * invoice's classification, so the buckets always sum to the total.
  */
-export async function computePhaseActuals(
+export async function computePhaseActualBreakdowns(
   projectId: string
-): Promise<Map<string, Prisma.Decimal>> {
+): Promise<Map<string, PhaseActualBreakdown>> {
   const invoices = await prisma.invoice.findMany({
     where: { projectId },
     select: {
       amount: true,
       status: true,
+      classification: true,
       jobTypes: { select: { phaseId: true, amount: true } },
       stages: { select: { amount: true, status: true } },
     },
   });
 
-  const map = new Map<string, Prisma.Decimal>();
-  const add = (phaseId: string, value: Prisma.Decimal) => {
-    map.set(phaseId, (map.get(phaseId) ?? new Prisma.Decimal(0)).plus(value));
+  const map = new Map<string, PhaseActualBreakdown>();
+  const add = (phaseId: string, bucket: Bucket, value: Prisma.Decimal) => {
+    const entry = map.get(phaseId) ?? {
+      labor: new Prisma.Decimal(0),
+      materials: new Prisma.Decimal(0),
+      other: new Prisma.Decimal(0),
+      total: new Prisma.Decimal(0),
+    };
+    entry[bucket] = entry[bucket].plus(value);
+    entry.total = entry.total.plus(value);
+    map.set(phaseId, entry);
   };
 
   for (const inv of invoices) {
+    const bucket = bucketOf(inv.classification);
     const hasStages = inv.stages.length > 0;
 
     if (hasStages) {
@@ -52,7 +85,7 @@ export async function computePhaseActuals(
       for (const jt of inv.jobTypes) {
         if (!jt.phaseId) continue;
         // proportional share of the paid-stage total
-        add(jt.phaseId, paidTotal.times(new Prisma.Decimal(jt.amount).div(jtTotal)));
+        add(jt.phaseId, bucket, paidTotal.times(new Prisma.Decimal(jt.amount).div(jtTotal)));
       }
     } else {
       if (inv.status !== "Paid") continue;
@@ -63,7 +96,7 @@ export async function computePhaseActuals(
       if (allocated.greaterThan(0)) {
         for (const jt of inv.jobTypes) {
           if (!jt.phaseId) continue;
-          add(jt.phaseId, new Prisma.Decimal(jt.amount));
+          add(jt.phaseId, bucket, new Prisma.Decimal(jt.amount));
         }
       } else {
         // Fallback: job types tag phases but carry $0 amounts — spread the
@@ -78,12 +111,28 @@ export async function computePhaseActuals(
         );
         if (phaseIds.length > 0) {
           const share = new Prisma.Decimal(inv.amount).div(phaseIds.length);
-          for (const phaseId of phaseIds) add(phaseId, share);
+          for (const phaseId of phaseIds) add(phaseId, bucket, share);
         }
       }
     }
   }
 
+  return map;
+}
+
+/**
+ * Compute Phase."actual" for every phase in a project from invoice spend.
+ * Thin wrapper over computePhaseActualBreakdowns — returns just the totals so
+ * existing callers (SOW tab, invoice routes) keep their shape.
+ *
+ * Returns a map of phaseId -> recognised actual (Decimal).
+ */
+export async function computePhaseActuals(
+  projectId: string
+): Promise<Map<string, Prisma.Decimal>> {
+  const breakdowns = await computePhaseActualBreakdowns(projectId);
+  const map = new Map<string, Prisma.Decimal>();
+  for (const [phaseId, b] of breakdowns) map.set(phaseId, b.total);
   return map;
 }
 

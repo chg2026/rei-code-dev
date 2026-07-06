@@ -7,7 +7,7 @@ import { formatET } from "@/lib/datetime";
 import DocUploadButton from "@/components/rehab/DocUploadButton";
 import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
 import { prisma } from "@/lib/prisma";
-import { computePhaseActuals } from "@/lib/rehab/invoiceActuals";
+import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +38,10 @@ export default async function BudgetPage({
   // Paid invoice rolls its job-type amounts into the phase, while a staged
   // invoice only counts its Paid stages (allocated across job types). The
   // helper is the single source of truth — Phase.actual is kept in sync with
-  // it by recomputePhaseActuals on every invoice / stage write.
-  const actualsMap = await computePhaseActuals(project.id);
+  // it by recomputePhaseActuals on every invoice / stage write. The breakdown
+  // variant additionally buckets each phase's actual by the invoice
+  // classification (labor / materials / other) for the per-phase detail rows.
+  const actualsMap = await computePhaseActualBreakdowns(project.id);
   const invoiceRows = await prisma.invoice.findMany({
     where: { projectId: project.id },
     include: { jobTypes: { orderBy: { createdAt: "asc" } } },
@@ -62,7 +64,7 @@ export default async function BudgetPage({
       invoicesByPhase.set(jt.phaseId, list);
     }
   }
-  const phaseActual = (phaseId: string) => Number(actualsMap.get(phaseId) ?? 0);
+  const phaseActual = (phaseId: string) => Number(actualsMap.get(phaseId)?.total ?? 0);
 
   const budget = Number(project.budget ?? 0);
   // Job-to-Date spend = sum of Paid invoices. Draws remain the contractor
@@ -103,6 +105,7 @@ export default async function BudgetPage({
   const phaseRows: BudgetPhaseRow[] = project.phases.map((p) => {
     const draw = p.draws[0];
     const drawPaid = !!draw && (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved);
+    const breakdown = actualsMap.get(p.id);
     return {
       id: p.id,
       number: p.number,
@@ -110,6 +113,11 @@ export default async function BudgetPage({
       status: p.status,
       budget: Number(p.budget ?? 0),
       actual: phaseActual(p.id),
+      laborBudget: Number(p.laborBudget ?? 0),
+      materialsBudget: Number(p.materialsBudget ?? 0),
+      actualLabor: Number(breakdown?.labor ?? 0),
+      actualMaterials: Number(breakdown?.materials ?? 0),
+      actualOther: Number(breakdown?.other ?? 0),
       drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
       drawLabel: draw
         ? drawPaid

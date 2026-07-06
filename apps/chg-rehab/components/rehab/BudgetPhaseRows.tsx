@@ -21,6 +21,11 @@ export type BudgetPhaseRow = {
   status: string;
   budget: number;
   actual: number;
+  laborBudget: number;
+  materialsBudget: number;
+  actualLabor: number;
+  actualMaterials: number;
+  actualOther: number;
   drawTagCls: string;
   drawLabel: string;
   incompleteChecklist: boolean;
@@ -112,6 +117,30 @@ export default function BudgetPhaseRows({
             </div>
             {isOpen && (
               <div style={{ padding: "6px 12px 10px 24px", background: "var(--bg-secondary)" }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--text-secondary)",
+                    paddingBottom: 6,
+                    marginBottom: 6,
+                    borderBottom: "0.5px solid var(--border-lo)",
+                  }}
+                >
+                  {p.laborBudget + p.materialsBudget === 0 && p.budget > 0 && (
+                    <div>Unsplit budget {fmt$(p.budget)}</div>
+                  )}
+                  <div>
+                    Labor:{" "}
+                    {p.laborBudget + p.materialsBudget > 0 ? `budget ${fmt$(p.laborBudget)} · ` : ""}
+                    actual {fmt$(p.actualLabor)}
+                  </div>
+                  <div>
+                    Materials:{" "}
+                    {p.laborBudget + p.materialsBudget > 0 ? `budget ${fmt$(p.materialsBudget)} · ` : ""}
+                    actual {fmt$(p.actualMaterials)}
+                  </div>
+                  {p.actualOther > 0 && <div>Other: actual {fmt$(p.actualOther)}</div>}
+                </div>
                 {p.invoices.length === 0 ? (
                   <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
                     No invoices assigned to this job type.
