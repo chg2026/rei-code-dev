@@ -8,6 +8,7 @@ import {
   MAX_UPLOAD_SIZE_BYTES,
   MAX_UPLOAD_SIZE_LABEL,
 } from "@/lib/fileValidation";
+import { budgetCode } from "@/lib/rehab/budgetCode";
 
 export type InvoiceAttachmentDTO = {
   id: string;
@@ -61,6 +62,24 @@ const STATUSES = ["Unpaid", "Pending", "Paid"];
 
 const fmt$ = (n: number) =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function UncodedBadge() {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "var(--red-bg)",
+        color: "var(--red-txt)",
+        fontSize: 9,
+        fontWeight: 500,
+      }}
+    >
+      Uncoded — no budget code
+    </span>
+  );
+}
 
 function statusStyle(status: string): React.CSSProperties {
   switch (status) {
@@ -181,6 +200,19 @@ export default function InvoicesClient({
     return `${inv.jobTypes.length} job types`;
   };
 
+  // Budget codes: one per distinct tagged phase, NN · <classification>.
+  // An invoice with no phase-tagged job types has none — it's "uncoded".
+  const budgetCodes = (inv: InvoiceDTO): string[] => {
+    const numbers = Array.from(
+      new Set(
+        inv.jobTypes
+          .map((jt) => (jt.phaseId ? phases.find((p) => p.id === jt.phaseId)?.number : undefined))
+          .filter((n): n is number => n != null)
+      )
+    ).sort((a, b) => a - b);
+    return numbers.map((n) => budgetCode(n, inv.classification));
+  };
+
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
       if (statusFilter !== "all" && inv.status !== statusFilter) return false;
@@ -199,6 +231,19 @@ export default function InvoicesClient({
       else unpaid += inv.amount; // Unpaid + Pending count as outstanding
     }
     return { total, unpaid, paid };
+  }, [invoices]);
+
+  // Invoices with no phase-tagged job types — spend that no budget code owns.
+  const uncoded = useMemo(() => {
+    let amount = 0;
+    let count = 0;
+    for (const inv of invoices) {
+      if (!inv.jobTypes.some((jt) => jt.phaseId)) {
+        amount += inv.amount;
+        count += 1;
+      }
+    }
+    return { amount, count };
   }, [invoices]);
 
   const selected = selectedId ? invoices.find((i) => i.id === selectedId) ?? null : null;
@@ -475,6 +520,15 @@ export default function InvoicesClient({
             {invoices.filter((i) => i.status === "Paid").length} settled
           </div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-label">Uncoded</div>
+          <div className="kpi-val" style={uncoded.count > 0 ? { color: "var(--red-txt)" } : undefined}>
+            {fmt$(uncoded.amount)}
+          </div>
+          <div className="kpi-sub">
+            across {uncoded.count} invoice{uncoded.count !== 1 ? "s" : ""} — no budget code
+          </div>
+        </div>
       </div>
 
       <div className="action-bar">
@@ -548,6 +602,29 @@ export default function InvoicesClient({
                   {jobTypeSummary(inv) ? ` · ${jobTypeSummary(inv)}` : ""}
                   {inv.attachments.length > 0 ? ` · 📎 ${inv.attachments.length}` : ""}
                 </div>
+                <div className="cell-meta" style={{ marginTop: 2 }}>
+                  {budgetCodes(inv).length > 0 ? (
+                    budgetCodes(inv).map((c) => (
+                      <span
+                        key={c}
+                        style={{
+                          display: "inline-block",
+                          padding: "1px 5px",
+                          marginRight: 4,
+                          borderRadius: 3,
+                          background: "#E8F0FB",
+                          color: "#1F4FA8",
+                          fontSize: 9,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {c}
+                      </span>
+                    ))
+                  ) : (
+                    <UncodedBadge />
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{inv.classification}</div>
               <div className="cell-amt" style={{ textAlign: "right" }}>{fmt$(inv.amount)}</div>
@@ -595,6 +672,26 @@ export default function InvoicesClient({
               </span>
 
               <DetailRow label="Category" value={selected.classification} />
+              {budgetCodes(selected).length > 0 ? (
+                <DetailRow
+                  label={budgetCodes(selected).length > 1 ? "Budget codes" : "Budget code"}
+                  value={budgetCodes(selected).join(", ")}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "3px 0",
+                    fontSize: 11,
+                  }}
+                >
+                  <span style={{ color: "var(--text-tertiary)" }}>Budget code</span>
+                  <UncodedBadge />
+                </div>
+              )}
               <DetailRow label="Invoice #" value={selected.invoiceNumber || "—"} />
               <DetailRow label="Date" value={selected.date} />
               {selected.notes && <DetailRow label="Notes" value={selected.notes} />}

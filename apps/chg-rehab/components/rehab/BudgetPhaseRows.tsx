@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
+import { budgetCode, phaseCode } from "@/lib/rehab/budgetCode";
 
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
@@ -105,7 +106,7 @@ export default function BudgetPhaseRows({
                     {p.name}
                   </div>
                   <div className="cell-meta" style={{ paddingLeft: 12 }}>
-                    Job Type {p.number}
+                    Job Type {p.number} · Code {phaseCode(p.number)}
                     {p.status === "InProgress" ? " — active" : ""}
                     {p.invoices.length > 0 ? ` · ${p.invoices.length} invoice${p.invoices.length === 1 ? "" : "s"}` : ""}
                   </div>
@@ -140,16 +141,18 @@ export default function BudgetPhaseRows({
                     <div>Unsplit budget {fmt$(p.budget)}</div>
                   )}
                   <div>
-                    Labor:{" "}
+                    {budgetCode(p.number, "Labor")}:{" "}
                     {p.laborBudget + p.materialsBudget > 0 ? `budget ${fmt$(p.laborBudget)} · ` : ""}
                     actual {fmt$(p.actualLabor)}
                   </div>
                   <div>
-                    Materials:{" "}
+                    {budgetCode(p.number, "Materials")}:{" "}
                     {p.laborBudget + p.materialsBudget > 0 ? `budget ${fmt$(p.materialsBudget)} · ` : ""}
                     actual {fmt$(p.actualMaterials)}
                   </div>
-                  {p.actualOther > 0 && <div>Other: actual {fmt$(p.actualOther)}</div>}
+                  {p.actualOther > 0 && (
+                    <div>{budgetCode(p.number, "Other")}: actual {fmt$(p.actualOther)}</div>
+                  )}
                 </div>
                 {p.invoices.length === 0 ? (
                   <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
