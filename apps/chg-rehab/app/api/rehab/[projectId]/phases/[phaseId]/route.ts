@@ -95,6 +95,15 @@ export async function PATCH(
         : null;
   }
 
+  if ("percentComplete" in body) {
+    const n = Number(body.percentComplete);
+    if (!Number.isFinite(n)) {
+      return NextResponse.json({ error: "Invalid percentComplete" }, { status: 400 });
+    }
+    // Clamp to the 0–100 work-complete range before persisting.
+    data.percentComplete = Math.max(0, Math.min(100, Math.round(n)));
+  }
+
   let labor = phase.laborBudget;
   let materials = phase.materialsBudget;
   let budgetTouched = false;

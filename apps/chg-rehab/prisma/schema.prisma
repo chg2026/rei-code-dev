@@ -250,6 +250,9 @@ model Phase {
   description          String?
   laborBudget          Decimal         @default(0) @db.Decimal(14, 2)
   materialsBudget      Decimal         @default(0) @db.Decimal(14, 2)
+  percentComplete      Int             @default(0) // explicit work %-complete (0–100), entered weekly
+  forecastMethod       ForecastMethod  @default(Auto) // per-line forecast method
+  forecastManual       Decimal?        @db.Decimal(14, 2) // manual Forecast-to-Complete override (method = Manual only)
   dependencies         Int[]           @default([])
   acceptanceCriteria   String[]        @default([])
   assignedContractorId String?
@@ -703,6 +706,12 @@ enum PhaseStatus {
   OnHold
   Done
   Canceled
+}
+
+enum ForecastMethod {
+  Auto
+  Manual
+  PercentComplete
 }
 
 enum ChecklistStatus {

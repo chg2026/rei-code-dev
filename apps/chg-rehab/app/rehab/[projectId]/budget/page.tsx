@@ -111,6 +111,10 @@ export default async function BudgetPage({
     const draw = p.draws[0];
     const drawPaid = !!draw && (draw.status === DrawStatus.Paid || draw.status === DrawStatus.Approved);
     const breakdown = actualsMap.get(p.id);
+    const checklistTotal = p.checklistItems.length;
+    const checklistDone = p.checklistItems.filter(
+      (i) => i.status === "Done" || i.status === "NA"
+    ).length;
     return {
       id: p.id,
       number: p.number,
@@ -124,6 +128,11 @@ export default async function BudgetPage({
       actualMaterials: Number(breakdown?.materials ?? 0),
       actualOther: Number(breakdown?.other ?? 0),
       committed: Number(breakdown?.committed ?? 0),
+      percentComplete: p.percentComplete,
+      forecastMethod: p.forecastMethod,
+      forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
+      checklistTotal,
+      checklistDone,
       drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
       drawLabel: draw
         ? drawPaid

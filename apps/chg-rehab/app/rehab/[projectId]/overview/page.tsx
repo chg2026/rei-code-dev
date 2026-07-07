@@ -7,6 +7,7 @@ import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
+import { effectivePct } from "@/lib/rehab/forecast";
 import { prisma } from "@/lib/prisma";
 import {
   PhaseStatus,
@@ -121,6 +122,25 @@ export default async function OverviewPage({
   // matching the Budget & Costs tab: phase budgets minus Committed.
   const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
   const budgetRemaining = phaseBudgetTotal - totalCommitted;
+
+  // Pace signal: % of budget spent (committed ÷ budget) vs % complete
+  // (budget-weighted average of each phase's effective %-complete). A phase
+  // with no explicit % and no checklist to infer from contributes 0 complete.
+  const spentPct = phaseBudgetTotal > 0 ? (totalCommitted / phaseBudgetTotal) * 100 : 0;
+  const weightedComplete = project.phases.reduce((acc, p) => {
+    const pBudget = Number(p.budget ?? 0);
+    const done = p.checklistItems.filter((i) => i.status === "Done" || i.status === "NA").length;
+    const { pct } = effectivePct(p.percentComplete, done, p.checklistItems.length);
+    return acc + pBudget * (pct ?? 0);
+  }, 0);
+  const completePct = phaseBudgetTotal > 0 ? weightedComplete / phaseBudgetTotal : 0;
+  const paceGap = spentPct - completePct;
+  const pace =
+    paceGap > 15
+      ? { label: "Over pace", bg: "var(--red-bg)", fg: "var(--red-txt)" }
+      : paceGap > 0
+        ? { label: "Watch pace", bg: "var(--amber-bg)", fg: "var(--amber-txt)" }
+        : { label: "On pace", bg: "var(--green-bg)", fg: "var(--green-txt)" };
 
   const targetEnd = project.endDate;
   const now = Date.now();
@@ -284,6 +304,42 @@ export default async function OverviewPage({
           outstandingAmount={outstandingAmount}
           pendingChangeOrders={pendingChangeOrders}
         />
+
+        {/* ── Pace signal: budget spent vs work complete ── */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexWrap: "wrap",
+            margin: "10px 0 4px",
+            padding: "10px 14px",
+            border: "0.5px solid var(--border-lo)",
+            borderRadius: 8,
+            background: "var(--bg-secondary)",
+          }}
+        >
+          <span
+            style={{
+              padding: "2px 9px",
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 600,
+              background: pace.bg,
+              color: pace.fg,
+            }}
+          >
+            {pace.label}
+          </span>
+          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+            <strong style={{ color: "var(--text-primary)" }}>{Math.round(spentPct)}%</strong> of budget
+            committed
+          </span>
+          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+            <strong style={{ color: "var(--text-primary)" }}>{Math.round(completePct)}%</strong> work
+            complete
+          </span>
+        </div>
 
         {/* ── Section 3: Phase tracker ── */}
         <div className="sec-hd">
