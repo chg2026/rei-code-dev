@@ -11,9 +11,15 @@ const fmt$ = (n: number) =>
 type Props = {
   code: string;
   rehabPct: number;
-  budget: number;
   budgetPct: number;
-  totalSpent: number;
+  /** Committed spend (all invoices) — numerator of "Budget % used". */
+  committed: number;
+  /** Total working budget (sum of phase budgets) — the % / forecast denominator. */
+  workingBudget: number;
+  /** Sum of every phase's Estimated Cost at Completion. */
+  projectedFinal: number;
+  /** workingBudget − projectedFinal (negative = over). */
+  projectedOverUnder: number;
   daysRemaining: number | null;
   daysDelayed: number;
   laborSpend: number;
@@ -24,13 +30,15 @@ type Props = {
 };
 
 /**
- * Eight read-only KPI tiles for the Rehab Overview tab, in a responsive grid
- * (4 across on desktop, 2 on mobile — see `.ov-kpis` in globals.css). The only
- * interactive tile is "Pending change orders", which links to that tab.
+ * Read-only KPI tiles for the Rehab Overview tab, in a responsive grid (4
+ * across on desktop, 2 on mobile — see `.ov-kpis` in globals.css). Every
+ * figure is fed by the same calcs as Budget & Costs and the pace signal. The
+ * only interactive tile is "Pending change orders", which links to that tab.
  */
 export default function OverviewKpis(p: Props) {
   const budgetColor =
     p.budgetPct > 100 ? "var(--danger)" : p.budgetPct >= 80 ? "var(--amber)" : "var(--green)";
+  const overUnderColor = p.projectedOverUnder < 0 ? "var(--danger)" : "var(--green)";
   const remainingColor =
     p.daysRemaining !== null && p.daysRemaining < 0 ? "var(--danger)" : "inherit";
   const delayedColor = p.daysDelayed > 0 ? "var(--danger)" : "inherit";
@@ -57,7 +65,25 @@ export default function OverviewKpis(p: Props) {
           {p.budgetPct}%
         </div>
         <div className="kpi-sub">
-          {fmt$(p.totalSpent)} of {fmt$(p.budget)}
+          {fmt$(p.committed)} of {fmt$(p.workingBudget)}
+        </div>
+      </div>
+
+      <div className="ov-kpi">
+        <div className="kpi-label">Projected final</div>
+        <div className="kpi-val">{fmt$(p.projectedFinal)}</div>
+        <div className="kpi-sub">Sum of phase EAC</div>
+      </div>
+
+      <div className="ov-kpi">
+        <div className="kpi-label">Projected over / under</div>
+        <div className="kpi-val" style={{ color: overUnderColor }}>
+          {p.projectedOverUnder < 0
+            ? `-${fmt$(Math.abs(p.projectedOverUnder))}`
+            : `+${fmt$(p.projectedOverUnder)}`}
+        </div>
+        <div className="kpi-sub">
+          {p.projectedOverUnder < 0 ? "Over working budget" : "Under working budget"}
         </div>
       </div>
 

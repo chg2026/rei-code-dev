@@ -7,7 +7,8 @@ import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
-import { effectivePct } from "@/lib/rehab/forecast";
+import { effectivePct, computeForecast } from "@/lib/rehab/forecast";
+import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { prisma } from "@/lib/prisma";
 import {
   PhaseStatus,
@@ -56,6 +57,7 @@ export default async function OverviewPage({
     contractorAssignments,
     propertyRow,
     allActivity,
+    actualsMap,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       where: { projectId: project.id, status: InvoiceStatus.Paid },
@@ -102,6 +104,9 @@ export default async function OverviewPage({
       select: { meta: true },
     }),
     loadProjectActivity(user.companyId, 200),
+    // Per-phase committed + paid actual — the exact breakdown Budget & Costs
+    // uses; feeds the per-phase EAC forecast below.
+    computePhaseActualBreakdowns(project.id),
   ]);
 
   // Current spend = Job-to-Date = sum of Paid invoices. Draws remain the
@@ -116,24 +121,50 @@ export default async function OverviewPage({
   // KPI computations
   const totalPhases = project.phases.length;
   const completedPhases = project.phases.filter((p) => p.status === PhaseStatus.Done).length;
-  const rehabPct = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
-  const budgetPct = budget > 0 ? Math.round((totalSpent / budget) * 100) : 0;
+
+  // Total working budget = sum of every phase budget (NOT the signed/approved
+  // project budget). This is the denominator Budget & Costs and the pace signal
+  // use, so every Overview health number shares it.
+  const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
   // Remaining is measured against commitments (all invoices, any status),
   // matching the Budget & Costs tab: phase budgets minus Committed.
-  const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
   const budgetRemaining = phaseBudgetTotal - totalCommitted;
 
-  // Pace signal: % of budget spent (committed ÷ budget) vs % complete
-  // (budget-weighted average of each phase's effective %-complete). A phase
-  // with no explicit % and no checklist to infer from contributes 0 complete.
-  const spentPct = phaseBudgetTotal > 0 ? (totalCommitted / phaseBudgetTotal) * 100 : 0;
-  const weightedComplete = project.phases.reduce((acc, p) => {
+  // Single-pass health numbers, all fed by the same calcs as Budget & Costs:
+  //   - weightedComplete → budget-weighted average of each phase's effective
+  //     %-complete (percentComplete, else checklist fallback via effectivePct).
+  //   - projectedFinal → sum of every phase's EAC from computeForecast, using
+  //     the per-phase committed + paid actual from computePhaseActualBreakdowns.
+  // A phase with no explicit % and no checklist to infer from contributes 0.
+  let weightedComplete = 0;
+  let projectedFinal = 0;
+  for (const p of project.phases) {
     const pBudget = Number(p.budget ?? 0);
+    const breakdown = actualsMap.get(p.id);
     const done = p.checklistItems.filter((i) => i.status === "Done" || i.status === "NA").length;
-    const { pct } = effectivePct(p.percentComplete, done, p.checklistItems.length);
-    return acc + pBudget * (pct ?? 0);
-  }, 0);
+    const total = p.checklistItems.length;
+    weightedComplete += pBudget * (effectivePct(p.percentComplete, done, total).pct ?? 0);
+    projectedFinal += computeForecast({
+      budget: pBudget,
+      committed: Number(breakdown?.committed ?? 0),
+      actual: Number(breakdown?.total ?? 0),
+      percentComplete: p.percentComplete,
+      forecastMethod: p.forecastMethod,
+      forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
+      checklistDone: done,
+      checklistTotal: total,
+    }).eac;
+  }
   const completePct = phaseBudgetTotal > 0 ? weightedComplete / phaseBudgetTotal : 0;
+  const projectedOverUnder = phaseBudgetTotal - projectedFinal;
+
+  // % of the working budget committed (Committed ÷ total phase budgets).
+  const spentPct = phaseBudgetTotal > 0 ? (totalCommitted / phaseBudgetTotal) * 100 : 0;
+
+  // Overview tiles share these exact numbers with the pace signal below.
+  const rehabPct = Math.round(completePct);
+  const budgetPct = Math.round(spentPct);
+
   const paceGap = spentPct - completePct;
   const pace =
     paceGap > 15
@@ -293,9 +324,11 @@ export default async function OverviewPage({
         <OverviewKpis
           code={code}
           rehabPct={rehabPct}
-          budget={budget}
           budgetPct={budgetPct}
-          totalSpent={totalSpent}
+          committed={totalCommitted}
+          workingBudget={phaseBudgetTotal}
+          projectedFinal={projectedFinal}
+          projectedOverUnder={projectedOverUnder}
           daysRemaining={daysRemaining}
           daysDelayed={daysDelayed}
           laborSpend={laborSpend}
