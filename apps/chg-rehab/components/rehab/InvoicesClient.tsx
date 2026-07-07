@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
@@ -167,10 +167,13 @@ export default function InvoicesClient({
   projectCode,
   phases,
   initialInvoices,
+  startNew = false,
 }: {
   projectCode: string;
   phases: PhaseLite[];
   initialInvoices: InvoiceDTO[];
+  /** Open the "New invoice" form on mount (e.g. from Budget's "+ Add invoice"). */
+  startNew?: boolean;
 }) {
   const router = useRouter();
   const [invoices, setInvoices] = useState<InvoiceDTO[]>(initialInvoices);
@@ -185,6 +188,17 @@ export default function InvoicesClient({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const apiBase = `/api/rehab/${encodeURIComponent(projectCode)}/invoices`;
+
+  // When arriving from Budget's "+ Add invoice" (?new=1), open the New invoice
+  // form immediately and drop the query param so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (!startNew) return;
+    setMode("new");
+    setSelectedId(null);
+    setForm(emptyForm());
+    setError(null);
+    router.replace(`/rehab/${encodeURIComponent(projectCode)}/invoices`);
+  }, [startNew, projectCode, router]);
 
   const jobTypeName = (id: string | null) => {
     if (!id) return null;
@@ -317,19 +331,43 @@ export default function InvoicesClient({
       setError("Enter a valid amount");
       return;
     }
-    // Keep only rows that carry an amount; drop fully-empty placeholder rows.
-    const jobTypeRows = form.jobTypes
-      .filter((r) => r.amount.trim() !== "" || r.phaseId !== "")
+    // Every invoice must be coded to a job type. Keep only rows with a phase
+    // selected; uncoded placeholder rows are dropped.
+    const coded = form.jobTypes
+      .filter((r) => r.phaseId !== "")
       .map((r) => ({
-        phaseId: r.phaseId || null,
-        amount: r.amount.trim() === "" ? 0 : Number(r.amount),
+        phaseId: r.phaseId,
+        amount: r.amount.trim() === "" ? null : Number(r.amount),
         notes: r.notes.trim() || null,
       }));
-    for (const r of jobTypeRows) {
-      if (Number.isNaN(r.amount) || r.amount < 0) {
+    if (coded.length === 0) {
+      setError("Assign a job type so this invoice is coded to the budget");
+      return;
+    }
+    for (const r of coded) {
+      if (r.amount !== null && (Number.isNaN(r.amount) || r.amount < 0)) {
         setError("Enter a valid amount for each job type");
         return;
       }
+    }
+    let jobTypeRows: { phaseId: string; amount: number; notes: string | null }[];
+    if (coded.length === 1) {
+      // A single job type auto-fills to the full invoice amount so the
+      // allocation is never left at $0.
+      jobTypeRows = [{ phaseId: coded[0].phaseId, amount: amountNum, notes: coded[0].notes }];
+    } else {
+      // Multiple job types must split the invoice exactly.
+      const sum = coded.reduce((s, r) => s + (r.amount ?? 0), 0);
+      const diff = Math.round((amountNum - sum) * 100) / 100;
+      if (Math.abs(diff) > 0.005) {
+        setError(
+          `Job type allocations total ${fmt$(sum)}, but the invoice is ${fmt$(amountNum)} (${
+            diff > 0 ? `${fmt$(diff)} unallocated` : `${fmt$(Math.abs(diff))} over`
+          }). Adjust so they add up to the invoice amount.`
+        );
+        return;
+      }
+      jobTypeRows = coded.map((r) => ({ phaseId: r.phaseId, amount: r.amount ?? 0, notes: r.notes }));
     }
     // Build the payment schedule. Each stage's dollar amount is derived from its
     // percentage of the invoice total.
@@ -982,16 +1020,21 @@ function JobTypesEditor({
       return { ...f, jobTypes: next.length > 0 ? next : [emptyJobTypeRow()] };
     });
 
-  const rowsTotal = form.jobTypes.reduce(
+  // Only phase-coded rows count toward the budget; uncoded placeholder rows are
+  // dropped on save.
+  const codedRows = form.jobTypes.filter((r) => r.phaseId !== "");
+  const rowsTotal = codedRows.reduce(
     (sum, r) => sum + (r.amount.trim() === "" ? 0 : Number(r.amount) || 0),
     0
   );
   const invoiceTotal = form.amount.trim() === "" ? 0 : Number(form.amount) || 0;
-  const mismatch = Math.abs(rowsTotal - invoiceTotal) > 0.005;
+  // A single coded job type auto-fills to the invoice amount on save, so a
+  // mismatch only matters when splitting across multiple job types.
+  const mismatch = codedRows.length > 1 && Math.abs(rowsTotal - invoiceTotal) > 0.005;
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <label style={lbl}>Job Types</label>
+      <label style={lbl}>Job Types *</label>
       {form.jobTypes.map((r, idx) => (
         <div key={idx} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "0.5px solid var(--border-lo)" }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1054,6 +1097,16 @@ function JobTypesEditor({
         <span>Job types total</span>
         <span style={{ fontWeight: 600 }}>{fmt$(rowsTotal)}</span>
       </div>
+      {codedRows.length === 0 && (
+        <div style={{ fontSize: 9, color: "var(--red-txt)", marginTop: 2 }}>
+          Assign a job type so this invoice is coded to the budget.
+        </div>
+      )}
+      {codedRows.length === 1 && (
+        <div style={{ fontSize: 9, color: "var(--text-tertiary)", marginTop: 2 }}>
+          The full {fmt$(invoiceTotal)} will be coded to this job type.
+        </div>
+      )}
       {mismatch && (
         <div style={{ fontSize: 9, color: "var(--amber-txt)", marginTop: 2 }}>
           Job types total ({fmt$(rowsTotal)}) doesn&apos;t match the invoice amount ({fmt$(invoiceTotal)}).

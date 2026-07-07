@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { parseJobTypes, parseStages } from "@/lib/rehab/invoice-utils";
+import { parseJobTypes, parseStages, enforceJobTypeCoding } from "@/lib/rehab/invoice-utils";
 import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
 import {
   InvoiceClassification,
@@ -97,13 +97,32 @@ export async function PATCH(
     data.status = body.status;
   }
   // Job types replace the legacy single phaseId. When supplied we delete the
-  // existing rows and recreate them (delete + recreate on save).
+  // existing rows and recreate them (delete + recreate on save). Enforce the
+  // same coding rule as create: every invoice must be coded to a job type and
+  // allocations must account for the full amount (single row auto-fills).
   let parsedJobTypes: Awaited<ReturnType<typeof parseJobTypes>> | null = null;
   if ("jobTypes" in body) {
-    parsedJobTypes = await parseJobTypes(body.jobTypes, resolved.projectId);
-    if (!parsedJobTypes.ok) {
-      return NextResponse.json({ error: parsedJobTypes.error }, { status: 400 });
+    const parsed = await parseJobTypes(body.jobTypes, resolved.projectId);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
+    // Validate allocations against the effective amount — the incoming one if
+    // the edit changed it, otherwise the invoice's current stored amount.
+    let effectiveAmount: Prisma.Decimal;
+    if (body.amount != null) {
+      effectiveAmount = new Prisma.Decimal(body.amount);
+    } else {
+      const current = await prisma.invoice.findUnique({
+        where: { id: resolved.invoiceId },
+        select: { amount: true },
+      });
+      effectiveAmount = current?.amount ?? new Prisma.Decimal(0);
+    }
+    const coded = enforceJobTypeCoding(parsed.rows, effectiveAmount);
+    if (!coded.ok) {
+      return NextResponse.json({ error: coded.error }, { status: 400 });
+    }
+    parsedJobTypes = { ok: true, rows: coded.rows };
   }
 
   // Stages (payment schedule) — upsert by id, delete the ones that were removed,

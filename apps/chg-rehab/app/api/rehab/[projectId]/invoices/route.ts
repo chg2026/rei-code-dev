@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { recomputePhaseActuals } from "@/lib/rehab/invoiceActuals";
-import { parseJobTypes, parseStages } from "@/lib/rehab/invoice-utils";
+import { parseJobTypes, parseStages, enforceJobTypeCoding } from "@/lib/rehab/invoice-utils";
 import {
   InvoiceClassification,
   InvoiceStatus,
@@ -88,6 +88,11 @@ export async function POST(
   const parsed = await parseJobTypes(body.jobTypes, project.id);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  // Every invoice must be coded to a job type; single-row invoices auto-fill
+  // to the full amount, multi-row must sum to it.
+  const coded = enforceJobTypeCoding(parsed.rows, amount);
+  if (!coded.ok) return NextResponse.json({ error: coded.error }, { status: 400 });
+
   const parsedStages = parseStages(body.stages);
   if (!parsedStages.ok) {
     return NextResponse.json({ error: parsedStages.error }, { status: 400 });
@@ -107,7 +112,7 @@ export async function POST(
       status,
       notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : null,
       jobTypes: {
-        create: parsed.rows.map((r) => ({
+        create: coded.rows.map((r) => ({
           phaseId: r.phaseId,
           amount: r.amount,
           notes: r.notes,
@@ -136,7 +141,7 @@ export async function POST(
 
   await recomputePhaseActuals(
     project.id,
-    parsed.rows.map((r) => r.phaseId)
+    coded.rows.map((r) => r.phaseId)
   );
 
   return NextResponse.json({ invoice }, { status: 201 });

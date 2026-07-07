@@ -54,6 +54,49 @@ export async function parseJobTypes(
   return { ok: true, rows };
 }
 
+/** Tolerance (dollars) for float/rounding drift when matching allocations. */
+const ALLOC_EPSILON = new Prisma.Decimal("0.005");
+
+/**
+ * Enforce that an invoice is coded to at least one job type and that its
+ * allocations account for the full invoice amount. Shared by create + edit so
+ * the rule can't be bypassed server-side.
+ *
+ *   - No phase-tagged row → rejected (invoice must be coded to the budget).
+ *   - Exactly one phase-tagged row → its amount is auto-filled to the full
+ *     invoice amount (allocations are never left at $0).
+ *   - Multiple phase-tagged rows → their amounts must sum to the invoice amount.
+ *
+ * Uncoded rows (no phaseId) are dropped: every kept row carries a phase.
+ */
+export function enforceJobTypeCoding(
+  rows: ParsedJobType[],
+  invoiceAmount: Prisma.Decimal
+): { ok: true; rows: ParsedJobType[] } | { ok: false; error: string } {
+  const coded = rows.filter((r) => r.phaseId !== null);
+  if (coded.length === 0) {
+    return {
+      ok: false,
+      error: "Assign a job type so this invoice is coded to the budget",
+    };
+  }
+  if (coded.length === 1) {
+    return { ok: true, rows: [{ ...coded[0], amount: invoiceAmount }] };
+  }
+  const sum = coded.reduce((acc, r) => acc.plus(r.amount), new Prisma.Decimal(0));
+  const diff = invoiceAmount.minus(sum);
+  if (diff.abs().greaterThan(ALLOC_EPSILON)) {
+    const off = diff.greaterThan(0)
+      ? `${diff.toFixed(2)} unallocated`
+      : `${diff.abs().toFixed(2)} over`;
+    return {
+      ok: false,
+      error: `Job type allocations total $${sum.toFixed(2)}, but the invoice is $${invoiceAmount.toFixed(2)} ($${off}). Adjust so they add up to the invoice amount.`,
+    };
+  }
+  return { ok: true, rows: coded };
+}
+
 export type ParsedStage = {
   id: string | null;
   name: string;

@@ -8,12 +8,15 @@ export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const { projectId } = await params;
+  const sp = await searchParams;
   const code = decodeURIComponent(projectId);
   const project = await loadProjectByCode(user.companyId, code);
   if (!project) notFound();
@@ -74,6 +77,7 @@ export default async function InvoicesPage({
       projectCode={project.code}
       phases={phases}
       initialInvoices={invoices}
+      startNew={sp?.new === "1"}
     />
   );
 }

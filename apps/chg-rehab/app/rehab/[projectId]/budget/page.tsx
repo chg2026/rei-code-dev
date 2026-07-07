@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@/lib/permissions";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
-import DocUploadButton from "@/components/rehab/DocUploadButton";
 import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
 import { prisma } from "@/lib/prisma";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
@@ -13,7 +11,7 @@ import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-type BudgetView = "phase" | "lineItems" | "invoices";
+type BudgetView = "phase" | "invoices";
 
 export default async function BudgetPage({
   params,
@@ -26,11 +24,9 @@ export default async function BudgetPage({
   if (!user) redirect("/login");
   const { projectId } = await params;
   const sp = await searchParams;
-  const view: BudgetView =
-    sp.view === "lineItems" ? "lineItems" : sp.view === "invoices" ? "invoices" : "phase";
+  const view: BudgetView = sp.view === "invoices" ? "invoices" : "phase";
   const project = await loadProjectByCode(user.companyId, decodeURIComponent(projectId));
   if (!project) notFound();
-  const canUploadDocs = await can(user, "documents", "edit");
   const invoiceDocs = project.documents.filter((d) => (d.category ?? "").toLowerCase() === "invoice");
 
   // Per-phase actual spend is computed by the shared helper so that staged
@@ -91,20 +87,6 @@ export default async function BudgetPage({
     .filter((d) => d.status === DrawStatus.Pending)
     .reduce((acc, d) => acc + Number(d.amount), 0);
 
-  // Materialize line items joined with the phase they belong to. Phase order is
-  // already enforced by the query, and SowSection.order matches phase index in
-  // the seed; use that to compute per-line budget rows.
-  const sectionByIdx = project.sowSections;
-  const lineRows = project.phases.flatMap((p, idx) => {
-    const section = sectionByIdx[idx];
-    if (!section) return [];
-    return section.lineItems.map((li) => ({
-      phase: p,
-      li,
-      isCO: /\(CO\)|CO\)/.test(li.description),
-    }));
-  });
-  const lineItemsTotal = lineRows.reduce((acc, r) => acc + Number(r.li.totalCost ?? 0), 0);
   const baseLink = `/rehab/${project.code}/budget`;
 
   const phaseRows: BudgetPhaseRow[] = project.phases.map((p) => {
@@ -160,112 +142,20 @@ export default async function BudgetPage({
       <div className="action-bar">
         <div className="toggle-group">
           <Link href={baseLink} scroll={false} className={`tg-btn ${view === "phase" ? "active" : ""}`}>By phase</Link>
-          <Link href={`${baseLink}?view=lineItems`} scroll={false} className={`tg-btn ${view === "lineItems" ? "active" : ""}`}>By line item</Link>
           <Link href={`${baseLink}?view=invoices`} scroll={false} className={`tg-btn ${view === "invoices" ? "active" : ""}`}>Invoices</Link>
         </div>
         <button className="btn">Export</button>
-        {canUploadDocs && (
-          <DocUploadButton
-            projectCode={project.code}
-            defaultCategory="Invoice"
-            fixedCategory
-            label="+ Add invoice"
-          />
-        )}
+        {/* Opens the real invoice form on the Invoices tab (single entry point —
+            no more dead document uploads that never become an invoice). */}
+        <Link href={`/rehab/${project.code}/invoices?new=1`} className="btn btn-primary">
+          + Add invoice
+        </Link>
       </div>
 
       <div className="body-split">
         <div className="body-main">
           {view === "phase" && (
             <BudgetPhaseRows phases={phaseRows} projectCode={project.code} />
-          )}
-
-          {view === "lineItems" && (
-            <>
-              <div
-                className="data-hd"
-                style={{ gridTemplateColumns: "minmax(0,1fr) 78px 70px 70px 76px 88px" }}
-              >
-                <span className="col-label">Line item</span>
-                <span className="col-label">Job Type</span>
-                <span className="col-label" style={{ textAlign: "right" }}>Estimated</span>
-                <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
-                <span className="col-label" style={{ textAlign: "right" }}>Variance</span>
-                <span className="col-label">Status</span>
-              </div>
-              {lineRows.map(({ phase: p, li, isCO }) => {
-                const est = Number(li.totalCost ?? 0);
-                const phaseDone = p.status === PhaseStatus.Done;
-                const phaseActive = p.status === PhaseStatus.InProgress;
-                const actVal = phaseDone || isCO ? est : null;
-                const variance = actVal !== null ? actVal - est : 0;
-                const tagCls = phaseDone ? "tag-paid" : phaseActive ? "tag-pend" : "";
-                const tagLabel = phaseDone ? "Done" : phaseActive ? "In progress" : "Pending";
-                return (
-                  <div
-                    className="data-row"
-                    style={{ gridTemplateColumns: "minmax(0,1fr) 78px 70px 70px 76px 88px" }}
-                    key={li.id}
-                  >
-                    <div>
-                      <div className="cell-name">
-                        {li.description}
-                        {isCO && (
-                          <span
-                            className="mapped-pill"
-                            style={{ marginLeft: 6, background: "var(--purple-bg)", color: "var(--purple-txt)" }}
-                          >
-                            CO
-                          </span>
-                        )}
-                      </div>
-                      {li.notes && <div className="cell-meta">{li.notes}</div>}
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>Job Type {p.number}</div>
-                    <div style={{ textAlign: "right", fontSize: 11 }}>${est.toLocaleString()}</div>
-                    <div style={{ textAlign: "right", fontSize: 11 }}>
-                      {actVal !== null ? (
-                        <span style={{ color: variance > 0 ? "var(--amber)" : "var(--green)" }}>
-                          ${actVal.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
-                      )}
-                    </div>
-                    <div style={{ textAlign: "right", fontSize: 10 }}>
-                      {actVal !== null ? (
-                        <span style={{ color: variance > 0 ? "var(--amber)" : "var(--green)" }}>
-                          {variance > 0 ? `+${fmt$(variance)}` : variance < 0 ? fmt$(variance) : "$0"}
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
-                      )}
-                    </div>
-                    <span
-                      className={`cell-tag ${tagCls}`}
-                      style={!tagCls ? { background: "#F1EFE8", color: "#5F5E5A" } : undefined}
-                    >
-                      {tagLabel}
-                    </span>
-                  </div>
-                );
-              })}
-              <div
-                className="data-row"
-                style={{
-                  gridTemplateColumns: "minmax(0,1fr) 78px 70px 70px 76px 88px",
-                  background: "var(--bg-secondary)",
-                  fontWeight: 600,
-                }}
-              >
-                <div className="cell-name">Total ({lineRows.length} line items)</div>
-                <div></div>
-                <div style={{ textAlign: "right", fontSize: 11 }}>${lineItemsTotal.toLocaleString()}</div>
-                <div></div>
-                <div></div>
-                <div></div>
-              </div>
-            </>
           )}
 
           {view === "invoices" && (
