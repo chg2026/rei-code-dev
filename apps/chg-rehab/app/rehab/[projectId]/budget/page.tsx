@@ -6,6 +6,7 @@ import { formatET } from "@/lib/datetime";
 import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
 import { prisma } from "@/lib/prisma";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
+import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
 import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,10 @@ export default async function BudgetPage({
   // variant additionally buckets each phase's actual by the invoice
   // classification (labor / materials / other) for the per-phase detail rows.
   const actualsMap = await computePhaseActualBreakdowns(project.id);
+  // Pending change orders per phase (and project total). Approved COs are
+  // already folded into Phase.budget, so these ride on top of the forecast
+  // (EAC) only — never budget / committed / actual.
+  const pendingCOs = await computePendingChangeOrders(project.id);
   const invoiceRows = await prisma.invoice.findMany({
     where: { projectId: project.id },
     include: { jobTypes: { orderBy: { createdAt: "asc" } } },
@@ -113,6 +118,7 @@ export default async function BudgetPage({
       percentComplete: p.percentComplete,
       forecastMethod: p.forecastMethod,
       forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
+      pendingCO: pendingCOs.byPhase.get(p.id) ?? 0,
       checklistTotal,
       checklistDone,
       drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
@@ -135,6 +141,7 @@ export default async function BudgetPage({
         <div className="kpi-card"><div className="kpi-label">Total spent</div><div className="kpi-val green">{fmt$(totalSpent)}</div><div className="kpi-sub">{paidInvoices.length} invoices paid</div></div>
         <div className="kpi-card"><div className="kpi-label">Committed</div><div className="kpi-val">{fmt$(totalCommitted)}</div><div className="kpi-sub">{invoiceRows.length} invoices, all statuses</div></div>
         <div className="kpi-card"><div className="kpi-label">Projected final</div><div className={`kpi-val ${overage > 0 ? "amber" : ""}`}>{fmt$(projected)}</div>{overage !== 0 && <div className="kpi-badge" style={overage > 0 ? { background: "var(--amber-bg)", color: "var(--amber-txt)" } : { background: "var(--green-bg)", color: "var(--green-txt)" }}>{overage > 0 ? `+${fmt$(overage)} over` : `${fmt$(overage)} under`}</div>}</div>
+        <div className="kpi-card"><div className="kpi-label">Pending changes</div><div className={`kpi-val ${pendingCOs.total > 0 ? "amber" : ""}`}>{fmt$(pendingCOs.total)}</div><div className="kpi-sub">Change orders awaiting approval</div></div>
         <div className="kpi-card"><div className="kpi-label">Remaining</div><div className="kpi-val" style={remaining < 0 ? { color: "var(--red-txt)" } : undefined}>{fmt$(remaining)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).length} draws pending</div></div>
         <div className="kpi-card"><div className="kpi-label">Contractor balance</div><div className={`kpi-val ${pendingBalance > 0 ? "amber" : ""}`}>{fmt$(pendingBalance)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).map(d => `Draw #${d.number}`).join(" + ") || "—"}</div></div>
       </div>

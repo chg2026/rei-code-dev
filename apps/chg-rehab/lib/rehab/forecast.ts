@@ -5,9 +5,11 @@
  * and the Overview pace signal. Kept free of Prisma/server imports so it can
  * run in a client component too.
  *
- * Mapping note: with no Commitments / Change Orders yet, `committed` is the
- * Procore "Projected Costs" (every invoice, any status) and `actual` is
- * "Job-to-Date" (paid allocation). Both come from computePhaseActualBreakdowns.
+ * Mapping note: `committed` is the Procore "Projected Costs" (every invoice,
+ * any status) and `actual` is "Job-to-Date" (paid allocation) — both from
+ * computePhaseActualBreakdowns. Pending change orders arrive separately via
+ * `pendingCO` (see lib/rehab/changeOrders.ts); Approved ones are already in
+ * `budget`.
  */
 
 export type ForecastMethodName = "Auto" | "Manual" | "PercentComplete";
@@ -45,6 +47,13 @@ export type ForecastInput = {
   forecastManual: number | null;
   checklistDone: number;
   checklistTotal: number;
+  /**
+   * Sum of Pending change-order amounts linked to this phase. Approved COs
+   * are already folded into `budget` on approval and Pending ones sit in
+   * neither budget nor committed/actual, so adding them here never
+   * double-counts. Optional so existing callers are unchanged.
+   */
+  pendingCO?: number;
 };
 
 export type ForecastResult = {
@@ -62,6 +71,10 @@ export type ForecastResult = {
  *   - Manual override → committed + forecastManual.
  *   - else known pct > 0 (cost-to-cost earned value) → actual / (pct / 100).
  *   - else (Auto / no pct) → max(budget, committed).
+ *
+ * Pending change orders ride on top of every method: EAC = base + pendingCO,
+ * so a pending CO raises the projected final (and worsens Over/Under) before
+ * it's approved or any invoice lands against it.
  */
 export function computeForecast(i: ForecastInput): ForecastResult {
   const { pct, source } = effectivePct(i.percentComplete, i.checklistDone, i.checklistTotal);
@@ -73,5 +86,6 @@ export function computeForecast(i: ForecastInput): ForecastResult {
   } else {
     eac = Math.max(i.budget, i.committed);
   }
+  eac += i.pendingCO ?? 0;
   return { eac, projected: i.budget - eac, pct, pctSource: source };
 }

@@ -9,6 +9,7 @@ import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
 import { effectivePct, computeForecast } from "@/lib/rehab/forecast";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
+import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
 import { prisma } from "@/lib/prisma";
 import {
   PhaseStatus,
@@ -58,6 +59,7 @@ export default async function OverviewPage({
     propertyRow,
     allActivity,
     actualsMap,
+    pendingCOs,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       where: { projectId: project.id, status: InvoiceStatus.Paid },
@@ -107,6 +109,9 @@ export default async function OverviewPage({
     // Per-phase committed + paid actual — the exact breakdown Budget & Costs
     // uses; feeds the per-phase EAC forecast below.
     computePhaseActualBreakdowns(project.id),
+    // Pending change orders per phase — added on top of each phase's EAC so
+    // Projected Final / Over-Under move before a CO is approved.
+    computePendingChangeOrders(project.id),
   ]);
 
   // Current spend = Job-to-Date = sum of Paid invoices. Draws remain the
@@ -151,6 +156,7 @@ export default async function OverviewPage({
       percentComplete: p.percentComplete,
       forecastMethod: p.forecastMethod,
       forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
+      pendingCO: pendingCOs.byPhase.get(p.id) ?? 0,
       checklistDone: done,
       checklistTotal: total,
     }).eac;

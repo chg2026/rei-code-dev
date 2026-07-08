@@ -36,6 +36,8 @@ export type BudgetPhaseRow = {
   percentComplete: number;
   forecastMethod: ForecastMethodName;
   forecastManual: number | null;
+  /** Sum of Pending change-order amounts for this phase (folds into the EAC). */
+  pendingCO: number;
   checklistTotal: number;
   checklistDone: number;
   drawTagCls: string;
@@ -138,6 +140,7 @@ export default function BudgetPhaseRows({
           percentComplete: effPercentComplete,
           forecastMethod: p.forecastMethod,
           forecastManual: p.forecastManual,
+          pendingCO: p.pendingCO,
           checklistDone: p.checklistDone,
           checklistTotal: p.checklistTotal,
         });
@@ -169,6 +172,11 @@ export default function BudgetPhaseRows({
                     Job Type {p.number} · Code {phaseCode(p.number)}
                     {p.status === "InProgress" ? " — active" : ""}
                     {p.invoices.length > 0 ? ` · ${p.invoices.length} invoice${p.invoices.length === 1 ? "" : "s"}` : ""}
+                    {p.pendingCO > 0 && (
+                      <span style={{ color: "var(--amber)" }}>
+                        {" "}· Pending changes +{fmt$(p.pendingCO)}
+                      </span>
+                    )}
                   </div>
                 </button>
               </div>
