@@ -92,34 +92,39 @@ export async function PATCH(
     data.status = nextStatus;
   }
 
-  // Once a change order is Approved its amount has already been folded into the
-  // linked phase budget. Editing the amount/phase or rolling the status back
-  // would silently desync Phase.budget, so financial fields are locked after
-  // approval (mirrors the "only Pending can be deleted" rule). Non-financial
-  // fields (title, reason) stay editable.
-  if (co.status === ChangeOrderStatus.Approved) {
-    const amountChanged = !nextAmount.equals(co.amount);
-    const phaseChanged = nextPhaseId !== co.phaseId;
-    const statusChanged = nextStatus !== co.status;
-    if (amountChanged || phaseChanged || statusChanged) {
-      return NextResponse.json(
-        {
-          error:
-            "An approved change order's amount, phase, and status are locked because its budget impact has already been applied.",
-        },
-        { status: 409 }
-      );
-    }
-  }
+  // Phase.budget must always equal each phase's original budget plus the sum of
+  // that phase's Approved change-order amounts. A CO contributes its amount to
+  // its linked phase only while Approved; Pending/Rejected COs have no budget
+  // effect. Rather than lock the record after approval, we reconcile with delta
+  // adjustments: reverse this CO's *old* budget effect and apply its *new* one.
+  // Edits to the amount, the linked job type, or the status therefore all keep
+  // the invariant exactly, with no double-counting.
+  const oldEffectivePhase = co.status === ChangeOrderStatus.Approved ? co.phaseId : null;
+  const newEffectivePhase = nextStatus === ChangeOrderStatus.Approved ? nextPhaseId : null;
+  const budgetDeltas = new Map<string, Prisma.Decimal>();
+  const addDelta = (phaseId: string, amt: Prisma.Decimal) => {
+    budgetDeltas.set(
+      phaseId,
+      (budgetDeltas.get(phaseId) ?? new Prisma.Decimal(0)).plus(amt)
+    );
+  };
+  if (oldEffectivePhase) addDelta(oldEffectivePhase, co.amount.negated());
+  if (newEffectivePhase) addDelta(newEffectivePhase, nextAmount);
 
-  // Approval transition: stamp approver + fold the change amount into the
-  // linked phase's budget. Only on the first transition into Approved so the
-  // budget is never incremented twice.
+  // Stamp the approver on the first transition into Approved (the existing
+  // one-time fold behavior); clear the stamp when leaving Approved so a later
+  // re-approval re-stamps cleanly. The budget increment itself is handled by
+  // the delta map above, which is guarded against double-adding by design.
   const becomingApproved =
     nextStatus === ChangeOrderStatus.Approved && co.status !== ChangeOrderStatus.Approved;
+  const leavingApproved =
+    co.status === ChangeOrderStatus.Approved && nextStatus !== ChangeOrderStatus.Approved;
   if (becomingApproved) {
     data.approvedById = user.id;
     data.approvedAt = new Date();
+  } else if (leavingApproved) {
+    data.approvedById = null;
+    data.approvedAt = null;
   }
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -127,10 +132,11 @@ export async function PATCH(
       where: { id: co.id },
       data,
     });
-    if (becomingApproved && nextPhaseId) {
-      await tx.phase.update({
-        where: { id: nextPhaseId },
-        data: { budget: { increment: nextAmount } },
+    for (const [phaseId, delta] of budgetDeltas) {
+      if (delta.isZero()) continue;
+      await tx.phase.updateMany({
+        where: { id: phaseId, projectId: pid },
+        data: { budget: { increment: delta } },
       });
     }
     return result;
@@ -152,14 +158,24 @@ export async function DELETE(
     user.companyId
   );
   if (!resolved) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { projectId: pid, co } = resolved;
 
-  if (resolved.co.status !== ChangeOrderStatus.Pending) {
-    return NextResponse.json(
-      { error: "Only pending change orders can be deleted" },
-      { status: 409 }
-    );
-  }
+  // Deleting an Approved CO must first un-fold its amount from the linked phase
+  // budget so the invariant (phase budget = original + Approved COs) holds.
+  // Pending/Rejected COs have no budget effect, so they simply delete.
+  const unfold =
+    co.status === ChangeOrderStatus.Approved && co.phaseId
+      ? { phaseId: co.phaseId, amount: co.amount }
+      : null;
 
-  await prisma.changeOrder.delete({ where: { id: resolved.co.id } });
+  await prisma.$transaction(async (tx) => {
+    if (unfold) {
+      await tx.phase.updateMany({
+        where: { id: unfold.phaseId, projectId: pid },
+        data: { budget: { decrement: unfold.amount } },
+      });
+    }
+    await tx.changeOrder.delete({ where: { id: co.id } });
+  });
   return NextResponse.json({ ok: true });
 }

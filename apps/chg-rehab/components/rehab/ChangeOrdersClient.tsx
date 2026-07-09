@@ -184,7 +184,11 @@ export default function ChangeOrdersClient({
   }
 
   async function remove(co: ChangeOrderDTO) {
-    if (!confirm(`Delete change order #${co.number}? This cannot be undone.`)) return;
+    const warning =
+      co.status === "Approved"
+        ? ` Its ${fmt$(co.amount)} will be removed from the linked phase budget.`
+        : "";
+    if (!confirm(`Delete change order #${co.number}? This cannot be undone.${warning}`)) return;
     try {
       const res = await fetch(`${base}/${co.id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -201,9 +205,10 @@ export default function ChangeOrdersClient({
   const selectedPhase = form.phaseId ? phaseById.get(form.phaseId) : undefined;
   const changeAmount = Number(form.amount);
   const hasAmount = form.amount.trim() !== "" && !Number.isNaN(changeAmount);
-  // Once approved, the amount has already been folded into the phase budget, so
-  // these fields are locked (the API enforces this too).
-  const lockedFinancial = editing?.mode === "edit" && editing.co.status === "Approved";
+  // Approved change orders are no longer locked: the API reconciles Phase.budget
+  // with delta adjustments on every edit/move/delete, so the amount, job type,
+  // and status stay freely editable.
+  const editingApproved = editing?.mode === "edit" && editing.co.status === "Approved";
 
   return (
     <div className="tab-panel active">
@@ -322,16 +327,18 @@ export default function ChangeOrdersClient({
                 <div style={{ color: "var(--text-secondary)" }}>{co.approvedByName ?? "—"}</div>
                 <div style={{ color: "var(--text-secondary)" }}>{fmtDate(co.approvedAt)}</div>
                 <div style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
-                  {co.status === "Pending" && (
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      onClick={() => remove(co)}
-                      title="Delete pending change order"
-                    >
-                      Delete
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => remove(co)}
+                    title={
+                      co.status === "Approved"
+                        ? "Delete change order (un-folds its amount from the phase budget)"
+                        : "Delete change order"
+                    }
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             );
@@ -373,7 +380,6 @@ export default function ChangeOrdersClient({
               <select
                 value={form.phaseId}
                 onChange={(e) => setForm({ ...form, phaseId: e.target.value })}
-                disabled={lockedFinancial}
                 style={inputStyle}
               >
                 <option value="">— No phase —</option>
@@ -403,7 +409,6 @@ export default function ChangeOrdersClient({
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 placeholder="Use a negative amount for a credit"
-                disabled={lockedFinancial}
                 style={inputStyle}
               />
             </Field>
@@ -437,7 +442,6 @@ export default function ChangeOrdersClient({
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value as ChangeOrderStatus })}
-                disabled={lockedFinancial}
                 style={inputStyle}
               >
                 {STATUSES.map((s) => (
@@ -448,10 +452,10 @@ export default function ChangeOrdersClient({
               </select>
             </Field>
 
-            {lockedFinancial && (
+            {editingApproved && (
               <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                This change order is approved — its amount, phase, and status are locked. Only the
-                title and reason can be edited.
+                This change order is approved. Editing the amount or job type — or changing its
+                status — re-reconciles the linked phase budget automatically.
               </div>
             )}
 
