@@ -127,18 +127,18 @@ export async function releaseDraw(
   const releasedByName =
     `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email || user.id;
 
-  // Record the release on the Draw row itself (single-step approve+pay in the
-  // prototype) and write a full release record to the activity log so that
-  // every release has an immutable audit entry with the dollar amount, the
-  // releasing user, the timestamp, and the gate snapshot at the moment of
-  // release.
+  // Record the release (approval) on the Draw row itself and write a full
+  // release record to the activity log so that every release has an immutable
+  // audit entry with the dollar amount, the releasing user, the timestamp, and
+  // the gate snapshot at the moment of release. Releasing approves the draw
+  // (status = Approved); actual payment (status = Paid + paidAt) is a separate,
+  // lien-waiver-gated step (see the mark-paid route + assertDrawPayable).
   await prisma.draw.update({
     where: { id: gate.draw.id },
     data: {
       status: DrawStatus.Approved,
       approvedAt: releasedAt,
       approvedById: user.id,
-      paidAt: releasedAt,
     },
   });
 

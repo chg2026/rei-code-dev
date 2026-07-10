@@ -133,6 +133,29 @@ export type PaymentGateOutcome = {
   flagged: number;
 };
 
+/**
+ * Payment-time lien-waiver gate. A draw can only be marked **Paid** once a
+ * lien waiver has been received when the company runs a strict payment gate
+ * (`CompanySetting.strictPaymentGate`). This is deliberately separate from
+ * `assertPaymentApprovable` (which governs the checklist->approval gate): a
+ * draw is first approved/released, then paid, and payment additionally
+ * requires the signed lien waiver on file. When strict mode is OFF this is a
+ * no-op.
+ */
+export async function assertDrawPayable(
+  companyId: string,
+  draw: { lienWaiverReceived: boolean }
+): Promise<void> {
+  const settings = await getCompanySettings(companyId);
+  if (!settings.strictPaymentGate) return;
+  if (!draw.lienWaiverReceived) {
+    throw new PaymentGateError(
+      ["a signed lien waiver must be received before this draw can be marked paid"],
+      0
+    );
+  }
+}
+
 export async function assertPaymentApprovable(
   companyId: string,
   draw: { projectId: string; phaseId: string | null }

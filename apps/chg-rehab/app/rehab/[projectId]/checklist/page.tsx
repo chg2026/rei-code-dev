@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { loadProjectByCode, loadCompanySettings } from "@/lib/rehab/queries";
+import { loadProjectByCode, loadCompanySettings, loadProjectComplianceDocs } from "@/lib/rehab/queries";
 import { computeGate } from "@/lib/paymentGate";
 import { can } from "@/lib/permissions";
 import { formatET } from "@/lib/datetime";
@@ -27,11 +27,16 @@ export default async function ChecklistPage({
   if (!project) notFound();
   const settings = await loadCompanySettings(user.companyId);
   const strictGate = settings?.strictGate ?? true;
+  const coiThresholdDays = settings?.coiThresholdDays ?? 60;
 
-  const [canEditChecklist, canApproveDraw] = await Promise.all([
+  const [canEditChecklist, canEditStructure, canEditDocuments, canApproveDraw] = await Promise.all([
     can(user, "checklist", "edit"),
+    can(user, "rehab", "edit"),
+    can(user, "documents", "edit"),
     can(user, "draws", "approve"),
   ]);
+
+  const complianceDocs = await loadProjectComplianceDocs(project, coiThresholdDays);
 
   const focusPhase = sp.phase ? parseInt(sp.phase, 10) : null;
 
@@ -67,12 +72,22 @@ export default async function ChecklistPage({
                     endLabel: formatET(p.endDate, false),
                     status: p.status,
                   }}
-                  initialItems={p.checklistItems.map((it) => ({
-                    id: it.id,
-                    label: it.label,
-                    status: it.status,
-                    requirement: parseChecklistItemMeta(it.meta).requirement,
-                  }))}
+                  projectRef={project.code}
+                  initialItems={[...p.checklistItems]
+                    .sort((a, b) => {
+                      const oa = parseChecklistItemMeta(a.meta).order;
+                      const ob = parseChecklistItemMeta(b.meta).order;
+                      if (oa == null && ob == null) return 0;
+                      if (oa == null) return 1;
+                      if (ob == null) return -1;
+                      return oa - ob;
+                    })
+                    .map((it) => ({
+                      id: it.id,
+                      label: it.label,
+                      status: it.status,
+                      requirement: parseChecklistItemMeta(it.meta).requirement,
+                    }))}
                   initialGate={gate}
                   initialDraw={
                     draw
@@ -80,7 +95,9 @@ export default async function ChecklistPage({
                           id: draw.id,
                           number: draw.number,
                           amount: Number(draw.amount),
+                          retainagePct: Number(draw.retainagePct),
                           status: draw.status,
+                          lienWaiverReceived: draw.lienWaiverReceived,
                           releasedAt: draw.paidAt ? formatET(draw.paidAt) : draw.approvedAt ? formatET(draw.approvedAt) : null,
                           releasedBy: draw.approvedById ? "Roey G." : null,
                         }
@@ -88,6 +105,8 @@ export default async function ChecklistPage({
                   }
                   defaultOpen={defaultOpen}
                   canEditChecklist={canEditChecklist}
+                  canEditStructure={canEditStructure}
+                  canEditDocuments={canEditDocuments}
                   canApproveDraw={canApproveDraw}
                   strictGate={strictGate}
                 />
@@ -142,6 +161,58 @@ export default async function ChecklistPage({
                 Change in Admin Settings →
               </Link>
             </div>
+          </div>
+          <div className="sb-sec" style={{ padding: "10px 12px" }}>
+            <div className="sb-hd" style={{ padding: "0 0 8px" }}>Contractor compliance</div>
+            {complianceDocs.length === 0 ? (
+              <div style={{ fontSize: 10, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+                No compliance documents on file for the contractors assigned to this project.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 9, color: "var(--text-tertiary)", marginBottom: 6 }}>
+                  Flagged when expiring within {coiThresholdDays} days.
+                </div>
+                {complianceDocs
+                  .slice()
+                  .sort((a, b) => {
+                    const rank = { Expired: 0, Expiring: 1, Active: 2 } as const;
+                    return rank[a.computedStatus] - rank[b.computedStatus];
+                  })
+                  .map((d) => {
+                    const tone =
+                      d.computedStatus === "Expired"
+                        ? { bg: "var(--red-bg)", fg: "var(--red-txt)" }
+                        : d.computedStatus === "Expiring"
+                        ? { bg: "var(--amber-bg)", fg: "var(--amber-txt)" }
+                        : { bg: "var(--green-bg)", fg: "var(--green-txt)" };
+                    const daysLabel =
+                      d.daysUntilExpiry == null
+                        ? "No expiry date"
+                        : d.daysUntilExpiry < 0
+                        ? `Expired ${Math.abs(d.daysUntilExpiry)}d ago`
+                        : `${d.daysUntilExpiry}d left`;
+                    return (
+                      <div className="alog-row" key={d.id} style={{ alignItems: "flex-start" }}>
+                        <div className="al-body" style={{ flex: 1 }}>
+                          <div className="al-action" style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                            <span>{d.contact.name}</span>
+                            <span
+                              style={{ background: tone.bg, color: tone.fg, fontSize: 9, padding: "1px 5px", borderRadius: 3, flexShrink: 0 }}
+                            >
+                              {d.computedStatus}
+                            </span>
+                          </div>
+                          <div className="al-meta">
+                            {d.type} · {daysLabel}
+                            {d.expiresAt ? ` · exp ${formatET(d.expiresAt, false)}` : ""}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </>
+            )}
           </div>
           <div className="sb-sec" style={{ padding: "10px 12px" }}>
             <div className="sb-hd" style={{ padding: "0 0 8px" }}>Payment approval log</div>

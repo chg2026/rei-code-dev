@@ -312,18 +312,21 @@ model ChecklistItem {
 }
 
 model Draw {
-  id           String     @id @default(cuid())
-  projectId    String
-  phaseId      String?
-  number       Int
-  title        String
-  amount       Decimal    @db.Decimal(14, 2)
-  status       DrawStatus @default(Pending)
-  approvedAt   DateTime?
-  approvedById String?
-  paidAt       DateTime?
-  notes        String?
-  createdAt    DateTime   @default(now())
+  id                 String     @id @default(cuid())
+  projectId          String
+  phaseId            String?
+  number             Int
+  title              String
+  amount             Decimal    @db.Decimal(14, 2)
+  retainagePct       Decimal    @default(0) @db.Decimal(5, 2)
+  lienWaiverDocId    String?
+  lienWaiverReceived Boolean    @default(false)
+  status             DrawStatus @default(Pending)
+  approvedAt         DateTime?
+  approvedById       String?
+  paidAt             DateTime?
+  notes              String?
+  createdAt          DateTime   @default(now())
   approvedBy   User?      @relation("DrawApprover", fields: [approvedById], references: [id])
   phase        Phase?     @relation(fields: [phaseId], references: [id])
   project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)

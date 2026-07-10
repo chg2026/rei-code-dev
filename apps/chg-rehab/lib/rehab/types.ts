@@ -62,12 +62,21 @@ export function parseProjectMeta(raw: Prisma.JsonValue | null | undefined): Proj
 
 export type ChecklistItemMeta = {
   requirement: string | null;
+  /**
+   * Manual sort position within a phase's checklist. There is no `order`
+   * column on ChecklistItem, so ordering is persisted here. Items with a
+   * null order fall back to `createdAt` ordering.
+   */
+  order: number | null;
 };
 
 export function parseChecklistItemMeta(raw: Prisma.JsonValue | null | undefined): ChecklistItemMeta {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { requirement: null };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { requirement: null, order: null };
   const r = raw as Record<string, unknown>;
-  return { requirement: typeof r.requirement === "string" ? r.requirement : null };
+  return {
+    requirement: typeof r.requirement === "string" ? r.requirement : null,
+    order: typeof r.order === "number" && Number.isFinite(r.order) ? r.order : null,
+  };
 }
 
 export type DocumentMeta = {
