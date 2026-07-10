@@ -26,6 +26,7 @@ model Company {
   settings             CompanySetting?
   contacts             Contact[]
   documents            Document[]
+  estimates            Estimate[]
   leases               Lease[]
   permissionLabels     PermissionLabelRow[]
   permissionRows       PermissionMatrixRow[]
@@ -202,20 +203,29 @@ model PipelineDeal {
 }
 
 model Project {
-  id           String        @id @default(cuid())
-  companyId    String
-  propertyId   String
-  code         String // 'CHG-2247'
-  name         String
-  status       ProjectStatus @default(Planning)
-  budget       Decimal?      @db.Decimal(14, 2)
-  contingency  Decimal       @default(0) @db.Decimal(14, 2) // labeled reserve, not folded into per-phase budgets
-  startDate    DateTime?
-  endDate      DateTime?
-  currentPhase Int?
-  meta         Json?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @default(now()) @updatedAt
+  id              String        @id @default(cuid())
+  companyId       String
+  propertyId      String
+  code            String // 'CHG-2247'
+  name            String
+  status          ProjectStatus @default(Planning)
+  budget          Decimal?      @db.Decimal(14, 2)
+  contingency     Decimal       @default(0) @db.Decimal(14, 2) // labeled reserve, not folded into per-phase budgets
+  startDate       DateTime?
+  endDate         DateTime?
+  currentPhase    Int?
+  meta            Json?
+  // Rehab-to-Return inputs (Phase 4). All optional — the Returns tab and the
+  // portfolio dashboard degrade gracefully when unset.
+  arv             Decimal?      @db.Decimal(14, 2)
+  acquisitionCost Decimal?      @db.Decimal(14, 2)
+  refiLtvPct      Decimal?      @db.Decimal(5, 2)
+  refiRatePct     Decimal?      @db.Decimal(5, 2)
+  refiTermYears   Int?
+  monthlyRent     Decimal?      @db.Decimal(14, 2)
+  monthlyExpenses Decimal?      @db.Decimal(14, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
 
   company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property              Property               @relation(fields: [propertyId], references: [id])
@@ -237,6 +247,40 @@ model Project {
 
   @@unique([companyId, code])
   @@index([companyId])
+}
+
+model Estimate {
+  id          String         @id @default(cuid())
+  companyId   String
+  propertyId  String?
+  title       String
+  rehabType   String?
+  sqft        Int?
+  notes       String?
+  status      String         @default("Draft")
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines       EstimateLine[]
+
+  @@index([companyId])
+}
+
+model EstimateLine {
+  id           String   @id @default(cuid())
+  estimateId   String
+  costCode     Int?
+  name         String
+  laborCost    Decimal  @default(0) @db.Decimal(14, 2)
+  materialCost Decimal  @default(0) @db.Decimal(14, 2)
+  unit         String?
+  unitPrice    Decimal? @db.Decimal(14, 2)
+  quantity     Decimal? @db.Decimal(14, 2)
+  createdAt    DateTime @default(now())
+  estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@index([estimateId])
 }
 
 model Phase {

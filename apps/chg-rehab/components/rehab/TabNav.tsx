@@ -6,6 +6,7 @@ const TABS = [
   { slug: "overview", label: "Overview" },
   { slug: "sow", label: "Scope of Work" },
   { slug: "budget", label: "Budget & Costs" },
+  { slug: "returns", label: "Returns" },
   { slug: "invoices", label: "Invoices" },
   { slug: "change-orders", label: "Change Orders" },
   { slug: "schedule", label: "Schedule" },

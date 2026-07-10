@@ -5,6 +5,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import AddProjectButton from "@/components/rehab/AddProjectButton";
 import RehabSearchInput from "@/components/rehab/RehabSearchInput";
+import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
+import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
+import { computeProjectForecastTotals } from "@/lib/rehab/projectForecast";
+import { computeReturns } from "@/lib/rehab/returns";
+import { InvoiceStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +44,103 @@ export default async function RehabIndex({
   const allProjects = await prisma.project.findMany({
     where: { companyId: user.companyId },
     include: {
-      property: { select: { address: true, city: true, state: true, code: true } },
-      phases: { select: { id: true, status: true } },
+      property: { select: { address: true, city: true, state: true, code: true, meta: true } },
+      phases: {
+        select: {
+          id: true,
+          status: true,
+          budget: true,
+          percentComplete: true,
+          forecastMethod: true,
+          forecastManual: true,
+          checklistItems: { select: { status: true } },
+        },
+      },
     },
     orderBy: { updatedAt: "desc" },
   });
+
+  // Portfolio finance rollup — same building blocks as the per-project pages:
+  // committed/actual from invoices, Projected Final from the shared
+  // project-forecast helper, returns math from the shared returns helper.
+  const [committedAgg, paidAgg, forecastEntries] = await Promise.all([
+    prisma.invoice.groupBy({
+      by: ["projectId"],
+      where: { project: { companyId: user.companyId } },
+      _sum: { amount: true },
+    }),
+    prisma.invoice.groupBy({
+      by: ["projectId"],
+      where: { project: { companyId: user.companyId }, status: InvoiceStatus.Paid },
+      _sum: { amount: true },
+    }),
+    Promise.all(
+      allProjects.map(async (p) => {
+        const [actuals, pendingCOs] = await Promise.all([
+          computePhaseActualBreakdowns(p.id),
+          computePendingChangeOrders(p.id),
+        ]);
+        return [p.id, computeProjectForecastTotals(p.phases, actuals, pendingCOs)] as const;
+      })
+    ),
+  ]);
+  const committedByProject = new Map(committedAgg.map((g) => [g.projectId, Number(g._sum.amount ?? 0)]));
+  const paidByProject = new Map(paidAgg.map((g) => [g.projectId, Number(g._sum.amount ?? 0)]));
+  const forecastByProject = new Map(forecastEntries);
+
+  const portfolioRows = allProjects.map((p) => {
+    const totals = forecastByProject.get(p.id) ?? { workingBudget: 0, projectedFinal: 0, overUnder: 0 };
+    const propMeta =
+      p.property.meta && typeof p.property.meta === "object" && !Array.isArray(p.property.meta)
+        ? (p.property.meta as { purchasePrice?: number })
+        : {};
+    const acquisition =
+      p.acquisitionCost != null
+        ? Number(p.acquisitionCost)
+        : typeof propMeta.purchasePrice === "number"
+          ? propMeta.purchasePrice
+          : null;
+    const arv = p.arv == null ? null : Number(p.arv);
+    const returns = computeReturns({
+      arv,
+      acquisitionCost: acquisition,
+      projectedRehab: totals.projectedFinal,
+      refiLtvPct: p.refiLtvPct == null ? null : Number(p.refiLtvPct),
+      refiRatePct: p.refiRatePct == null ? null : Number(p.refiRatePct),
+      refiTermYears: p.refiTermYears,
+      monthlyRent: p.monthlyRent == null ? null : Number(p.monthlyRent),
+      monthlyExpenses: p.monthlyExpenses == null ? null : Number(p.monthlyExpenses),
+    });
+    return {
+      project: p,
+      workingBudget: totals.workingBudget,
+      projectedFinal: totals.projectedFinal,
+      overUnder: totals.overUnder,
+      committed: committedByProject.get(p.id) ?? 0,
+      actual: paidByProject.get(p.id) ?? 0,
+      allIn: returns.allIn,
+      dscr: returns.dscr,
+      arv,
+    };
+  });
+
+  const port = portfolioRows.reduce(
+    (acc, r) => {
+      acc.allIn += r.allIn;
+      acc.workingBudget += r.workingBudget;
+      acc.committed += r.committed;
+      acc.actual += r.actual;
+      acc.projectedFinal += r.projectedFinal;
+      acc.overUnder += r.overUnder;
+      if (r.arv != null) {
+        acc.arv += r.arv;
+        acc.hasArv = true;
+      }
+      return acc;
+    },
+    { allIn: 0, workingBudget: 0, committed: 0, actual: 0, projectedFinal: 0, overUnder: 0, arv: 0, hasArv: false }
+  );
+  const portfolioEquity = port.hasArv ? port.arv - port.allIn : null;
 
   const filtered = allProjects.filter((p) => {
     if (!q) return true;
@@ -72,6 +169,9 @@ export default async function RehabIndex({
           <AddProjectButton />
           <Link href="/rehab/templates" className="btn-sm" style={{ textDecoration: "none", marginLeft: 4 }}>
             SOW Templates
+          </Link>
+          <Link href="/rehab/estimator" className="btn-sm" style={{ textDecoration: "none", marginLeft: 4 }}>
+            Estimator
           </Link>
         </div>
         <div className="proj-r">
@@ -183,6 +283,84 @@ export default async function RehabIndex({
               </div>
             ))}
           </div>
+
+          {/* Portfolio finance KPIs */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+            {[
+              { val: fmtMoney(port.allIn) ?? "—", label: "Total all-in cost", color: "#0A0A0A" },
+              { val: fmtMoney(port.workingBudget) ?? "—", label: "Working budget", color: "#0A0A0A" },
+              { val: fmtMoney(port.committed) ?? "—", label: "Committed", color: "#0A0A0A" },
+              { val: fmtMoney(port.actual) ?? "—", label: "Actual (paid)", color: "#27500A" },
+              { val: fmtMoney(port.projectedFinal) ?? "—", label: "Projected final", color: "#0A0A0A" },
+              {
+                val:
+                  port.overUnder === 0
+                    ? "$0"
+                    : `${port.overUnder < 0 ? "-" : "+"}$${Math.round(Math.abs(port.overUnder)).toLocaleString()}`,
+                label: "Projected over/under",
+                color: port.overUnder < 0 ? "#9F1D1D" : "#27500A",
+              },
+              {
+                val:
+                  portfolioEquity == null
+                    ? "—"
+                    : `${portfolioEquity < 0 ? "-" : ""}$${Math.round(Math.abs(portfolioEquity)).toLocaleString()}`,
+                label: "Portfolio equity (ARV − all-in)",
+                color: portfolioEquity != null && portfolioEquity < 0 ? "#9F1D1D" : "#1F4D5C",
+              },
+            ].map(({ val, label, color }) => (
+              <div key={label} style={{ background: "#fff", borderRadius: 8, padding: "14px 16px", border: "0.5px solid rgba(0,0,0,0.06)" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color, letterSpacing: "-0.02em" }}>{val}</div>
+                <div style={{ fontSize: 11, color: "#6B6862", marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Per-project portfolio summary */}
+          {portfolioRows.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 8, border: "0.5px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
+              <div style={{ padding: "12px 16px", borderBottom: "0.5px solid #F5F4F0", fontSize: 12, fontWeight: 600, color: "#0A0A0A" }}>
+                Portfolio summary
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.6fr) repeat(5, minmax(72px, 1fr))", gap: 8, padding: "6px 16px", borderBottom: "0.5px solid #F5F4F0", fontSize: 9, color: "#A8A49C", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <span>Project</span>
+                <span style={{ textAlign: "right" }}>Budget</span>
+                <span style={{ textAlign: "right" }}>Actual</span>
+                <span style={{ textAlign: "right" }}>Forecast</span>
+                <span style={{ textAlign: "right" }}>Over/Under</span>
+                <span style={{ textAlign: "right" }}>DSCR</span>
+              </div>
+              {portfolioRows.map((r) => {
+                const band =
+                  r.dscr == null ? null : r.dscr >= 1.25 ? "#27500A" : r.dscr >= 1.0 ? "#92400E" : "#9F1D1D";
+                return (
+                  <Link
+                    key={r.project.id}
+                    href={`/rehab/${encodeURIComponent(r.project.code)}/returns`}
+                    style={{ display: "grid", gridTemplateColumns: "minmax(0,1.6fr) repeat(5, minmax(72px, 1fr))", gap: 8, padding: "9px 16px", borderBottom: "0.5px solid #F5F4F0", textDecoration: "none", color: "inherit", alignItems: "center" }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {r.project.property.address.split(",")[0]}
+                      </div>
+                      <div style={{ fontSize: 9, color: "#A8A49C" }}>{r.project.code}</div>
+                    </div>
+                    <div style={{ fontSize: 11, textAlign: "right" }}>{fmtMoney(r.workingBudget) ?? "—"}</div>
+                    <div style={{ fontSize: 11, textAlign: "right" }}>{fmtMoney(r.actual) ?? "—"}</div>
+                    <div style={{ fontSize: 11, textAlign: "right" }}>{fmtMoney(r.projectedFinal) ?? "—"}</div>
+                    <div style={{ fontSize: 11, textAlign: "right", fontWeight: 500, color: r.overUnder < 0 ? "#9F1D1D" : "#27500A" }}>
+                      {r.overUnder === 0
+                        ? "$0"
+                        : `${r.overUnder < 0 ? "-" : "+"}$${Math.round(Math.abs(r.overUnder)).toLocaleString()}`}
+                    </div>
+                    <div style={{ fontSize: 11, textAlign: "right", fontWeight: 500, color: band ?? "#A8A49C" }}>
+                      {r.dscr != null ? r.dscr.toFixed(2) : "—"}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* Active projects */}
           {activeProjects.length > 0 && (
