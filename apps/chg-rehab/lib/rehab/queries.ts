@@ -7,7 +7,7 @@ import {
   type Draw,
   type SOWSection,
   type SOWLineItem,
-  type ProjectAddendum,
+  type ChangeOrder,
   type ProjectAssignment,
   type Document,
   type ContractorComplianceDoc,
@@ -27,7 +27,12 @@ export type FullProject = Project & {
   >;
   draws: Draw[];
   sowSections: Array<SOWSection & { lineItems: SOWLineItem[] }>;
-  addenda: ProjectAddendum[];
+  /**
+   * All change orders on the project (ChangeOrder is the single "change"
+   * object — the legacy ProjectAddendum table is retired and no longer read).
+   * Project-level "addenda" are the entries with phaseId === null.
+   */
+  changeOrders: ChangeOrder[];
   assignments: Array<ProjectAssignment & { user: User }>;
   documents: Document[];
 };
@@ -38,7 +43,10 @@ export async function loadProjectByCode(companyId: string, code: string): Promis
     include: {
       property: { select: { code: true, address: true, city: true, state: true } },
       phases: {
-        orderBy: { number: "asc" },
+        // Display order is sortOrder (reorderable); number is the stable cost
+        // code and only breaks ties. Every tab that renders phases flows from
+        // this query, so they all share one ordering.
+        orderBy: [{ sortOrder: "asc" }, { number: "asc" }],
         include: {
           checklistItems: { orderBy: { createdAt: "asc" } },
           draws: { orderBy: { number: "asc" } },
@@ -49,7 +57,7 @@ export async function loadProjectByCode(companyId: string, code: string): Promis
         orderBy: { order: "asc" },
         include: { lineItems: { orderBy: { description: "asc" } } },
       },
-      addenda: { orderBy: { createdAt: "asc" } },
+      changeOrders: { orderBy: { number: "asc" } },
       assignments: { include: { user: true } },
       documents: { orderBy: { uploadedAt: "desc" } },
     },

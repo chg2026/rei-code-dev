@@ -20,6 +20,13 @@ const nextConfig = {
         if (request && request.startsWith("node:")) {
           return callback(null, "commonjs " + request);
         }
+        // The Twilio SDK (and its jsonwebtoken dependency) uses bare
+        // `require('crypto')`/`require('stream')`. Keep it as a runtime require
+        // so webpack never tries to bundle it into the instrumentation/edge
+        // trace (it is only ever executed in the Node runtime).
+        if (request === "twilio" || request.startsWith("twilio/")) {
+          return callback(null, "commonjs " + request);
+        }
         return callback();
       });
       config.externals = externals;

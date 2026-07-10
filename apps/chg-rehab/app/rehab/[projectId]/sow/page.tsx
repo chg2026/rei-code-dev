@@ -35,7 +35,10 @@ export default async function SowPage({
   const focusPhase = sp.phase ? parseInt(sp.phase, 10) : NaN;
 
   const totalValue = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
-  const latestAddendum = project.addenda[project.addenda.length - 1];
+  // "Addenda" = project-level change orders (phaseId null); ChangeOrder is the
+  // single "change" object — the legacy ProjectAddendum table is no longer read.
+  const addenda = project.changeOrders.filter((co) => co.phaseId === null);
+  const latestAddendum = addenda[addenda.length - 1];
   const meta = parseProjectMeta(project.meta);
 
   // Pair phases with sow sections by index (both ordered)
@@ -43,7 +46,7 @@ export default async function SowPage({
 
   return (
     <div className="tab-panel active">
-      {latestAddendum && Number(latestAddendum.delta) !== 0 && (
+      {latestAddendum && Number(latestAddendum.amount) !== 0 && (
         <div className="amber-bar">
           <span className="ab-badge">{latestAddendum.title} — Active</span>
           <span className="ab-text">{latestAddendum.reason || "Scope change applied."}</span>
@@ -228,7 +231,7 @@ export default async function SowPage({
             <div className="ip-row"><span className="ir-lbl">Total value</span><span className="ir-val">{fmt$(totalValue)}</span></div>
             <div className="ip-row"><span className="ir-lbl">Job Types</span><span className="ir-val">{project.phases.length}</span></div>
             <div className="ip-row"><span className="ir-lbl">Signed</span><span className="ir-val">{formatET(project.startDate, false)}</span></div>
-            <div className="ip-row"><span className="ir-lbl">Addenda</span><span className="ir-val">{project.addenda.length}</span></div>
+            <div className="ip-row"><span className="ir-lbl">Addenda</span><span className="ir-val">{addenda.length}</span></div>
           </div>
           <div className="sb-sec" style={{ padding: "10px 12px" }}>
             <div className="sb-hd" style={{ padding: "0 0 6px" }}>Version history</div>
@@ -238,14 +241,14 @@ export default async function SowPage({
                 {formatET(project.startDate, false)} · v1.0
               </div>
             </div>
-            {project.addenda.map((a) => (
+            {addenda.map((a) => (
               <div key={a.id} style={{ padding: "4px 0", borderBottom: "0.5px solid var(--border-lo)" }}>
                 <div style={{ fontSize: 10, fontWeight: 500 }}>{a.title}</div>
                 <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
                   {formatET(a.createdAt, false)}
-                  {Number(a.delta) !== 0 ? ` · +$${Number(a.delta).toLocaleString()}` : ""}
+                  {Number(a.amount) !== 0 ? ` · +$${Number(a.amount).toLocaleString()}` : ""}
                   {a.daysDelta !== 0 ? ` · +${a.daysDelta} day${a.daysDelta === 1 ? "" : "s"}` : ""}
-                  {Number(a.delta) === 0 && a.daysDelta === 0 ? " · No change" : ""}
+                  {Number(a.amount) === 0 && a.daysDelta === 0 ? " · No change" : ""}
                 </div>
               </div>
             ))}

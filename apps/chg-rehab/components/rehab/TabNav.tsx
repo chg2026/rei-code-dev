@@ -14,6 +14,7 @@ const TABS = [
   { slug: "daily-log", label: "Daily Log" },
   { slug: "issues", label: "Issues" },
   { slug: "punch", label: "Punch List" },
+  { slug: "materials", label: "Materials" },
   { slug: "photos", label: "Photos" },
   { slug: "documents", label: "Documents" },
   { slug: "activity", label: "Activity" },

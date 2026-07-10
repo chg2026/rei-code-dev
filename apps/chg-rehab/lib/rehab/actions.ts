@@ -278,6 +278,12 @@ export async function fileException(projectCode: string, phaseNumber: number, su
   revalidatePath(`/rehab/${project.code}/sow`);
 }
 
+/**
+ * Legacy "add addendum" action. Kept for compatibility, but it now writes a
+ * project-level ChangeOrder (phaseId null) — ChangeOrder is the single
+ * "change" object; the ProjectAddendum table is retired (never written or
+ * read, rows kept only as backup).
+ */
 export async function addProjectAddendum(projectCode: string, title: string, reason: string, deltaDollars: string) {
   const user = await requireUser();
   const project = await prisma.project.findUnique({
@@ -287,15 +293,27 @@ export async function addProjectAddendum(projectCode: string, title: string, rea
   const allowed = await can(user, "rehab", "approve");
   if (!allowed) throw new Error("Not authorized");
   await assertBillingOk(user.companyId);
-  const created = await prisma.projectAddendum.create({
-    data: { projectId: project.id, title: title.trim(), reason: reason.trim() || null, delta: deltaDollars || "0", status: "Pending" },
+  const max = await prisma.changeOrder.aggregate({
+    where: { projectId: project.id },
+    _max: { number: true },
+  });
+  const created = await prisma.changeOrder.create({
+    data: {
+      projectId: project.id,
+      phaseId: null,
+      number: (max._max.number ?? 0) + 1,
+      title: title.trim(),
+      reason: reason.trim() || null,
+      amount: deltaDollars || "0",
+      status: "Pending",
+    },
   });
   await prisma.activityLogEntry.create({
     data: {
       companyId: user.companyId,
       actorId: user.id,
       action: "addendum.created",
-      entity: "Addendum",
+      entity: "ChangeOrder",
       entityId: created.id,
       message: `${title.trim()} created (delta $${deltaDollars || "0"}).`,
       meta: { type: "system", projectId: project.id },
@@ -404,6 +422,14 @@ export async function approveChangeOrder(activityEntryId: string, projectCode: s
   const estimate = typeof rawMeta.estimate === "string" ? rawMeta.estimate : "0";
   const phaseNumber = typeof rawMeta.phaseNumber === "number" ? rawMeta.phaseNumber : null;
 
+  // Record the approval as a real project-level ChangeOrder (the retired
+  // ProjectAddendum table is no longer written). Mirrors the legacy addendum
+  // semantics exactly: phaseId null, no phase-budget folding.
+  const maxNumber = await prisma.changeOrder.aggregate({
+    where: { projectId: project.id },
+    _max: { number: true },
+  });
+
   await prisma.$transaction([
     prisma.activityLogEntry.update({
       where: { id: activityEntryId },
@@ -425,13 +451,17 @@ export async function approveChangeOrder(activityEntryId: string, projectCode: s
         },
       },
     }),
-    prisma.projectAddendum.create({
+    prisma.changeOrder.create({
       data: {
         projectId: project.id,
+        phaseId: null,
+        number: (maxNumber._max.number ?? 0) + 1,
         title: `CO — Job Type ${phaseNumber ?? "?"}: ${scope || "Change order"}`,
         reason: scope || null,
-        delta: estimate && estimate !== "0" ? parseFloat(estimate) : null,
+        amount: estimate && estimate !== "0" ? parseFloat(estimate) : 0,
         status: "Approved",
+        approvedById: user.id,
+        approvedAt: new Date(),
       },
     }),
   ]);

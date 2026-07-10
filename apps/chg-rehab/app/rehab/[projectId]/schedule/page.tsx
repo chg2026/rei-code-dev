@@ -1,11 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { loadProjectByCode } from "@/lib/rehab/queries";
+import { can } from "@/lib/permissions";
 import { formatET } from "@/lib/datetime";
 import { ChecklistStatus, PhaseStatus } from "@prisma/client";
 import { parseProjectMeta } from "@/lib/rehab/types";
 import ScheduleViewToggle from "@/components/rehab/ScheduleViewToggle";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
+import AddAddendumButton from "@/components/rehab/AddAddendumButton";
 import GanttChart, { type GanttPhase } from "@/components/rehab/GanttChart";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +27,14 @@ export default async function SchedulePage({
   const view = sp.view === "list" ? "list" : "gantt";
   const project = await loadProjectByCode(user.companyId, decodeURIComponent(projectId));
   if (!project) notFound();
+  const canEdit = await can(user, "rehab", "edit");
 
   const meta = parseProjectMeta(project.meta);
+
+  // Project-level change orders (phaseId null) are the "addenda": daysDelta is
+  // the schedule impact, amount the cost impact. ChangeOrder is the single
+  // "change" object — the legacy ProjectAddendum table is no longer read.
+  const addenda = project.changeOrders.filter((co) => co.phaseId === null);
 
   // Effective scheduling dates: prefer the planned* fields (basis for the
   // Gantt) and fall back to the legacy start/end for phases not yet planned.
@@ -74,7 +82,7 @@ export default async function SchedulePage({
     <div className="tab-panel active">
       <div className="action-bar">
         <ScheduleViewToggle projectCode={project.code} view={view} />
-        <button className="btn">+ Add addendum</button>
+        {canEdit && <AddAddendumButton projectCode={project.code} />}
         <button className="btn">Export</button>
       </div>
 
@@ -116,14 +124,24 @@ export default async function SchedulePage({
           </div>
           <div className="ip-sec" style={{ borderBottom: "none" }}>
             <div className="ip-lbl">Addenda</div>
-            {project.addenda.map((a) => (
+            {addenda.map((a) => (
               <div className="ip-row" key={a.id}>
-                <span className="ir-lbl" style={{ color: "var(--blue)" }}>{a.title}</span>
+                <span className="ir-lbl" style={{ color: "var(--blue)" }}>
+                  {a.title}
+                  {Number(a.amount) !== 0 && (
+                    <span style={{ color: "var(--text-tertiary)", marginLeft: 4 }}>
+                      {fmt$(Number(a.amount))}
+                    </span>
+                  )}
+                </span>
                 <span className="small-badge" style={{ background: "var(--purple-bg)", color: "var(--purple-txt)" }}>
                   {a.daysDelta === 0 ? "+0 days" : `+${a.daysDelta} day${a.daysDelta === 1 ? "" : "s"}`}
                 </span>
               </div>
             ))}
+            {addenda.length === 0 && (
+              <div style={{ fontSize: 10, color: "var(--text-tertiary)", padding: "2px 0" }}>None</div>
+            )}
           </div>
         </div>
 

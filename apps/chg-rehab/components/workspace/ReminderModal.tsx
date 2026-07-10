@@ -30,6 +30,29 @@ const URGENCIES: { id: string; label: string; color: string }[] = [
   { id: "urgent", label: "Urgent", color: "#ef4444" },
 ];
 
+// UI-only presets (minutes before due). Labels for persistence are derived
+// server-side, so the card only needs to send these numbers.
+const SMS_PRESETS: { minutes: number; label: string }[] = [
+  { minutes: 5, label: "5 min" },
+  { minutes: 15, label: "15 min" },
+  { minutes: 30, label: "30 min" },
+  { minutes: 60, label: "1 hr" },
+  { minutes: 120, label: "2 hr" },
+  { minutes: 180, label: "3 hr" },
+  { minutes: 1440, label: "1 day" },
+  { minutes: 2880, label: "2 days" },
+];
+
+const CUSTOM_UNIT_MULT: Record<string, number> = { minutes: 1, hours: 60, days: 1440 };
+
+function smsLabel(minutes: number): string {
+  const preset = SMS_PRESETS.find((p) => p.minutes === minutes);
+  if (preset) return preset.label + " before";
+  if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes / 1440 === 1 ? "" : "s"} before`;
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes / 60 === 1 ? "" : "s"} before`;
+  return `${minutes} minute${minutes === 1 ? "" : "s"} before`;
+}
+
 function firstNameOf(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
@@ -48,6 +71,12 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
   const [err, setErr] = useState<string | null>(null);
 
   const [members, setMembers] = useState<Member[]>([]);
+
+  // SMS reminders
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [smsLeadTimes, setSmsLeadTimes] = useState<number[]>([]);
+  const [customValue, setCustomValue] = useState("");
+  const [customUnit, setCustomUnit] = useState<"minutes" | "hours" | "days">("hours");
 
   // Assignee combobox
   const [assigneeQuery, setAssigneeQuery] = useState("");
@@ -73,6 +102,41 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
     setAssigneeOpen(false);
     setMentionQuery(null);
     setErr(null);
+    setSmsLeadTimes([]);
+    setCustomValue("");
+    setCustomUnit("hours");
+  }, [open, reminder]);
+
+  // Load SMS phone-verification state whenever the card opens, plus any
+  // existing pending lead times for the reminder being edited.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/account/sms-status", { cache: "no-store" });
+        if (!r.ok) return;
+        const data = await r.json();
+        if (!cancelled) setPhoneVerified(Boolean(data.phoneVerified));
+      } catch {
+        /* ignore */
+      }
+      if (reminder?.id) {
+        try {
+          const r = await fetch(`/api/workspace/reminders/${reminder.id}/sms`, { cache: "no-store" });
+          if (!r.ok) return;
+          const data = await r.json();
+          if (cancelled) return;
+          const mins = (data.leadTimes ?? [])
+            .map((l: { minutesBefore: number }) => l.minutesBefore)
+            .filter((m: number) => Number.isFinite(m));
+          setSmsLeadTimes(Array.from(new Set<number>(mins)).sort((a, b) => a - b));
+        } catch {
+          /* ignore */
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [open, reminder]);
 
   useEffect(() => {
@@ -170,6 +234,25 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
     setMentionQuery(null);
   }, [mentionAnchor]);
 
+  const toggleLeadTime = useCallback((minutes: number) => {
+    setSmsLeadTimes((prev) =>
+      prev.includes(minutes)
+        ? prev.filter((m) => m !== minutes)
+        : [...prev, minutes].sort((a, b) => a - b)
+    );
+  }, []);
+
+  const addCustomLeadTime = useCallback(() => {
+    const n = Number(customValue);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const minutes = Math.round(n) * CUSTOM_UNIT_MULT[customUnit];
+    if (minutes <= 0 || minutes > 43_200) return; // cap at 30 days
+    setSmsLeadTimes((prev) =>
+      prev.includes(minutes) ? prev : [...prev, minutes].sort((a, b) => a - b)
+    );
+    setCustomValue("");
+  }, [customValue, customUnit]);
+
   const submit = useCallback(async () => {
     setErr(null);
     if (!title.trim()) {
@@ -201,6 +284,21 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || "Failed to save reminder");
+
+      // Persist SMS lead times against the saved reminder. Only meaningful for
+      // a verified phone; the reconcile endpoint upserts/removes pending rows
+      // and never touches already-sent ones.
+      if (phoneVerified) {
+        const reminderId: string | undefined = isEdit ? reminder!.id : data.id;
+        if (reminderId) {
+          await fetch(`/api/workspace/reminders/${reminderId}/sms`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ leadTimes: smsLeadTimes }),
+          }).catch(() => undefined);
+        }
+      }
+
       onSaved?.();
       onClose();
     } catch (e) {
@@ -208,7 +306,7 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
     } finally {
       setBusy(false);
     }
-  }, [title, notes, tags, dueDate, dueTime, urgency, assigneeId, isEdit, reminder, onSaved, onClose]);
+  }, [title, notes, tags, dueDate, dueTime, urgency, assigneeId, isEdit, reminder, phoneVerified, smsLeadTimes, onSaved, onClose]);
 
   if (!open) return null;
 
@@ -470,6 +568,105 @@ export default function ReminderModal({ open, onClose, onSaved, reminder }: Remi
                 );
               })}
             </div>
+          </div>
+          <div className={s.field}>
+            <label className={s.fieldLabel}>SMS reminders</label>
+            {phoneVerified ? (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {SMS_PRESETS.map((p) => {
+                    const active = smsLeadTimes.includes(p.minutes);
+                    return (
+                      <button
+                        key={p.minutes}
+                        type="button"
+                        onClick={() => toggleLeadTime(p.minutes)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 999,
+                          border: active ? "1.5px solid var(--marine, #2f5d8a)" : "1px solid var(--border-mid, #d0d4d9)",
+                          background: active ? "var(--marine, #2f5d8a)" : "transparent",
+                          color: active ? "#fff" : "var(--quill, #555)",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Custom lead times not covered by a preset (chips to remove). */}
+                {smsLeadTimes.filter((m) => !SMS_PRESETS.some((p) => p.minutes === m)).length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                    {smsLeadTimes
+                      .filter((m) => !SMS_PRESETS.some((p) => p.minutes === m))
+                      .map((m) => (
+                        <span
+                          key={m}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            background: "var(--bone, #f1efe9)",
+                            borderRadius: 12,
+                            padding: "3px 9px",
+                            fontSize: 12,
+                          }}
+                        >
+                          {smsLabel(m)}
+                          <button
+                            type="button"
+                            onClick={() => toggleLeadTime(m)}
+                            aria-label={`Remove ${smsLabel(m)}`}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--stone, #888)", fontSize: 13, lineHeight: 1, padding: 0 }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    value={customValue}
+                    onChange={(e) => setCustomValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomLeadTime(); } }}
+                    placeholder="Custom"
+                    style={{ width: 80, padding: "5px 8px", fontSize: 13, border: "1px solid var(--border-mid, #d0d4d9)", borderRadius: 6, fontFamily: "inherit" }}
+                  />
+                  <select
+                    value={customUnit}
+                    onChange={(e) => setCustomUnit(e.target.value as "minutes" | "hours" | "days")}
+                    style={{ padding: "5px 8px", fontSize: 13, border: "1px solid var(--border-mid, #d0d4d9)", borderRadius: 6, fontFamily: "inherit" }}
+                  >
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                  </select>
+                  <button type="button" className={`${s.btn} ${s.ghost}`} onClick={addCustomLeadTime} style={{ padding: "5px 12px" }}>
+                    Add
+                  </button>
+                  <span style={{ fontSize: 11, color: "var(--quill, #888)" }}>before the reminder</span>
+                </div>
+                {!dueDate && (
+                  <div style={{ fontSize: 11, color: "var(--quill, #888)", marginTop: 6 }}>
+                    Set a date{dueTime ? "" : " (and optionally a time)"} above so we know when to text you.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--quill, #666)", lineHeight: 1.5 }}>
+                Text reminders need a verified mobile number.{" "}
+                <a href="/account" style={{ color: "var(--marine, #2f5d8a)", textDecoration: "underline" }}>
+                  Verify your phone in Profile settings
+                </a>{" "}
+                to turn these on.
+              </div>
+            )}
           </div>
           {err ? <div className={s.error}>{err}</div> : null}
         </div>

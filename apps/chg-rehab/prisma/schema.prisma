@@ -27,6 +27,7 @@ model Company {
   contacts             Contact[]
   documents            Document[]
   estimates            Estimate[]
+  companyRoles         CompanyRole[]
   leases               Lease[]
   permissionLabels     PermissionLabelRow[]
   permissionRows       PermissionMatrixRow[]
@@ -86,6 +87,7 @@ model User {
   phoneVerified           Boolean                      @default(false)
   phoneVerifiedAt         DateTime?
   timezone                String                       @default("America/New_York") // IANA timezone
+  customRoleId            String? // when set, access resolves from CompanyRole.permissions (see lib/permissions.ts#can)
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @default(now()) @updatedAt
   activityEntries         ActivityLogEntry[]
@@ -244,6 +246,7 @@ model Project {
   issues                Issue[]
   punchItems            PunchItem[]
   photos                Photo[]
+  materialOrders        MaterialOrder[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -283,10 +286,56 @@ model EstimateLine {
   @@index([estimateId])
 }
 
+model CompanyRole {
+  id          String   @id @default(cuid())
+  companyId   String
+  key         String // stable slug; for system roles this is the UserRole enum name
+  name        String
+  isSystem    Boolean  @default(false)
+  permissions Json     @default("{}") // feature -> "none" | "view" | "edit"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+}
+
+model MaterialOrder {
+  id             String         @id @default(cuid())
+  projectId      String
+  phaseId        String?
+  vendor         String?
+  description    String
+  quantity       String?
+  trackingNumber String?
+  eta            DateTime?      @db.Date
+  status         MaterialStatus @default(Needed)
+  urgent         Boolean        @default(false)
+  cost           Decimal?       @db.Decimal(14, 2)
+  notes          String?
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase          Phase?         @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+enum MaterialStatus {
+  Needed
+  Ordered
+  Shipped
+  Delivered
+  Delayed
+}
+
 model Phase {
   id                   String           @id @default(cuid())
   projectId            String
-  number               Int
+  number               Int // stable cost code — never renumbered on reorder
+  sortOrder            Int              @default(0) // display order; reordering rewrites this, not `number`
   name                 String
   status               PhaseStatus      @default(NotStarted)
   budget               Decimal?         @db.Decimal(14, 2)
@@ -312,6 +361,7 @@ model Phase {
   commitments          Commitment[]
   issues               Issue[]
   punchItems           PunchItem[]
+  materialOrders       MaterialOrder[]
   project              Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, number])

@@ -72,6 +72,7 @@ export async function runNotificationSweep(
   const emailFlush = await flushPendingEmails(companyId, now);
   await sweepDocExpiry(companyId, now);
   await sweepContractorLapse(companyId, now);
+  await sweepReminderSms(companyId, now);
 
   // All steps completed without throwing — record the successful sweep.
   await prisma.notificationState.update({
@@ -202,6 +203,118 @@ async function sweepContractorLapse(companyId: string, now: Date): Promise<void>
       },
       dedupeKey: `missingUpdates:${a.id}:${cutoff.toISOString().slice(0, 10)}`,
     });
+  }
+}
+
+/** Max real send attempts before an SMS reminder row is marked terminally failed. */
+const MAX_SMS_ATTEMPTS = 3;
+
+/** Friendly "Jan 5, 2026 at 9:00 AM" from a reminder's local date/time strings. */
+function formatReminderDue(dueDate: string | null, dueTime: string | null): string {
+  if (!dueDate) return "";
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
+  if (!dm) return dueDate;
+  const d = new Date(Date.UTC(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3])));
+  const dateStr = d.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const tm = dueTime ? /^(\d{2}):(\d{2})$/.exec(dueTime) : null;
+  if (!tm) return dateStr;
+  let h = Number(tm[1]);
+  const min = tm[2];
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${dateStr} at ${h}:${min} ${ampm}`;
+}
+
+/**
+ * Send due SMS reminders. Selects pending WsReminderSms rows whose scheduled
+ * moment has arrived, texts each recipient, and marks the row sent/failed.
+ *
+ * Idempotency: each row is *claimed* with a conditional `updateMany` that flips
+ * `pending -> sending` and returns count 1 only for the writer that won the
+ * race. Any concurrent sweep sees count 0 and skips the row, so a reminder can
+ * never be texted twice — even if two sweeps overlap. A row is only ever
+ * re-selected while it is still `pending`.
+ */
+async function sweepReminderSms(companyId: string, now: Date): Promise<void> {
+  // Lazy-import the Twilio helper so the Node-only SDK never enters the
+  // instrumentation/edge bundle that statically loads this module.
+  const { sendSms } = await import("../twilio");
+
+  const due = await prisma.wsReminderSms.findMany({
+    where: { companyId, status: "pending", scheduledFor: { lte: now } },
+    include: {
+      reminder: { select: { title: true, dueDate: true, dueTime: true, done: true, dismissed: true } },
+      user: { select: { phoneNumber: true, phoneVerified: true } },
+    },
+    orderBy: { scheduledFor: "asc" },
+    take: 200,
+  });
+
+  for (const sms of due) {
+    // Atomic claim — only one writer flips pending -> sending.
+    const claim = await prisma.wsReminderSms.updateMany({
+      where: { id: sms.id, status: "pending" },
+      data: { status: "sending" },
+    });
+    if (claim.count !== 1) continue; // already claimed by a concurrent sweep
+
+    // Reminder was completed/dismissed before the text fired — cancel silently.
+    if (!sms.reminder || sms.reminder.done || sms.reminder.dismissed) {
+      await prisma.wsReminderSms.update({
+        where: { id: sms.id },
+        data: { status: "canceled", lastError: "Reminder completed or dismissed before send." },
+      });
+      continue;
+    }
+
+    const phone = sms.user?.phoneNumber;
+    if (!sms.user?.phoneVerified || !phone) {
+      await prisma.wsReminderSms.update({
+        where: { id: sms.id },
+        data: {
+          status: "failed",
+          attempts: { increment: 1 },
+          lastError: "Recipient has no verified phone number.",
+        },
+      });
+      continue;
+    }
+
+    const dueStr = formatReminderDue(sms.reminder.dueDate, sms.reminder.dueTime);
+    const body = dueStr
+      ? `Reminder: ${sms.reminder.title} — due ${dueStr}`
+      : `Reminder: ${sms.reminder.title}`;
+
+    const result = await sendSms(phone, body);
+    if (result.sent) {
+      await prisma.wsReminderSms.update({
+        where: { id: sms.id },
+        data: { status: "sent", sentAt: new Date(), lastError: null },
+      });
+    } else if (result.skipped) {
+      // SMS isn't configured on this deploy — leave the row queued (back to
+      // pending) so it delivers once credentials are added. No attempt counted.
+      await prisma.wsReminderSms.update({
+        where: { id: sms.id },
+        data: { status: "pending" },
+      });
+    } else {
+      const attempts = sms.attempts + 1;
+      const terminal = attempts >= MAX_SMS_ATTEMPTS;
+      await prisma.wsReminderSms.update({
+        where: { id: sms.id },
+        data: {
+          status: terminal ? "failed" : "pending",
+          attempts,
+          lastError: result.error,
+        },
+      });
+    }
   }
 }
 
