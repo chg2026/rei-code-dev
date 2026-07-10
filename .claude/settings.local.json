@@ -9,7 +9,9 @@
       "Bash(npx vitest *)",
       "Bash(git stash *)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Read(//home/runner/**)",
+      "Bash(find / -maxdepth 4 -name \"*.log\")"
     ]
   }
 }
