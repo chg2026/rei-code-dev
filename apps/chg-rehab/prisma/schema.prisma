@@ -230,39 +230,45 @@ model Project {
   invoices              Invoice[]
   changeOrders          ChangeOrder[]
   commitments           Commitment[]
+  dailyLogs             DailyLog[]
+  issues                Issue[]
+  punchItems            PunchItem[]
+  photos                Photo[]
 
   @@unique([companyId, code])
   @@index([companyId])
 }
 
 model Phase {
-  id                   String          @id @default(cuid())
+  id                   String           @id @default(cuid())
   projectId            String
   number               Int
   name                 String
-  status               PhaseStatus     @default(NotStarted)
-  budget               Decimal?        @db.Decimal(14, 2)
-  actual               Decimal?        @db.Decimal(14, 2)
+  status               PhaseStatus      @default(NotStarted)
+  budget               Decimal?         @db.Decimal(14, 2)
+  actual               Decimal?         @db.Decimal(14, 2)
   startDate            DateTime?
   endDate              DateTime?
-  plannedStartDate     DateTime?       @db.Date
-  estimatedDays        Int             @default(0)
-  plannedEndDate       DateTime?       @db.Date
+  plannedStartDate     DateTime?        @db.Date
+  estimatedDays        Int              @default(0)
+  plannedEndDate       DateTime?        @db.Date
   drawNote             String?
   description          String?
-  laborBudget          Decimal         @default(0) @db.Decimal(14, 2)
-  materialsBudget      Decimal         @default(0) @db.Decimal(14, 2)
-  percentComplete      Int             @default(0) // explicit work %-complete (0–100), entered weekly
-  forecastMethod       ForecastMethod  @default(Auto) // per-line forecast method
-  forecastManual       Decimal?        @db.Decimal(14, 2) // manual Forecast-to-Complete override (method = Manual only)
-  dependencies         Int[]           @default([])
-  acceptanceCriteria   String[]        @default([])
+  laborBudget          Decimal          @default(0) @db.Decimal(14, 2)
+  materialsBudget      Decimal          @default(0) @db.Decimal(14, 2)
+  percentComplete      Int              @default(0) // explicit work %-complete (0–100), entered weekly
+  forecastMethod       ForecastMethod   @default(Auto) // per-line forecast method
+  forecastManual       Decimal?         @db.Decimal(14, 2) // manual Forecast-to-Complete override (method = Manual only)
+  dependencies         Int[]            @default([])
+  acceptanceCriteria   String[]         @default([])
   assignedContractorId String?
   checklistItems       ChecklistItem[]
   draws                Draw[]
   invoiceJobTypes      InvoiceJobType[]
   commitments          Commitment[]
-  project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues               Issue[]
+  punchItems           PunchItem[]
+  project              Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, number])
   @@index([projectId])
@@ -327,11 +333,95 @@ model Draw {
   paidAt             DateTime?
   notes              String?
   createdAt          DateTime   @default(now())
-  approvedBy   User?      @relation("DrawApprover", fields: [approvedById], references: [id])
-  phase        Phase?     @relation(fields: [phaseId], references: [id])
-  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  approvedBy         User?      @relation("DrawApprover", fields: [approvedById], references: [id])
+  phase              Phase?     @relation(fields: [phaseId], references: [id])
+  project            Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model DailyLog {
+  id            String   @id @default(cuid())
+  projectId     String
+  logDate       DateTime @db.Date
+  weather       String?
+  crewCount     Int?
+  workPerformed String
+  notes         String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Issue {
+  id          String      @id @default(cuid())
+  projectId   String
+  phaseId     String?
+  type        IssueType   @default(Issue)
+  title       String
+  description String?
+  status      IssueStatus @default(Open)
+  assigneeId  String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  resolvedAt  DateTime?
+  phase       Phase?      @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([phaseId])
+}
+
+model PunchItem {
+  id          String      @id @default(cuid())
+  projectId   String
+  phaseId     String?
+  title       String
+  location    String?
+  status      PunchStatus @default(Open)
+  assigneeId  String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  doneAt      DateTime?
+  phase       Phase?      @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Photo {
+  id          String    @id @default(cuid())
+  projectId   String
+  phaseId     String?
+  docId       String?
+  caption     String?
+  dailyLogId  String?
+  issueId     String?
+  punchItemId String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  document    Document? @relation(fields: [docId], references: [id], onDelete: SetNull)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+enum IssueType {
+  Issue
+  Question
+}
+
+enum IssueStatus {
+  Open
+  InProgress
+  Resolved
+}
+
+enum PunchStatus {
+  Open
+  Done
 }
 
 model SOWSection {
@@ -386,7 +476,7 @@ model ProjectAssignment {
 }
 
 model Contact {
-  id            String      @id @default(cuid())
+  id            String         @id @default(cuid())
   companyId     String
   type          ContactType
   name          String
@@ -401,9 +491,9 @@ model Contact {
   rating        Int?
   notes         String?
   meta          Json?
-  emailOptOut   Boolean     @default(false)
+  emailOptOut   Boolean        @default(false)
   emailOptOutAt DateTime?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime       @default(now())
 
   org              Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   complianceDocs   ContractorComplianceDoc[]
@@ -566,6 +656,7 @@ model Document {
   project      Project?  @relation(fields: [projectId], references: [id])
   property     Property? @relation(fields: [propertyId], references: [id])
   uploadedBy   User?     @relation("DocUploader", fields: [uploadedById], references: [id])
+  photos       Photo[]
 
   @@index([companyId, level])
 }
@@ -1633,15 +1724,15 @@ model CpSentMessage {
 // ========================================================================
 
 model WsTask {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   companyId       String
   createdById     String
   assigneeId      String?
   title           String
   description     String?
-  priority        String    @default("Medium") // Urgent | High | Medium | Low
+  priority        String       @default("Medium") // Urgent | High | Medium | Low
   dueDate         DateTime?
-  done            Boolean   @default(false)
+  done            Boolean      @default(false)
   doneAt          DateTime?
   status          WsTaskStatus @default(NotStarted)
   isPrivate       Boolean      @default(false)
@@ -1649,15 +1740,15 @@ model WsTask {
   linkId          String?
   linkLabel       String? // denormalised display label e.g. "210 Harbour Ln (Rehab)"
   spaceId         String? // Company Department (PmSpace) this task belongs to
-  sourceMessageId String?   @unique
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  sourceMessageId String?      @unique
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
 
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdBy     User            @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  assignee      User?           @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  space         PmSpace?        @relation("WsTaskSpace", fields: [spaceId], references: [id], onDelete: SetNull)
-  sourceMessage WsMessage?      @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User               @relation("WsTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee      User?              @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  space         PmSpace?           @relation("WsTaskSpace", fields: [spaceId], references: [id], onDelete: SetNull)
+  sourceMessage WsMessage?         @relation("WsMessageConvertedTask", fields: [sourceMessageId], references: [id], onDelete: SetNull)
   comments      WsTaskComment[]
   attachments   WsTaskAttachment[]
   assignees     WsTaskAssignee[]
@@ -1953,14 +2044,14 @@ model PmTag {
 }
 
 model PmTask {
-  id           String           @id @default(cuid())
+  id           String             @id @default(cuid())
   companyId    String
   listId       String
   parentTaskId String?
   createdById  String
   name         String
   description  String?
-  taskType     String           @default("task")
+  taskType     String             @default("task")
   statusId     String?
   priority     String?
   coverImage   String?
@@ -1970,14 +2061,14 @@ model PmTask {
   doneDate     DateTime?
   timeEstimate Int?
   sprintPoints Int?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @default(now()) @updatedAt
-  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  list         PmList           @relation(fields: [listId], references: [id], onDelete: Cascade)
-  status       PmStatus?        @relation(fields: [statusId], references: [id], onDelete: SetNull)
-  createdBy    User             @relation("PmTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  parent       PmTask?          @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subtasks     PmTask[]         @relation("PmSubtasks")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @default(now()) @updatedAt
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  list         PmList             @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status       PmStatus?          @relation(fields: [statusId], references: [id], onDelete: SetNull)
+  createdBy    User               @relation("PmTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  parent       PmTask?            @relation("PmSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     PmTask[]           @relation("PmSubtasks")
   assignees    PmTaskAssignee[]
   tags         PmTaskTag[]
   comments     PmComment[]

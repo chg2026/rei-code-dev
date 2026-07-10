@@ -107,6 +107,11 @@ function actionLabel(action: string): string {
     case "contact.created": return "created a contact";
     case "compliance.uploaded": return "uploaded compliance doc";
     case "compliance.renewed": return "renewed compliance doc";
+    case "dailyLog.created": return "posted a daily log";
+    case "issue.created": return "opened an issue";
+    case "issue.resolved": return "resolved an issue";
+    case "punch.created": return "added a punch item";
+    case "punch.resolved": return "completed a punch item";
     default: return action.replace(/\./g, " ");
   }
 }

@@ -18,7 +18,9 @@ import {
   CommitmentStatus,
   InvoiceClassification,
   InvoiceStatus,
+  IssueStatus,
   ProjectStatus,
+  PunchStatus,
 } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +96,9 @@ export default async function OverviewPage({
     pendingCOs,
     approvedCOAgg,
     approvedCommitmentAgg,
+    openIssueCount,
+    openPunchCount,
+    latestDailyLog,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       where: { projectId: project.id, status: InvoiceStatus.Paid },
@@ -157,6 +162,19 @@ export default async function OverviewPage({
     prisma.commitment.aggregate({
       where: { projectId: project.id, status: CommitmentStatus.Approved },
       _sum: { amount: true },
+    }),
+    // Field-execution tiles: open issues/questions, open punch items, and the
+    // date of the most recent daily log.
+    prisma.issue.count({
+      where: { projectId: project.id, status: { not: IssueStatus.Resolved } },
+    }),
+    prisma.punchItem.count({
+      where: { projectId: project.id, status: PunchStatus.Open },
+    }),
+    prisma.dailyLog.findFirst({
+      where: { projectId: project.id },
+      orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
+      select: { logDate: true },
     }),
   ]);
 
@@ -411,6 +429,9 @@ export default async function OverviewPage({
           outstandingCount={outstandingCount}
           outstandingAmount={outstandingAmount}
           pendingChangeOrders={pendingChangeOrders}
+          openIssues={openIssueCount}
+          openPunchItems={openPunchCount}
+          latestDailyLog={latestDailyLog ? latestDailyLog.logDate.toISOString().slice(0, 10) : null}
         />
 
         {/* ── Pace signal: budget spent vs work complete ── */}

@@ -537,4 +537,5 @@ export async function uploadProjectDocument(
   });
   revalidatePath(`/rehab/${project.code}/documents`);
   revalidatePath(`/rehab/${project.code}/activity`);
+  return { id: doc.id };
 }

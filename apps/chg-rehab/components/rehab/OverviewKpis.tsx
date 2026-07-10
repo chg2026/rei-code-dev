@@ -27,7 +27,20 @@ type Props = {
   outstandingCount: number;
   outstandingAmount: number;
   pendingChangeOrders: number;
+  openIssues: number;
+  openPunchItems: number;
+  /** YYYY-MM-DD of the most recent daily log, or null when none exist. */
+  latestDailyLog: string | null;
 };
+
+function fmtYmd(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return ymd;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toLocaleDateString(
+    "en-US",
+    { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }
+  );
+}
 
 /**
  * Read-only KPI tiles for the Rehab Overview tab, in a responsive grid (4
@@ -138,6 +151,28 @@ export default function OverviewKpis(p: Props) {
         <div className="kpi-sub">
           {p.pendingChangeOrders === 0 ? "None awaiting review" : "Review →"}
         </div>
+      </Link>
+
+      <Link href={`/rehab/${p.code}/issues`} className="ov-kpi link">
+        <div className="kpi-label">Open issues</div>
+        <div className="kpi-val" style={{ color: p.openIssues > 0 ? "var(--amber)" : "inherit" }}>
+          {p.openIssues}
+        </div>
+        <div className="kpi-sub">{p.openIssues === 0 ? "Nothing open" : "Review →"}</div>
+      </Link>
+
+      <Link href={`/rehab/${p.code}/punch`} className="ov-kpi link">
+        <div className="kpi-label">Open punch items</div>
+        <div className="kpi-val" style={{ color: p.openPunchItems > 0 ? "var(--amber)" : "inherit" }}>
+          {p.openPunchItems}
+        </div>
+        <div className="kpi-sub">{p.openPunchItems === 0 ? "Punch list clear" : "Review →"}</div>
+      </Link>
+
+      <Link href={`/rehab/${p.code}/daily-log`} className="ov-kpi link">
+        <div className="kpi-label">Latest daily log</div>
+        <div className="kpi-val">{p.latestDailyLog ? fmtYmd(p.latestDailyLog) : "—"}</div>
+        <div className="kpi-sub">{p.latestDailyLog ? "View log →" : "No entries yet"}</div>
       </Link>
     </div>
   );

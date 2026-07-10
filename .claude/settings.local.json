@@ -6,7 +6,8 @@
       "Bash(npx next *)",
       "Bash(node *)",
       "Bash(npm test *)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(git stash *)"
     ]
   }
 }

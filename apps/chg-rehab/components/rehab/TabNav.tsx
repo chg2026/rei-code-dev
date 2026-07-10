@@ -10,6 +10,10 @@ const TABS = [
   { slug: "change-orders", label: "Change Orders" },
   { slug: "schedule", label: "Schedule" },
   { slug: "checklist", label: "Checklist & Payments" },
+  { slug: "daily-log", label: "Daily Log" },
+  { slug: "issues", label: "Issues" },
+  { slug: "punch", label: "Punch List" },
+  { slug: "photos", label: "Photos" },
   { slug: "documents", label: "Documents" },
   { slug: "activity", label: "Activity" },
 ];
