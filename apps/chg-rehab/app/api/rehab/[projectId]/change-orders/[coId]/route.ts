@@ -58,6 +58,18 @@ export async function PATCH(
       typeof body.reason === "string" && body.reason.trim() ? body.reason.trim() : null;
   }
 
+  // Optional schedule impact in days (captured only — no schedule rewiring).
+  if (body.daysDelta != null && body.daysDelta !== "") {
+    const n = Number(body.daysDelta);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      return NextResponse.json(
+        { error: "Schedule impact must be a whole number of days" },
+        { status: 400 }
+      );
+    }
+    data.daysDelta = n;
+  }
+
   let nextAmount = co.amount;
   if (body.amount != null) {
     try {

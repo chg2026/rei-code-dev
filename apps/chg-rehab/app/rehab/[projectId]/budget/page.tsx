@@ -4,7 +4,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import BudgetPhaseRows, { type BudgetPhaseRow } from "@/components/rehab/BudgetPhaseRows";
+import ContingencyKpi from "@/components/rehab/ContingencyKpi";
+import CommitmentsView, { type CommitmentDTO } from "@/components/rehab/CommitmentsView";
 import { prisma } from "@/lib/prisma";
+import { can } from "@/lib/permissions";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
 import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
@@ -12,7 +15,7 @@ import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-type BudgetView = "phase" | "invoices";
+type BudgetView = "phase" | "invoices" | "commitments";
 
 export default async function BudgetPage({
   params,
@@ -25,10 +28,14 @@ export default async function BudgetPage({
   if (!user) redirect("/login");
   const { projectId } = await params;
   const sp = await searchParams;
-  const view: BudgetView = sp.view === "invoices" ? "invoices" : "phase";
+  const view: BudgetView =
+    sp.view === "invoices" ? "invoices" : sp.view === "commitments" ? "commitments" : "phase";
   const project = await loadProjectByCode(user.companyId, decodeURIComponent(projectId));
   if (!project) notFound();
   const invoiceDocs = project.documents.filter((d) => (d.category ?? "").toLowerCase() === "invoice");
+  // Contingency reserve — a labeled line, never folded into per-phase math.
+  const contingency = Number(project.contingency ?? 0);
+  const canEditRehab = await can(user, "rehab", "edit");
 
   // Per-phase actual spend is computed by the shared helper so that staged
   // (milestone) payments are handled identically to the SOW tab: an unstaged
@@ -48,6 +55,31 @@ export default async function BudgetPage({
     include: { jobTypes: { orderBy: { createdAt: "asc" } } },
     orderBy: { date: "desc" },
   });
+  // Commitments (subcontracts / purchase orders). "Contracted" per phase = sum
+  // of its Approved commitments — additive info only, never part of the
+  // invoice-driven Committed/Actual/Forecast columns.
+  const commitmentRows = await prisma.commitment.findMany({
+    where: { projectId: project.id },
+    orderBy: { createdAt: "asc" },
+  });
+  const contractedByPhase = new Map<string, number>();
+  for (const c of commitmentRows) {
+    if (c.status !== "Approved" || !c.phaseId) continue;
+    contractedByPhase.set(
+      c.phaseId,
+      (contractedByPhase.get(c.phaseId) ?? 0) + Number(c.amount)
+    );
+  }
+  const commitmentDTOs: CommitmentDTO[] = commitmentRows.map((c) => ({
+    id: c.id,
+    title: c.title,
+    phaseId: c.phaseId,
+    type: c.type,
+    status: c.status,
+    amount: Number(c.amount),
+    notes: c.notes,
+    createdAt: c.createdAt.toISOString(),
+  }));
   const invoicesByPhase = new Map<string, BudgetPhaseRow["invoices"]>();
   for (const inv of invoiceRows) {
     for (const jt of inv.jobTypes) {
@@ -119,6 +151,7 @@ export default async function BudgetPage({
       forecastMethod: p.forecastMethod,
       forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
       pendingCO: pendingCOs.byPhase.get(p.id) ?? 0,
+      contracted: contractedByPhase.get(p.id) ?? 0,
       checklistTotal,
       checklistDone,
       drawTagCls: drawPaid ? "tag-paid" : "tag-pend",
@@ -142,6 +175,7 @@ export default async function BudgetPage({
         <div className="kpi-card"><div className="kpi-label">Committed</div><div className="kpi-val">{fmt$(totalCommitted)}</div><div className="kpi-sub">{invoiceRows.length} invoices, all statuses</div></div>
         <div className="kpi-card"><div className="kpi-label">Projected final</div><div className={`kpi-val ${overage > 0 ? "amber" : ""}`}>{fmt$(projected)}</div>{overage !== 0 && <div className="kpi-badge" style={overage > 0 ? { background: "var(--amber-bg)", color: "var(--amber-txt)" } : { background: "var(--green-bg)", color: "var(--green-txt)" }}>{overage > 0 ? `+${fmt$(overage)} over` : `${fmt$(overage)} under`}</div>}</div>
         <div className="kpi-card"><div className="kpi-label">Pending changes</div><div className={`kpi-val ${pendingCOs.total > 0 ? "amber" : ""}`}>{fmt$(pendingCOs.total)}</div><div className="kpi-sub">Change orders awaiting approval</div></div>
+        <ContingencyKpi projectCode={project.code} initial={contingency} canEdit={canEditRehab} />
         <div className="kpi-card"><div className="kpi-label">Remaining</div><div className="kpi-val" style={remaining < 0 ? { color: "var(--red-txt)" } : undefined}>{fmt$(remaining)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).length} draws pending</div></div>
         <div className="kpi-card"><div className="kpi-label">Contractor balance</div><div className={`kpi-val ${pendingBalance > 0 ? "amber" : ""}`}>{fmt$(pendingBalance)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).map(d => `Draw #${d.number}`).join(" + ") || "—"}</div></div>
       </div>
@@ -150,6 +184,7 @@ export default async function BudgetPage({
         <div className="toggle-group">
           <Link href={baseLink} scroll={false} className={`tg-btn ${view === "phase" ? "active" : ""}`}>By phase</Link>
           <Link href={`${baseLink}?view=invoices`} scroll={false} className={`tg-btn ${view === "invoices" ? "active" : ""}`}>Invoices</Link>
+          <Link href={`${baseLink}?view=commitments`} scroll={false} className={`tg-btn ${view === "commitments" ? "active" : ""}`}>Commitments</Link>
         </div>
         <button className="btn">Export</button>
         {/* Opens the real invoice form on the Invoices tab (single entry point —
@@ -163,6 +198,15 @@ export default async function BudgetPage({
         <div className="body-main">
           {view === "phase" && (
             <BudgetPhaseRows phases={phaseRows} projectCode={project.code} />
+          )}
+
+          {view === "commitments" && (
+            <CommitmentsView
+              projectCode={project.code}
+              phases={project.phases.map((p) => ({ id: p.id, number: p.number, name: p.name }))}
+              commitments={commitmentDTOs}
+              canEdit={canEditRehab}
+            />
           )}
 
           {view === "invoices" && (

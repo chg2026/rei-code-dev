@@ -209,6 +209,7 @@ model Project {
   name         String
   status       ProjectStatus @default(Planning)
   budget       Decimal?      @db.Decimal(14, 2)
+  contingency  Decimal       @default(0) @db.Decimal(14, 2) // labeled reserve, not folded into per-phase budgets
   startDate    DateTime?
   endDate      DateTime?
   currentPhase Int?
@@ -228,6 +229,7 @@ model Project {
   warehouseAllocations  WarehouseItem[]
   invoices              Invoice[]
   changeOrders          ChangeOrder[]
+  commitments           Commitment[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -259,6 +261,7 @@ model Phase {
   checklistItems       ChecklistItem[]
   draws                Draw[]
   invoiceJobTypes      InvoiceJobType[]
+  commitments          Commitment[]
   project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, number])
@@ -2133,6 +2136,7 @@ model ChangeOrder {
   reason       String?
   amount       Decimal           @db.Decimal(14, 2)
   status       ChangeOrderStatus @default(Pending)
+  daysDelta    Int               @default(0) // schedule impact in days (captured only; no schedule rewiring)
   approvedById String?
   approvedAt   DateTime?
   createdAt    DateTime          @default(now())
@@ -2147,4 +2151,35 @@ enum ChangeOrderStatus {
   Pending
   Approved
   Rejected
+}
+
+// Per-job agreement (subcontract or purchase order). Approved commitments feed
+// the "Contracted" figure per phase — additive, never part of Committed/Actual.
+model Commitment {
+  id           String           @id @default(cuid())
+  projectId    String
+  phaseId      String?
+  contractorId String? // plain reference, no relation
+  type         CommitmentType
+  title        String
+  status       CommitmentStatus @default(Draft)
+  amount       Decimal          @db.Decimal(14, 2)
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase        Phase?           @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+enum CommitmentType {
+  Subcontract
+  PurchaseOrder
+}
+
+enum CommitmentStatus {
+  Draft
+  Approved
+  Complete
 }

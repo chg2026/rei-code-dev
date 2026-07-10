@@ -73,7 +73,7 @@ export default async function SowPage({
         {canEdit && <SowAddPhase projectCode={project.code} />}
         <SowActions
           projectCode={project.code}
-          phases={project.phases.map((p) => ({ number: p.number, name: p.name }))}
+          phases={project.phases.map((p) => ({ id: p.id, number: p.number, name: p.name }))}
           canEdit={canEdit}
         />
         <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>

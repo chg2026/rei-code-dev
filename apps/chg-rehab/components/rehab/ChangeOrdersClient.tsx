@@ -13,6 +13,7 @@ export type ChangeOrderDTO = {
   reason: string | null;
   amount: number;
   status: ChangeOrderStatus;
+  daysDelta: number;
   phaseId: string | null;
   approvedById: string | null;
   approvedByName: string | null;
@@ -56,11 +57,12 @@ type FormState = {
   phaseId: string;
   reason: string;
   amount: string;
+  daysDelta: string;
   status: ChangeOrderStatus;
 };
 
 function emptyForm(): FormState {
-  return { title: "", phaseId: "", reason: "", amount: "", status: "Pending" };
+  return { title: "", phaseId: "", reason: "", amount: "", daysDelta: "", status: "Pending" };
 }
 
 function formFromCo(co: ChangeOrderDTO): FormState {
@@ -69,6 +71,7 @@ function formFromCo(co: ChangeOrderDTO): FormState {
     phaseId: co.phaseId ?? "",
     reason: co.reason ?? "",
     amount: String(co.amount),
+    daysDelta: co.daysDelta === 0 ? "" : String(co.daysDelta),
     status: co.status,
   };
 }
@@ -146,6 +149,11 @@ export default function ChangeOrdersClient({
       setError("A valid amount is required.");
       return;
     }
+    const daysNum = form.daysDelta.trim() === "" ? 0 : Number(form.daysDelta);
+    if (!Number.isInteger(daysNum)) {
+      setError("Schedule impact must be a whole number of days.");
+      return;
+    }
     setSaving(true);
     setError(null);
     const payload = {
@@ -153,6 +161,7 @@ export default function ChangeOrdersClient({
       phaseId: form.phaseId || null,
       reason: form.reason.trim() || null,
       amount: amountNum,
+      daysDelta: daysNum,
       status: form.status,
     };
     try {
@@ -309,6 +318,11 @@ export default function ChangeOrdersClient({
                 </div>
                 <div style={{ color: "var(--text-secondary)" }}>
                   {phase ? `Job Type ${phase.number} · ${phase.name}` : "—"}
+                  {co.daysDelta !== 0 && (
+                    <div style={{ fontSize: 11, marginTop: 2 }}>
+                      {co.daysDelta > 0 ? `+${co.daysDelta}` : co.daysDelta} days schedule impact
+                    </div>
+                  )}
                 </div>
                 <div
                   style={{
@@ -409,6 +423,18 @@ export default function ChangeOrdersClient({
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 placeholder="Use a negative amount for a credit"
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label="Schedule impact (days) — optional">
+              <input
+                className="form-input"
+                type="number"
+                step="1"
+                value={form.daysDelta}
+                onChange={(e) => setForm({ ...form, daysDelta: e.target.value })}
+                placeholder="e.g. 5 (use a negative number for days saved)"
                 style={inputStyle}
               />
             </Field>

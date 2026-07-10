@@ -15,6 +15,7 @@ import {
   PhaseStatus,
   DrawStatus,
   ChangeOrderStatus,
+  CommitmentStatus,
   InvoiceClassification,
   InvoiceStatus,
   ProjectStatus,
@@ -30,6 +31,37 @@ const fmt$ = (n: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+/** One label/value line in the Cost Breakdown panel. `total` bolds the "=" rows. */
+function BreakdownRow({
+  label,
+  value,
+  total = false,
+  muted = false,
+}: {
+  label: string;
+  value: string;
+  total?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        fontSize: 12,
+        fontWeight: total ? 600 : 400,
+        color: muted ? "var(--text-tertiary)" : total ? "var(--text-primary)" : "var(--text-secondary)",
+        paddingTop: total ? 4 : 0,
+        borderTop: total ? "0.5px solid var(--border-lo)" : undefined,
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ color: total ? "var(--text-primary)" : "inherit" }}>{value}</span>
+    </div>
+  );
+}
 
 export default async function OverviewPage({
   params,
@@ -60,6 +92,8 @@ export default async function OverviewPage({
     allActivity,
     actualsMap,
     pendingCOs,
+    approvedCOAgg,
+    approvedCommitmentAgg,
   ] = await Promise.all([
     prisma.invoice.aggregate({
       where: { projectId: project.id, status: InvoiceStatus.Paid },
@@ -112,6 +146,18 @@ export default async function OverviewPage({
     // Pending change orders per phase — added on top of each phase's EAC so
     // Projected Final / Over-Under move before a CO is approved.
     computePendingChangeOrders(project.id),
+    // Approved change-order total — already folded into Phase.budget, surfaced
+    // separately in the Cost Breakdown so base vs. working budget is legible.
+    prisma.changeOrder.aggregate({
+      where: { projectId: project.id, status: ChangeOrderStatus.Approved },
+      _sum: { amount: true },
+    }),
+    // Contracted = approved commitments (subcontracts / POs) — info line only,
+    // never part of the invoice-driven Committed/Actual/Forecast numbers.
+    prisma.commitment.aggregate({
+      where: { projectId: project.id, status: CommitmentStatus.Approved },
+      _sum: { amount: true },
+    }),
   ]);
 
   // Current spend = Job-to-Date = sum of Paid invoices. Draws remain the
@@ -166,6 +212,29 @@ export default async function OverviewPage({
 
   // % of the working budget committed (Committed ÷ total phase budgets).
   const spentPct = phaseBudgetTotal > 0 ? (totalCommitted / phaseBudgetTotal) * 100 : 0;
+
+  // Cost Breakdown aggregates (reuse existing calcs; no new forecast logic).
+  //   workingBudget = phaseBudgetTotal — already includes approved COs, which
+  //     fold into Phase.budget on approval.
+  //   approvedCO / pendingCO — ChangeOrder sums by status.
+  //   baseBudget = working − approved; projectedBudget = working + pending.
+  //   labor/material budgets = sums of the per-phase split budgets.
+  const workingBudget = phaseBudgetTotal;
+  const approvedCO = Number(approvedCOAgg._sum.amount ?? 0);
+  const pendingCO = pendingCOs.total;
+  const baseBudget = workingBudget - approvedCO;
+  const projectedBudget = workingBudget + pendingCO;
+  const laborBudget = project.phases.reduce((acc, p) => acc + Number(p.laborBudget ?? 0), 0);
+  const materialBudget = project.phases.reduce((acc, p) => acc + Number(p.materialsBudget ?? 0), 0);
+  // Contingency reserve (labeled line, not folded into per-phase math) and the
+  // contracted total from approved commitments.
+  const contingency = Number(project.contingency ?? 0);
+  const totalInclContingency = workingBudget + contingency;
+  const contracted = Number(approvedCommitmentAgg._sum.amount ?? 0);
+  // Over / Under against the working budget: negative = projected over budget
+  // (shown red). projectedFinal is the sum of per-phase EAC computed above.
+  const forecastEac = projectedFinal;
+  const forecastOverUnder = projectedOverUnder;
 
   // Overview tiles share these exact numbers with the pace signal below.
   const rehabPct = Math.round(completePct);
@@ -378,6 +447,82 @@ export default async function OverviewPage({
             <strong style={{ color: "var(--text-primary)" }}>{Math.round(completePct)}%</strong> work
             complete
           </span>
+        </div>
+
+        {/* ── Cost Breakdown ── */}
+        <div className="sec-hd">Cost breakdown</div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            margin: "4px 0 8px",
+            padding: "12px 14px",
+            border: "0.5px solid var(--border-lo)",
+            borderRadius: 8,
+            background: "var(--bg-secondary)",
+          }}
+        >
+          <BreakdownRow label="Base budget" value={fmt$(baseBudget)} />
+          <BreakdownRow label="+ Change orders (approved)" value={fmt$(approvedCO)} />
+          <BreakdownRow label="= Working budget" value={fmt$(workingBudget)} total />
+          <BreakdownRow
+            label="+ Change orders (pending)"
+            value={fmt$(pendingCO)}
+            muted={pendingCO === 0}
+          />
+          <BreakdownRow label="= Projected budget" value={fmt$(projectedBudget)} total />
+          <BreakdownRow
+            label="Contingency reserve"
+            value={fmt$(contingency)}
+            muted={contingency === 0}
+          />
+          <BreakdownRow
+            label="Total budget incl. contingency"
+            value={fmt$(totalInclContingency)}
+            total
+          />
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              marginTop: 6,
+              paddingTop: 8,
+              borderTop: "0.5px solid var(--border-lo)",
+              fontSize: 12,
+              color: "var(--text-secondary)",
+            }}
+          >
+            <div>
+              <strong style={{ color: "var(--text-primary)" }}>Labor</strong> — budget{" "}
+              {fmt$(laborBudget)} · spent {fmt$(laborSpend)}
+            </div>
+            <div>
+              <strong style={{ color: "var(--text-primary)" }}>Materials</strong> — budget{" "}
+              {fmt$(materialBudget)} · spent {fmt$(materialSpend)}
+            </div>
+            <div>
+              Contracted (approved commitments) {fmt$(contracted)}
+            </div>
+            <div>
+              Committed {fmt$(totalCommitted)} · Actual (paid) {fmt$(totalSpent)}
+            </div>
+            <div>
+              Forecast (EAC) {fmt$(forecastEac)} · Over / Under{" "}
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: forecastOverUnder < 0 ? "var(--danger)" : "var(--green-txt)",
+                }}
+              >
+                {forecastOverUnder < 0
+                  ? `-${fmt$(Math.abs(forecastOverUnder))}`
+                  : `+${fmt$(forecastOverUnder)}`}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* ── Section 3: Phase tracker ── */}

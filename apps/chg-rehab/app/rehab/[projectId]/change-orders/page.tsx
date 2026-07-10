@@ -48,6 +48,7 @@ export default async function ChangeOrdersPage({
     reason: co.reason,
     amount: Number(co.amount),
     status: co.status,
+    daysDelta: co.daysDelta,
     phaseId: co.phaseId,
     approvedById: co.approvedById,
     approvedByName: co.approvedById ? nameById.get(co.approvedById) ?? null : null,

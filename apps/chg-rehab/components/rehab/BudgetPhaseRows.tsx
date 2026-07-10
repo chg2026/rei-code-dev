@@ -38,6 +38,8 @@ export type BudgetPhaseRow = {
   forecastManual: number | null;
   /** Sum of Pending change-order amounts for this phase (folds into the EAC). */
   pendingCO: number;
+  /** Sum of Approved commitment amounts for this phase (info only — additive). */
+  contracted: number;
   checklistTotal: number;
   checklistDone: number;
   drawTagCls: string;
@@ -177,6 +179,7 @@ export default function BudgetPhaseRows({
                         {" "}· Pending changes +{fmt$(p.pendingCO)}
                       </span>
                     )}
+                    {p.contracted > 0 && <span> · Contracted {fmt$(p.contracted)}</span>}
                   </div>
                 </button>
               </div>
@@ -290,6 +293,9 @@ export default function BudgetPhaseRows({
                   {p.actualOther > 0 && (
                     <div>{budgetCode(p.number, "Other")}: actual {fmt$(p.actualOther)}</div>
                   )}
+                  <div>
+                    Contracted (approved commitments): {fmt$(p.contracted)}
+                  </div>
                 </div>
                 {p.invoices.length === 0 ? (
                   <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>

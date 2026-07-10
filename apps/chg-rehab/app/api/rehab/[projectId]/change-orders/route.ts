@@ -85,18 +85,33 @@ export async function POST(
   }
 
   let phaseId: string | null = null;
+  let phaseNumber: number | null = null;
   if (typeof body.phaseId === "string" && body.phaseId) {
     const phase = await prisma.phase.findFirst({
       where: { id: body.phaseId, projectId: project.id },
-      select: { id: true },
+      select: { id: true, number: true },
     });
     if (!phase) return NextResponse.json({ error: "Invalid phase" }, { status: 400 });
     phaseId = phase.id;
+    phaseNumber = phase.number;
   }
 
   const status: ChangeOrderStatus = STATUSES.includes(body.status)
     ? body.status
     : ChangeOrderStatus.Pending;
+
+  // Optional schedule impact in days (captured only — no schedule rewiring).
+  let daysDelta = 0;
+  if (body.daysDelta != null && body.daysDelta !== "") {
+    const n = Number(body.daysDelta);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      return NextResponse.json(
+        { error: "Schedule impact must be a whole number of days" },
+        { status: 400 }
+      );
+    }
+    daysDelta = n;
+  }
 
   // Auto-increment the per-project change-order number. The unique constraint
   // (projectId, number) guards against races — retry once on collision.
@@ -120,6 +135,7 @@ export async function POST(
             reason,
             amount,
             status,
+            daysDelta,
             approvedById: status === ChangeOrderStatus.Approved ? user.id : null,
             approvedAt: status === ChangeOrderStatus.Approved ? new Date() : null,
           },
@@ -131,6 +147,32 @@ export async function POST(
             data: { budget: { increment: amount } },
           });
         }
+        // Audit trail. Action is "changeOrder.created" (NOT the legacy
+        // "changeOrder.requested", which the old activity-log-only flow
+        // resolves via approveChangeOrder/rejectChangeOrder — these real CO
+        // rows must not be double-resolvable through that path).
+        await tx.activityLogEntry.create({
+          data: {
+            companyId: user.companyId,
+            actorId: user.id,
+            action: "changeOrder.created",
+            entity: "ChangeOrder",
+            entityId: co.id,
+            message: `${
+              phaseNumber != null ? `Job Type ${phaseNumber} — ` : ""
+            }change order #${co.number} created (${status}): ${title} ($${Number(
+              amount
+            ).toLocaleString()})${co.daysDelta ? ` · ${co.daysDelta > 0 ? "+" : ""}${co.daysDelta} days` : ""}.`,
+            meta: {
+              type: "changeOrder",
+              projectId: project.id,
+              coId: co.id,
+              coNumber: co.number,
+              coStatus: status.toLowerCase(),
+              ...(phaseNumber != null ? { phaseNumber } : {}),
+            },
+          },
+        });
         return co;
       });
       return NextResponse.json({ changeOrder: created }, { status: 201 });

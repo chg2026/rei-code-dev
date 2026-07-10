@@ -20,9 +20,11 @@ async function resolveProject(projectIdOrCode: string, companyId: string) {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Patch project-level fields editable inline from the Overview tab. Currently
- * only the actual completion date, persisted into `project.meta.actualEndDate`
- * (the Project model has no dedicated column for it).
+ * Patch project-level fields editable inline from the Rehab tabs:
+ *   - actualEndDate (Overview) — persisted into `project.meta.actualEndDate`
+ *     (the Project model has no dedicated column for it).
+ *   - contingency (Budget & Costs header) — the labeled reserve amount on
+ *     Project.contingency. Requires rehab edit permission (admins / PMs).
  */
 export async function PATCH(
   req: NextRequest,
@@ -35,7 +37,29 @@ export async function PATCH(
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
-  if (!body || typeof body !== "object" || !("actualEndDate" in body)) {
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  if ("contingency" in body) {
+    if (!(await can(user, "rehab", "edit"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const n = Number(body.contingency);
+    if (!Number.isFinite(n) || n < 0) {
+      return NextResponse.json(
+        { error: "Contingency must be a non-negative amount" },
+        { status: 400 }
+      );
+    }
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { contingency: n },
+    });
+    return NextResponse.json({ ok: true, contingency: n });
+  }
+
+  if (!("actualEndDate" in body)) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
