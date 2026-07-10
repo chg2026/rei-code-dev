@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         companyId: user.companyId,
         OR: [{ id: copyFromProjectId }, { code: copyFromProjectId }],
       },
-      include: { phases: { orderBy: { number: "asc" } } },
+      include: { phases: { orderBy: [{ sortOrder: "asc" }, { number: "asc" }] } },
     });
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
     const actuals = await computePhaseActualBreakdowns(project.id);

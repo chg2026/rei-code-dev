@@ -2,8 +2,54 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { invalidatePermissionsCache } from "@/lib/permissions";
+import { provisionCompanyPermissions } from "@/lib/permissionsProvision";
 
 const VALID = new Set(["edit", "view", "none"]);
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (user.role !== "Admin")
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // Ensure the company has a full set of default rows so the admin never sees
+  // an empty grid (and so non-admin roles aren't silently default-denied).
+  await provisionCompanyPermissions(user.companyId);
+
+  const [labelRows, matrixRows] = await Promise.all([
+    prisma.permissionLabelRow.findMany({
+      where: { companyId: user.companyId },
+      orderBy: { ord: "asc" },
+    }),
+    prisma.permissionMatrixRow.findMany({
+      where: { companyId: user.companyId },
+      orderBy: [{ feature: "asc" }, { action: "asc" }],
+    }),
+  ]);
+
+  return NextResponse.json({
+    labelRows: labelRows.map((r) => ({
+      id: r.id,
+      label: r.label,
+      ord: r.ord,
+      pm: r.pm,
+      gc: r.gc,
+      sub: r.sub,
+      inspector: r.inspector,
+      adminLock: r.adminLock,
+      locked: r.locked,
+    })),
+    matrixRows: matrixRows.map((r) => ({
+      id: r.id,
+      feature: r.feature,
+      action: r.action,
+      roles: r.roles,
+      notes: r.notes,
+    })),
+  });
+}
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();

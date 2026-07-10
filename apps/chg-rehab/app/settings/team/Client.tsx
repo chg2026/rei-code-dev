@@ -7,8 +7,11 @@ type Member = {
   email: string | null;
   name: string;
   role: string;
+  customRoleId: string | null;
   joinedAt: string;
 };
+
+type CustomRole = { id: string; name: string };
 
 type PendingInvite = {
   id: string;
@@ -21,6 +24,7 @@ type PendingInvite = {
 type MembersResponse = {
   members?: Member[];
   pendingInvites?: PendingInvite[];
+  customRoles?: CustomRole[];
 };
 
 const INVITE_ROLES: { value: string; label: string }[] = [
@@ -103,6 +107,7 @@ export default function TeamSettingsClient({
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [pending, setPending] = useState<PendingInvite[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -124,6 +129,7 @@ export default function TeamSettingsClient({
       );
       setMembers(data.members ?? []);
       setPending(data.pendingInvites ?? []);
+      setCustomRoles(data.customRoles ?? []);
     } catch (e) {
       setError((e as Error).message || "Failed to load team data");
     } finally {
@@ -155,6 +161,28 @@ export default function TeamSettingsClient({
       showToast((err as Error).message || "Invite failed");
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function changeMemberRole(member: Member, value: string) {
+    // `custom:<id>` selects a custom role; anything else is a system enum role.
+    const isCustom = value.startsWith("custom:");
+    const body = isCustom
+      ? { customRoleId: value.slice("custom:".length) }
+      : { role: value };
+    setBusyId(member.id);
+    try {
+      await jsonFetch(`/api/admin/users/${encodeURIComponent(member.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      showToast("Role updated");
+      await loadAll();
+    } catch (err) {
+      showToast((err as Error).message || "Role change failed");
+      await loadAll();
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -278,17 +306,54 @@ export default function TeamSettingsClient({
               No team members yet.
             </div>
           ) : (
-            members.map((m) => (
-              <div className="admin-row" key={`m-${m.id}`}>
-                <div className="admin-info">
-                  <div className="admin-lbl">{m.name}</div>
-                  <div className="admin-desc">
-                    {m.email ?? "—"} · {roleLabel(m.role)} · joined{" "}
-                    {formatDate(m.joinedAt)}
+            members.map((m) => {
+              const currentValue = m.customRoleId ? `custom:${m.customRoleId}` : m.role;
+              return (
+                <div className="admin-row" key={`m-${m.id}`}>
+                  <div className="admin-info">
+                    <div className="admin-lbl">{m.name}</div>
+                    <div className="admin-desc">
+                      {m.email ?? "—"} · joined {formatDate(m.joinedAt)}
+                    </div>
                   </div>
+                  {isAdmin ? (
+                    <select
+                      className="admin-input"
+                      value={currentValue}
+                      disabled={busyId === m.id}
+                      onChange={(e) => void changeMemberRole(m, e.target.value)}
+                      style={{ width: 200 }}
+                    >
+                      <optgroup label="System roles">
+                        {INVITE_ROLES.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                        {/* Subcontractor is assignable but not invitable */}
+                        <option value="Subcontractor">Subcontractor</option>
+                      </optgroup>
+                      {customRoles.length > 0 && (
+                        <optgroup label="Custom roles">
+                          {customRoles.map((r) => (
+                            <option key={r.id} value={`custom:${r.id}`}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="admin-desc">
+                      {m.customRoleId
+                        ? customRoles.find((r) => r.id === m.customRoleId)?.name ??
+                          "Custom role"
+                        : roleLabel(m.role)}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {/* Invite form */}

@@ -101,17 +101,23 @@ export async function POST(
   let nextNumber = (agg._max.number ?? 0) + 1;
 
   await prisma.phase.createMany({
-    data: cleaned.map((p) => ({
-      projectId: project.id,
-      number: nextNumber++,
-      name: p.name,
-      description: p.description,
-      laborBudget: p.laborBudget,
-      materialsBudget: p.materialsBudget,
-      budget: p.laborBudget.plus(p.materialsBudget),
-      dependencies: p.dependencies,
-      acceptanceCriteria: p.acceptanceCriteria,
-    })),
+    data: cleaned.map((p) => {
+      const number = nextNumber++;
+      // Appended phases sort after existing ones; sortOrder mirrors the new
+      // number (backfill made existing sortOrder == number), so they land last.
+      return {
+        projectId: project.id,
+        number,
+        sortOrder: number,
+        name: p.name,
+        description: p.description,
+        laborBudget: p.laborBudget,
+        materialsBudget: p.materialsBudget,
+        budget: p.laborBudget.plus(p.materialsBudget),
+        dependencies: p.dependencies,
+        acceptanceCriteria: p.acceptanceCriteria,
+      };
+    }),
   });
 
   const phases = await prisma.phase.findMany({

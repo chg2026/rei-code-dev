@@ -779,7 +779,7 @@ async function FinancialsTab({ property, companyId }: { property: NonNullable<Aw
   const m = (property.meta || {}) as PropertyMeta;
   const project = await prisma.project.findFirst({
     where: { companyId, propertyId: property.id },
-    include: { phases: { orderBy: { number: "asc" } } },
+    include: { phases: { orderBy: [{ sortOrder: "asc" }, { number: "asc" }] } },
   });
   const phases = project?.phases ?? [];
   const totalRehabProjected = phases.reduce((acc, p) => acc + (p.actual ? Number(p.actual) : Number(p.budget || 0)), 0);

@@ -93,26 +93,73 @@ export async function POST(
       ? body.description.trim()
       : null;
 
-  const agg = await prisma.phase.aggregate({
+  // Existing phases in display order. `number` is the stable cost code and is
+  // never reused for a live phase; `sortOrder` is the reorderable position.
+  const existing = await prisma.phase.findMany({
     where: { projectId: project.id },
-    _max: { number: true },
+    select: { id: true, number: true, sortOrder: true },
+    orderBy: [{ sortOrder: "asc" }, { number: "asc" }],
   });
-  const nextNumber = (agg._max.number ?? 0) + 1;
+  const n = existing.length;
 
-  const phase = await prisma.phase.create({
-    data: {
-      projectId: project.id,
-      number: nextNumber,
-      name,
-      description,
-      laborBudget: labor,
-      materialsBudget: materials,
-      budget: labor.plus(materials),
-      plannedStartDate: plannedStart,
-      estimatedDays,
-      plannedEndDate: computePlannedEnd(plannedStart, estimatedDays),
-    },
-  });
+  // Stable cost code: the next number above the current max. If that would
+  // exceed the 1–99 scheme, fall back to the smallest unused number so freed
+  // codes can be reclaimed. When every code is taken we refuse.
+  const used = new Set(existing.map((p) => p.number));
+  const maxNumber = existing.reduce((m, p) => Math.max(m, p.number), 0);
+  let nextNumber = maxNumber + 1;
+  if (nextNumber > 99) {
+    nextNumber = 0;
+    for (let i = 1; i <= 99; i++) {
+      if (!used.has(i)) { nextNumber = i; break; }
+    }
+    if (nextNumber === 0) {
+      return NextResponse.json({ error: "Maximum number of job types reached." }, { status: 400 });
+    }
+  }
+
+  // Insert position (1-based slot in the sorted list). Defaults to appending.
+  let position = n + 1;
+  if ("position" in body && body.position !== null && body.position !== undefined && body.position !== "") {
+    const pp = Number(body.position);
+    if (!Number.isInteger(pp) || pp < 1 || pp > n + 1) {
+      return NextResponse.json({ error: "Invalid position" }, { status: 400 });
+    }
+    position = pp;
+  }
+
+  const maxSort = existing.reduce((m, p) => Math.max(m, p.sortOrder), 0);
+  const phaseData = {
+    projectId: project.id,
+    number: nextNumber,
+    name,
+    description,
+    laborBudget: labor,
+    materialsBudget: materials,
+    budget: labor.plus(materials),
+    plannedStartDate: plannedStart,
+    estimatedDays,
+    plannedEndDate: computePlannedEnd(plannedStart, estimatedDays),
+  };
+
+  let phase;
+  if (position >= n + 1) {
+    // Append — no other phase moves.
+    phase = await prisma.phase.create({ data: { ...phaseData, sortOrder: maxSort + 1 } });
+  } else {
+    // Insert before the phase currently occupying the slot: open a gap by
+    // shifting everything at/after that sortOrder, then drop the new phase in.
+    // Only sortOrder changes — no existing phase's number/cost code is touched.
+    const targetSortOrder = existing[position - 1].sortOrder;
+    const [, created] = await prisma.$transaction([
+      prisma.phase.updateMany({
+        where: { projectId: project.id, sortOrder: { gte: targetSortOrder } },
+        data: { sortOrder: { increment: 1 } },
+      }),
+      prisma.phase.create({ data: { ...phaseData, sortOrder: targetSortOrder } }),
+    ]);
+    phase = created;
+  }
 
   return NextResponse.json({ phase }, { status: 201 });
 }

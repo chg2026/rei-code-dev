@@ -25,6 +25,12 @@ import {
   InvestorActivityType,
 } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
+import {
+  DEFAULT_PERMISSION_MATRIX,
+  DEFAULT_PERMISSION_LABEL_ROWS,
+  SYSTEM_ROLES,
+  DEFAULT_ROLE_PERMISSIONS,
+} from "../lib/permissionsProvision";
 
 const prisma = new PrismaClient();
 
@@ -1478,60 +1484,18 @@ async function main() {
     }
   }
 
-  // ── Permission matrix ───────────────────────────────────────────────
-  const matrix: { feature: string; action: string; roles: Record<string, boolean>; notes?: string }[] = [
-    { feature: "pipeline", action: "view",    roles: { Admin: true, ProjectManager: true } },
-    { feature: "pipeline", action: "edit",    roles: { Admin: true, ProjectManager: true } },
-    { feature: "pipeline", action: "approve", roles: { Admin: true } },
-    { feature: "rehab",    action: "view",    roles: { Admin: true, ProjectManager: true, GeneralContractor: true, Subcontractor: true, Inspector: true } },
-    { feature: "rehab",    action: "edit",    roles: { Admin: true, ProjectManager: true, GeneralContractor: true } },
-    { feature: "rehab",    action: "approve", roles: { Admin: true, ProjectManager: true } },
-    { feature: "checklist",action: "edit",    roles: { Admin: true, ProjectManager: true, GeneralContractor: true, Inspector: true }, notes: "Inspector + GC can verify checklist items" },
-    { feature: "draws",    action: "view",    roles: { Admin: true, ProjectManager: true, GeneralContractor: true } },
-    { feature: "draws",    action: "edit",    roles: { Admin: true, ProjectManager: true, GeneralContractor: true } },
-    { feature: "draws",    action: "approve", roles: { Admin: true, ProjectManager: true }, notes: "Draws require PM/Admin approval" },
-    { feature: "warehouse", action: "view",   roles: { Admin: true, ProjectManager: true, GeneralContractor: true, Subcontractor: true } },
-    { feature: "warehouse", action: "edit",   roles: { Admin: true, ProjectManager: true } },
-    { feature: "property",  action: "view",   roles: { Admin: true, ProjectManager: true, GeneralContractor: true } },
-    { feature: "property",  action: "edit",   roles: { Admin: true, ProjectManager: true } },
-    { feature: "contacts",  action: "view",   roles: { Admin: true, ProjectManager: true, GeneralContractor: true } },
-    { feature: "contacts",  action: "edit",   roles: { Admin: true, ProjectManager: true } },
-    { feature: "contacts",  action: "assign", roles: { Admin: true, ProjectManager: true }, notes: "Assign contractor to project" },
-    { feature: "documents", action: "view",   roles: { Admin: true, ProjectManager: true, GeneralContractor: true, Inspector: true } },
-    { feature: "documents", action: "edit",   roles: { Admin: true, ProjectManager: true } },
-    { feature: "admin",     action: "admin",  roles: { Admin: true }, notes: "Admin Settings is Admin-only" },
-  ];
-  for (const m of matrix) {
+  // ── Permission matrix (defaults shared with lib/permissionsProvision) ─
+  for (const m of DEFAULT_PERMISSION_MATRIX) {
     await prisma.permissionMatrixRow.upsert({
       where: { companyId_feature_action: { companyId: company.id, feature: m.feature, action: m.action } },
       update: { roles: m.roles, notes: m.notes },
-      create: { companyId: company.id, ...m },
+      create: { companyId: company.id, feature: m.feature, action: m.action, roles: m.roles, notes: m.notes },
     });
   }
 
-  // ── PermissionLabelRow (18 prototype rows) ───────────────────────────
-  const PERM_ROWS: { label: string; adminLock: boolean; pm: string; gc: string; sub: string; inspector: string; locked?: boolean }[] = [
-    { label: "Approve draw payments",      adminLock: false, pm: "edit", gc: "none", sub: "none", inspector: "none" },
-    { label: "View projects",              adminLock: false, pm: "view", gc: "view", sub: "view", inspector: "view" },
-    { label: "Edit projects & SOW",        adminLock: false, pm: "edit", gc: "none", sub: "none", inspector: "none" },
-    { label: "Upload documents",           adminLock: false, pm: "edit", gc: "edit", sub: "none", inspector: "none" },
-    { label: "Delete documents",           adminLock: true,  pm: "none", gc: "none", sub: "none", inspector: "none" },
-    { label: "View documents",             adminLock: false, pm: "view", gc: "view", sub: "view", inspector: "view" },
-    { label: "File exception",             adminLock: false, pm: "edit", gc: "none", sub: "none", inspector: "none" },
-    { label: "Verify checklist items",     adminLock: false, pm: "edit", gc: "edit", sub: "none", inspector: "edit" },
-    { label: "View checklist",             adminLock: false, pm: "view", gc: "view", sub: "view", inspector: "view" },
-    { label: "Add/edit SOW line items",    adminLock: false, pm: "edit", gc: "none", sub: "none", inspector: "none" },
-    { label: "Create document categories", adminLock: true,  pm: "none", gc: "none", sub: "none", inspector: "none" },
-    { label: "Manage warehouse templates", adminLock: true,  pm: "edit", gc: "none", sub: "none", inspector: "none" },
-    { label: "Add items to warehouse",     adminLock: false, pm: "edit", gc: "edit", sub: "none", inspector: "none" },
-    { label: "View warehouse",             adminLock: false, pm: "view", gc: "view", sub: "none", inspector: "none" },
-    { label: "View activity log",          adminLock: false, pm: "view", gc: "view", sub: "view", inspector: "view" },
-    { label: "Edit system log entries",    adminLock: true,  pm: "none", gc: "none", sub: "none", inspector: "none", locked: true },
-    { label: "Change admin settings",      adminLock: true,  pm: "none", gc: "none", sub: "none", inspector: "none" },
-    { label: "Add team members",           adminLock: false, pm: "edit", gc: "none", sub: "none", inspector: "none" },
-  ];
+  // ── PermissionLabelRow (grid edited in /admin → Permissions) ─────────
   let permOrd = 0;
-  for (const p of PERM_ROWS) {
+  for (const p of DEFAULT_PERMISSION_LABEL_ROWS) {
     await prisma.permissionLabelRow.upsert({
       where: { companyId_label: { companyId: company.id, label: p.label } },
       update: {
@@ -1546,6 +1510,21 @@ async function main() {
       },
     });
     permOrd++;
+  }
+
+  // ── System CompanyRole rows (isSystem, for display + cloning) ────────
+  for (const r of SYSTEM_ROLES) {
+    await prisma.companyRole.upsert({
+      where: { companyId_key: { companyId: company.id, key: r.key } },
+      update: { name: r.name, isSystem: true, permissions: DEFAULT_ROLE_PERMISSIONS[r.key] ?? {} },
+      create: {
+        companyId: company.id,
+        key: r.key,
+        name: r.name,
+        isSystem: true,
+        permissions: DEFAULT_ROLE_PERMISSIONS[r.key] ?? {},
+      },
+    });
   }
 
   // ── Documents Hub: prototype rows that drive expiry / staged behavior

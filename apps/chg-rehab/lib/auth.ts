@@ -98,6 +98,7 @@ function toSessionUser(
     profileImageUrl: u.profileImageUrl,
     role: u.role,
     companyId: u.companyId,
+    customRoleId: u.customRoleId,
     profileScore,
     isSuperAdmin,
     isInvestor,

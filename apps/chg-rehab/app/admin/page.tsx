@@ -12,6 +12,7 @@ import { getUnsubscribeLinkDiagnostic } from "@/lib/contactUnsubscribe";
 import AdminClient from "./Client";
 import AdminTabStrip from "./AdminTabStrip";
 import DepartmentsPanel from "./DepartmentsPanel";
+import PermissionsPanel from "./PermissionsPanel";
 import InvestorPortalShell from "./investor-portal/InvestorPortalShell";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,19 @@ export default async function AdminPage({
           <AdminTabStrip current={tab} />
           <div style={{ flex: 1, overflow: "auto" }}>
             <DepartmentsPanel />
+          </div>
+        </div>
+      </Suspense>
+    );
+  }
+
+  if (tab === "permissions") {
+    return (
+      <Suspense fallback={null}>
+        <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+          <AdminTabStrip current={tab} />
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <PermissionsPanel />
           </div>
         </div>
       </Suspense>

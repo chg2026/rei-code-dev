@@ -11,6 +11,7 @@ import SowActions from "@/components/rehab/SowActions";
 import SowPhaseDetails from "@/components/rehab/SowPhaseDetails";
 import SowTemplatePicker from "@/components/rehab/SowTemplatePicker";
 import SowAddPhase from "@/components/rehab/SowAddPhase";
+import SowPhaseReorder from "@/components/rehab/SowPhaseReorder";
 import { ensureDefaultTemplates } from "@/lib/rehab/seed-templates";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,8 @@ export default async function SowPage({
 
   // Pair phases with sow sections by index (both ordered)
   const sections = project.sowSections;
+  // Phase ids in current display (sortOrder) order — drives the reorder controls.
+  const orderedPhaseIds = project.phases.map((p) => p.id);
 
   return (
     <div className="tab-panel active">
@@ -73,7 +76,12 @@ export default async function SowPage({
         {canEdit && project.phases.length === 0 && (
           <SowTemplatePicker projectCode={project.code} />
         )}
-        {canEdit && <SowAddPhase projectCode={project.code} />}
+        {canEdit && (
+          <SowAddPhase
+            projectCode={project.code}
+            phases={project.phases.map((p) => ({ id: p.id, number: p.number, name: p.name }))}
+          />
+        )}
         <SowActions
           projectCode={project.code}
           phases={project.phases.map((p) => ({ id: p.id, number: p.number, name: p.name }))}
@@ -142,7 +150,16 @@ export default async function SowPage({
                 forceOpen={!Number.isNaN(focusPhase) && focusPhase === p.number}
                 header={
                   <>
-                    <div className={`pnum ${pnClass}`}>{p.number}</div>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                      {canEdit && (
+                        <SowPhaseReorder
+                          projectCode={project.code}
+                          orderedIds={orderedPhaseIds}
+                          index={idx}
+                        />
+                      )}
+                      <div className={`pnum ${pnClass}`} title={`Cost code ${p.number}`}>{p.number}</div>
+                    </div>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 500 }}>{p.name}</div>
                       <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>

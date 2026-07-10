@@ -29,10 +29,10 @@ export async function PATCH(
   if (me.role !== "Admin")
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = (await req.json().catch(() => ({}))) as { role?: string };
-  const role = parseRole(body.role);
-  if (!role)
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as {
+    role?: string;
+    customRoleId?: string | null;
+  };
 
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target || (!me.isSuperAdmin && target.companyId !== me.companyId))
@@ -44,7 +44,54 @@ export async function PATCH(
       { status: 400 }
     );
 
-  if (target.role === role)
+  // ── Custom role branch ────────────────────────────────────────────────
+  // A non-empty customRoleId assigns a custom CompanyRole. The enum `role`
+  // column is left as the user's base role (so removing the custom role later
+  // restores a sensible fallback), and access resolves from the CompanyRole
+  // permissions in lib/permissions.ts#can().
+  if (typeof body.customRoleId === "string" && body.customRoleId) {
+    const customRole = await prisma.companyRole.findFirst({
+      where: { id: body.customRoleId, companyId: target.companyId, isSystem: false },
+    });
+    if (!customRole)
+      return NextResponse.json({ error: "Unknown custom role" }, { status: 400 });
+
+    if (target.customRoleId === customRole.id)
+      return NextResponse.json({ ok: true, unchanged: true });
+
+    await prisma.user.update({
+      where: { id },
+      data: { customRoleId: customRole.id },
+    });
+
+    const targetName =
+      [target.firstName, target.lastName].filter(Boolean).join(" ") ||
+      target.email ||
+      "User";
+    await prisma.activityLogEntry.create({
+      data: {
+        companyId: me.companyId,
+        actorId: me.id,
+        action: "user_role_changed",
+        entity: "User",
+        entityId: target.id,
+        message: `Assigned ${targetName} the custom role "${customRole.name}"`,
+        meta: { customRoleId: customRole.id, customRoleName: customRole.name, email: target.email },
+      },
+    });
+
+    return NextResponse.json({ ok: true, customRoleId: customRole.id });
+  }
+
+  // ── System (enum) role branch ─────────────────────────────────────────
+  const role = parseRole(body.role);
+  if (!role)
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+
+  // No-op only when the enum role is unchanged AND the user isn't currently on
+  // a custom role (switching from a custom role back to its matching enum role
+  // must still clear customRoleId).
+  if (target.role === role && !target.customRoleId)
     return NextResponse.json({ ok: true, unchanged: true });
 
   // Block any role transition that would leave the company with zero active
@@ -73,7 +120,9 @@ export async function PATCH(
   }
 
   const previousRole = target.role;
-  await prisma.user.update({ where: { id }, data: { role } });
+  // Setting a system role always clears any custom-role override so the enum
+  // role + permission matrix become authoritative again.
+  await prisma.user.update({ where: { id }, data: { role, customRoleId: null } });
 
   const targetName =
     [target.firstName, target.lastName].filter(Boolean).join(" ") ||

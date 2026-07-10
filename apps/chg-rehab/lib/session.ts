@@ -14,6 +14,11 @@ export interface SessionUser {
   role: string;
   companyId: string;
   /**
+   * When set, access resolves from the matching `CompanyRole.permissions`
+   * instead of the enum `role` + permission matrix. See lib/permissions.ts#can.
+   */
+  customRoleId?: string | null;
+  /**
    * Supabase `user_profiles.profile_score` (0–100). Surfaced on the session
    * so the global ProfileCompletionBanner can render without an extra
    * round-trip on every layout.

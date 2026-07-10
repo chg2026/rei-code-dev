@@ -63,12 +63,21 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 3,
 };
 
-export default function SowAddPhase({ projectCode }: { projectCode: string }) {
+export default function SowAddPhase({
+  projectCode,
+  phases = [],
+}: {
+  projectCode: string;
+  /** Existing phases in display (sortOrder) order — powers the position picker. */
+  phases?: { id: string; number: number; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"template" | "custom">("template");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Insert position for a custom phase: "" = append at the end.
+  const [position, setPosition] = useState("");
 
   // From Template state
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -112,6 +121,7 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
     setDays("");
     setLabor("");
     setMaterials("");
+    setPosition("");
     setError(null);
   }
 
@@ -202,6 +212,8 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
               estimatedDays: days ? Number(days) : 0,
               laborBudget: labor ? Number(labor) : 0,
               materialsBudget: materials ? Number(materials) : 0,
+              // Omit when appending; otherwise a 1-based slot in the sorted list.
+              ...(position ? { position: Number(position) } : {}),
             }),
           }
         );
@@ -397,6 +409,27 @@ export default function SowAddPhase({ projectCode }: { projectCode: string }) {
                       />
                     </label>
                   </div>
+                  {phases.length > 0 && (
+                    <div>
+                      <div style={labelStyle}>Insert position</div>
+                      <select
+                        value={position}
+                        disabled={pending}
+                        onChange={(e) => setPosition(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">At the end (last)</option>
+                        {phases.map((p, i) => (
+                          <option key={p.id} value={String(i + 1)}>
+                            Position {i + 1} — before Code {p.number} ({p.name})
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ fontSize: 9, color: "var(--text-tertiary)", marginTop: 3 }}>
+                        The new job type gets the next available cost code; existing codes never change.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

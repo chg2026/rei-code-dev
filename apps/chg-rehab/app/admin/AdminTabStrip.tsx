@@ -9,6 +9,7 @@ const TABS: { value: string; label: string }[] = [
   { value: "fundraising", label: "Fundraising" },
   { value: "finance", label: "Finance" },
   { value: "departments", label: "Departments" },
+  { value: "permissions", label: "Permissions" },
 ];
 
 export default function AdminTabStrip({

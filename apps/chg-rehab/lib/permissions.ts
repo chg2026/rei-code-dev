@@ -34,6 +34,17 @@ const FEATURE_ACTION_TO_LABEL: Record<string, string> = {
   "activity:view": "View activity log",
   "team:edit": "Add team members",
   "admin:edit": "Change admin settings",
+  // Features that used to be legacy-matrix-only. These map to label rows that
+  // the provisioning helper seeds with defaults identical to the legacy
+  // matrix, so switching them onto the label path is behaviour-preserving.
+  "pipeline:view": "View pipeline",
+  "pipeline:edit": "Edit pipeline",
+  "rehab:view": "View rehab projects",
+  "rehab:edit": "Edit rehab projects",
+  "property:view": "View properties",
+  "property:edit": "Edit properties",
+  "contacts:view": "View contacts",
+  "contacts:edit": "Edit contacts",
 };
 
 const ROLE_KEY: Record<string, "pm" | "gc" | "sub" | "inspector" | null> = {
@@ -51,6 +62,8 @@ type Cached = {
   ts: number;
   labels: Map<string, LabelRoles>;
   legacy: Record<string, Record<string, string[]>>;
+  // customRoleId → feature → "none" | "view" | "edit"
+  roles: Map<string, Record<string, string>>;
 };
 const memo = new Map<string, Cached>();
 const TTL_MS = 30_000;
@@ -59,9 +72,10 @@ async function load(companyId: string): Promise<Cached> {
   const cached = memo.get(companyId);
   if (cached && Date.now() - cached.ts < TTL_MS) return cached;
 
-  const [labelRows, legacyRows] = await Promise.all([
+  const [labelRows, legacyRows, roleRows] = await Promise.all([
     prisma.permissionLabelRow.findMany({ where: { companyId } }),
     prisma.permissionMatrixRow.findMany({ where: { companyId } }),
+    prisma.companyRole.findMany({ where: { companyId } }),
   ]);
 
   const labels = new Map<string, LabelRoles>();
@@ -85,7 +99,12 @@ async function load(companyId: string): Promise<Cached> {
       .map(([k]) => k);
   }
 
-  const c = { ts: Date.now(), labels, legacy };
+  const roles = new Map<string, Record<string, string>>();
+  for (const r of roleRows) {
+    roles.set(r.id, (r.permissions as Record<string, string>) || {});
+  }
+
+  const c = { ts: Date.now(), labels, legacy, roles };
   memo.set(companyId, c);
   return c;
 }
@@ -97,14 +116,33 @@ function actionRank(a: string): number {
 }
 
 export async function can(
-  user: { role: string; companyId: string } | null | undefined,
+  user:
+    | { role: string; companyId: string; customRoleId?: string | null }
+    | null
+    | undefined,
   feature: string,
   action: Action = "view"
 ): Promise<boolean> {
   if (!user) return false;
+  // Admin bypass stays first and unconditional — even an Admin who has been
+  // assigned a custom role keeps full access.
   if (user.role === "Admin") return true;
 
   const cache = await load(user.companyId);
+
+  // Custom role: when the user has one, resolve access from its permissions
+  // map (feature → none/view/edit). This is additive — a user WITHOUT a
+  // customRoleId never reaches this branch and keeps the exact legacy
+  // behaviour below. If the referenced role is missing (e.g. deleted), fall
+  // through to the legacy logic rather than locking the user out.
+  if (user.customRoleId) {
+    const perms = cache.roles.get(user.customRoleId);
+    if (perms) {
+      const need = actionRank(action === "view" ? "view" : "edit");
+      const have = actionRank(perms[feature] ?? "none");
+      return have >= need;
+    }
+  }
 
   // Prefer label-row mapping (the source of truth edited in /admin)
   const label = FEATURE_ACTION_TO_LABEL[`${feature}:${action}`];

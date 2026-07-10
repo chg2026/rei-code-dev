@@ -76,6 +76,7 @@ export async function POST(
       return {
         projectId: project.id,
         number: idx + 1,
+        sortOrder: idx + 1,
         name: p.name,
         description: p.description ?? null,
         laborBudget: labor,

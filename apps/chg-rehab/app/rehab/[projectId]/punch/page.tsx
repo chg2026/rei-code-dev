@@ -40,7 +40,7 @@ export default async function PunchListPage({
     prisma.phase.findMany({
       where: { projectId: project.id },
       select: { id: true, number: true, name: true },
-      orderBy: { number: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { number: "asc" }],
     }),
     prisma.projectAssignment.findMany({
       where: { projectId: project.id },
