@@ -7,9 +7,10 @@ import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
-import { effectivePct, computeForecast } from "@/lib/rehab/forecast";
+import { effectivePct } from "@/lib/rehab/forecast";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
+import { computeProjectForecastTotals } from "@/lib/rehab/projectForecast";
 import { prisma } from "@/lib/prisma";
 import {
   PhaseStatus,
@@ -199,34 +200,26 @@ export default async function OverviewPage({
   // matching the Budget & Costs tab: phase budgets minus Committed.
   const budgetRemaining = phaseBudgetTotal - totalCommitted;
 
-  // Single-pass health numbers, all fed by the same calcs as Budget & Costs:
-  //   - weightedComplete → budget-weighted average of each phase's effective
-  //     %-complete (percentComplete, else checklist fallback via effectivePct).
-  //   - projectedFinal → sum of every phase's EAC from computeForecast, using
-  //     the per-phase committed + paid actual from computePhaseActualBreakdowns.
+  // Projected Final / Over-Under come from the shared project-forecast helper
+  // (lib/rehab/projectForecast.ts) — the exact calculation the Budget & Costs
+  // header KPI uses, so the two surfaces always show identical numbers.
+  const { projectedFinal, overUnder: projectedOverUnder } = computeProjectForecastTotals(
+    project.phases,
+    actualsMap,
+    pendingCOs
+  );
+
+  // weightedComplete → budget-weighted average of each phase's effective
+  // %-complete (percentComplete, else checklist fallback via effectivePct).
   // A phase with no explicit % and no checklist to infer from contributes 0.
   let weightedComplete = 0;
-  let projectedFinal = 0;
   for (const p of project.phases) {
     const pBudget = Number(p.budget ?? 0);
-    const breakdown = actualsMap.get(p.id);
     const done = p.checklistItems.filter((i) => i.status === "Done" || i.status === "NA").length;
     const total = p.checklistItems.length;
     weightedComplete += pBudget * (effectivePct(p.percentComplete, done, total).pct ?? 0);
-    projectedFinal += computeForecast({
-      budget: pBudget,
-      committed: Number(breakdown?.committed ?? 0),
-      actual: Number(breakdown?.total ?? 0),
-      percentComplete: p.percentComplete,
-      forecastMethod: p.forecastMethod,
-      forecastManual: p.forecastManual == null ? null : Number(p.forecastManual),
-      pendingCO: pendingCOs.byPhase.get(p.id) ?? 0,
-      checklistDone: done,
-      checklistTotal: total,
-    }).eac;
   }
   const completePct = phaseBudgetTotal > 0 ? weightedComplete / phaseBudgetTotal : 0;
-  const projectedOverUnder = phaseBudgetTotal - projectedFinal;
 
   // % of the working budget committed (Committed ÷ total phase budgets).
   const spentPct = phaseBudgetTotal > 0 ? (totalCommitted / phaseBudgetTotal) * 100 : 0;

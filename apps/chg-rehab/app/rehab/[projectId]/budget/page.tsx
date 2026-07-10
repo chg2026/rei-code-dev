@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
-import { DrawStatus, InvoiceStatus, PhaseStatus } from "@prisma/client";
+import { computeProjectForecastTotals } from "@/lib/rehab/projectForecast";
+import { DrawStatus, InvoiceStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -107,19 +108,19 @@ export default async function BudgetPage({
   // Committed = every invoice regardless of status (Unpaid, Pending, Paid).
   const totalCommitted = invoiceRows.reduce((acc, inv) => acc + Number(inv.amount), 0);
   const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
-  // Projected final: not-started phases contribute their budget, in-flight or
-  // completed phases contribute their invoice-derived actual (which may exceed
-  // budget for cost overruns). When a phase has no paid invoices yet we fall
-  // back to its budget so projections never understate the plan.
-  const projected = project.phases.reduce((acc, p) => {
-    const budgetN = Number(p.budget ?? 0);
-    const actualN = phaseActual(p.id);
-    return acc + (p.status === PhaseStatus.NotStarted ? budgetN : actualN || budgetN);
-  }, 0);
+  // Projected Final / Over-Under come from the shared project-forecast helper
+  // (lib/rehab/projectForecast.ts): Σ per-phase EAC with pending COs folded in,
+  // measured against the working budget (Σ phase budgets — NOT the signed
+  // Approved budget, which can be $0). The Overview tile uses the same helper,
+  // so the two surfaces always show identical numbers.
+  const { projectedFinal, overUnder } = computeProjectForecastTotals(
+    project.phases,
+    actualsMap,
+    pendingCOs
+  );
   // Remaining is measured against commitments, not just paid spend: what's
   // left of the phase budgets after every invoice (any status) is accounted.
   const remaining = phaseBudgetTotal - totalCommitted;
-  const overage = projected - budget;
   const pendingBalance = project.draws
     .filter((d) => d.status === DrawStatus.Pending)
     .reduce((acc, d) => acc + Number(d.amount), 0);
@@ -173,7 +174,7 @@ export default async function BudgetPage({
         <div className="kpi-card"><div className="kpi-label">Approved budget</div><div className="kpi-val">{fmt$(budget)}</div><div className="kpi-sub">Signed {formatET(project.startDate, false)}</div></div>
         <div className="kpi-card"><div className="kpi-label">Total spent</div><div className="kpi-val green">{fmt$(totalSpent)}</div><div className="kpi-sub">{paidInvoices.length} invoices paid</div></div>
         <div className="kpi-card"><div className="kpi-label">Committed</div><div className="kpi-val">{fmt$(totalCommitted)}</div><div className="kpi-sub">{invoiceRows.length} invoices, all statuses</div></div>
-        <div className="kpi-card"><div className="kpi-label">Projected final</div><div className={`kpi-val ${overage > 0 ? "amber" : ""}`}>{fmt$(projected)}</div>{overage !== 0 && <div className="kpi-badge" style={overage > 0 ? { background: "var(--amber-bg)", color: "var(--amber-txt)" } : { background: "var(--green-bg)", color: "var(--green-txt)" }}>{overage > 0 ? `+${fmt$(overage)} over` : `${fmt$(overage)} under`}</div>}</div>
+        <div className="kpi-card"><div className="kpi-label">Projected final</div><div className={`kpi-val ${overUnder < 0 ? "amber" : ""}`}>{fmt$(projectedFinal)}</div>{overUnder !== 0 && <div className="kpi-badge" style={overUnder < 0 ? { background: "var(--red-bg)", color: "var(--red-txt)" } : { background: "var(--green-bg)", color: "var(--green-txt)" }}>{overUnder < 0 ? `+${fmt$(Math.abs(overUnder))} over` : `${fmt$(overUnder)} under`}</div>}</div>
         <div className="kpi-card"><div className="kpi-label">Pending changes</div><div className={`kpi-val ${pendingCOs.total > 0 ? "amber" : ""}`}>{fmt$(pendingCOs.total)}</div><div className="kpi-sub">Change orders awaiting approval</div></div>
         <ContingencyKpi projectCode={project.code} initial={contingency} canEdit={canEditRehab} />
         <div className="kpi-card"><div className="kpi-label">Remaining</div><div className="kpi-val" style={remaining < 0 ? { color: "var(--red-txt)" } : undefined}>{fmt$(remaining)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).length} draws pending</div></div>
