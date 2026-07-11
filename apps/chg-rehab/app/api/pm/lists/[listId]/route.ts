@@ -11,18 +11,19 @@ async function authorizeList(listId: string, companyId: string) {
   });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { listId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ listId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const list = await authorizeList(params.listId, user.companyId);
+  const { listId } = await params;
+  const list = await authorizeList(listId, user.companyId);
   if (!list) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
   const updated = await prisma.pmList.update({
-    where: { id: params.listId },
+    where: { id: listId },
     data: {
-      ...(body.name !== undefined && { name: body.name }),
+      ...(body.name  !== undefined && { name: body.name }),
       ...(body.color !== undefined && { color: body.color }),
       ...(body.order !== undefined && { order: body.order }),
     },
@@ -31,13 +32,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { listId: st
   return NextResponse.json({ list: updated });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { listId: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ listId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const list = await authorizeList(params.listId, user.companyId);
+  const { listId } = await params;
+  const list = await authorizeList(listId, user.companyId);
   if (!list) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.pmList.delete({ where: { id: params.listId } });
+  await prisma.pmList.delete({ where: { id: listId } });
   return NextResponse.json({ ok: true });
 }

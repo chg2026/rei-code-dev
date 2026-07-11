@@ -9,10 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function PmListPage({
   params,
 }: {
-  params: { spaceId: string; listId: string };
+  params: Promise<{ spaceId: string; listId: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+
+  const { spaceId, listId } = await params;
 
   const [spaces, space, list] = await Promise.all([
     prisma.pmSpace.findMany({
@@ -21,18 +23,18 @@ export default async function PmListPage({
       orderBy: { createdAt: "asc" },
     }),
     prisma.pmSpace.findFirst({
-      where: { id: params.spaceId, companyId: user.companyId },
+      where: { id: spaceId, companyId: user.companyId },
       include: { statuses: { orderBy: { order: "asc" } }, lists: { orderBy: { order: "asc" } } },
     }),
     prisma.pmList.findFirst({
-      where: { id: params.listId, space: { companyId: user.companyId } },
+      where: { id: listId, space: { companyId: user.companyId } },
     }),
   ]);
 
   if (!space || !list) redirect("/pm");
 
   const tasks = await prisma.pmTask.findMany({
-    where: { listId: params.listId, parentTaskId: null },
+    where: { listId, parentTaskId: null },
     include: {
       status: true,
       assignees: {
@@ -47,16 +49,16 @@ export default async function PmListPage({
   return (
     <PmLayout
       spaces={spaces}
-      selectedSpaceId={params.spaceId}
-      selectedListId={params.listId}
+      selectedSpaceId={spaceId}
+      selectedListId={listId}
       statuses={space.statuses}
       lists={space.lists}
     >
       <PmListView
         tasks={tasks as any}
         statuses={space.statuses}
-        listId={params.listId}
-        spaceId={params.spaceId}
+        listId={listId}
+        spaceId={spaceId}
       />
     </PmLayout>
   );

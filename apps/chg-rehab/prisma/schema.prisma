@@ -53,6 +53,12 @@ model Company {
   cpBidInvitations     CpBidInvitation[]     @relation("CpBidInvFromCompany")
   cpOnboardingInvites  CpOnboardingInvite[]  @relation("CpOnboardingInvCompany")
   pmSpaces             PmSpace[]
+  wsChannels           WsChannel[]
+  wsMessages           WsMessage[]
+  wsTasks              WsTask[]
+  wsCalendarEvents     WsCalendarEvent[]
+  wsReminders          WsReminder[]
+  wsGoals              WsGoal[]
 }
 
 model User {
@@ -82,6 +88,12 @@ model User {
   pmTaskAssignees          PmTaskAssignee[]
   pmComments               PmComment[]
   pmActivity               PmActivity[]
+  wsTasksCreated           WsTask[]              @relation("WsTaskCreatedBy")
+  wsTasksAssigned          WsTask[]              @relation("WsTaskAssignee")
+  wsMessages               WsMessage[]           @relation("WsMessageAuthor")
+  wsChannelMemberships     WsChannelMember[]
+  wsReminders              WsReminder[]
+  wsGoals                  WsGoal[]              @relation("WsGoalOwner")
 
   @@index([companyId])
   @@index([companyId, active])
@@ -1630,4 +1642,131 @@ model PmTaskTag {
   tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([taskId, tagId])
+}
+
+// ─── Workspace models (messaging, tasks, goals, calendar, reminders) ───────────
+
+model WsChannel {
+  id        String   @id @default(cuid())
+  companyId String
+  kind      String
+  slug      String?
+  name      String
+  partyType String?
+  partyId   String?
+  createdAt DateTime @default(now())
+
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members  WsChannelMember[]
+  messages WsMessage[]
+
+  @@unique([companyId, kind, partyType, partyId])
+  @@index([companyId])
+}
+
+model WsChannelMember {
+  channelId  String
+  userId     String
+  lastReadAt DateTime?
+
+  channel WsChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+}
+
+model WsMessage {
+  id              String    @id @default(cuid())
+  companyId       String
+  channelId       String
+  authorUserId    String?
+  authorLabel     String?
+  body            String    @db.Text
+  convertedTaskId String?   @unique
+  createdAt       DateTime  @default(now())
+
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  channel       WsChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author        User?      @relation("WsMessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  convertedTask WsTask?    @relation("WsMessageConverted", fields: [convertedTaskId], references: [id], onDelete: SetNull)
+  sourceForTask WsTask[]   @relation("WsTaskSource")
+
+  @@index([channelId, createdAt])
+  @@index([companyId])
+}
+
+model WsTask {
+  id              String    @id @default(cuid())
+  companyId       String
+  createdById     String
+  assigneeId      String?
+  title           String
+  priority        String    @default("Medium")
+  dueDate         DateTime?
+  done            Boolean   @default(false)
+  doneAt          DateTime?
+  linkType        String?
+  linkId          String?
+  linkLabel       String?
+  sourceMessageId String?
+  createdAt       DateTime  @default(now())
+
+  company          Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy        User       @relation("WsTaskCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee         User?      @relation("WsTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  sourceMessage    WsMessage? @relation("WsTaskSource", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  convertedTaskMsg WsMessage? @relation("WsMessageConverted")
+
+  @@index([companyId, done])
+  @@index([companyId, dueDate])
+}
+
+model WsCalendarEvent {
+  id        String   @id @default(cuid())
+  companyId String
+  title     String
+  startAt   DateTime
+  link      String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startAt])
+}
+
+model WsReminder {
+  id        String    @id @default(cuid())
+  companyId String
+  userId    String
+  title     String
+  remindAt  DateTime?
+  urgent    Boolean   @default(false)
+  done      Boolean   @default(false)
+  source    String?
+  link      String?
+  createdAt DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, done])
+}
+
+model WsGoal {
+  id          String   @id @default(cuid())
+  companyId   String
+  ownerUserId String?
+  title       String
+  scope       String   @default("company")
+  metricMode  String   @default("count")
+  current     Float    @default(0)
+  target      Float    @default(1)
+  period      String?
+  done        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner   User?   @relation("WsGoalOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
 }

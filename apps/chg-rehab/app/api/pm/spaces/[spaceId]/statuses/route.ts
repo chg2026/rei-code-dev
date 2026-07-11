@@ -4,26 +4,28 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest, { params }: { params: { spaceId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const space = await prisma.pmSpace.findFirst({ where: { id: params.spaceId, companyId: user.companyId } });
+  const { spaceId } = await params;
+  const space = await prisma.pmSpace.findFirst({ where: { id: spaceId, companyId: user.companyId } });
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const statuses = await prisma.pmStatus.findMany({
-    where: { spaceId: params.spaceId },
+    where: { spaceId },
     orderBy: { order: "asc" },
   });
 
   return NextResponse.json({ statuses });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { spaceId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ spaceId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const space = await prisma.pmSpace.findFirst({ where: { id: params.spaceId, companyId: user.companyId } });
+  const { spaceId } = await params;
+  const space = await prisma.pmSpace.findFirst({ where: { id: spaceId, companyId: user.companyId } });
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -31,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { spaceId: st
 
   const status = await prisma.pmStatus.create({
     data: {
-      spaceId: params.spaceId,
+      spaceId,
       name: body.name.trim(),
       color: body.color ?? "#6B7280",
       type: body.type ?? "open",

@@ -10,15 +10,16 @@ async function authorizeTask(taskId: string, companyId: string) {
   });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { taskId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const task = await authorizeTask(params.taskId, user.companyId);
+  const { taskId } = await params;
+  const task = await authorizeTask(taskId, user.companyId);
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const comments = await prisma.pmComment.findMany({
-    where: { taskId: params.taskId },
+    where: { taskId },
     include: { user: { select: { id: true, firstName: true, lastName: true, initials: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -26,23 +27,24 @@ export async function GET(_req: NextRequest, { params }: { params: { taskId: str
   return NextResponse.json({ comments });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { taskId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const task = await authorizeTask(params.taskId, user.companyId);
+  const { taskId } = await params;
+  const task = await authorizeTask(taskId, user.companyId);
   if (!task) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
   if (!body.body?.trim()) return NextResponse.json({ error: "body is required" }, { status: 400 });
 
   const comment = await prisma.pmComment.create({
-    data: { taskId: params.taskId, userId: user.id, body: body.body.trim() },
+    data: { taskId, userId: user.id, body: body.body.trim() },
     include: { user: { select: { id: true, firstName: true, lastName: true, initials: true } } },
   });
 
   await prisma.pmActivity.create({
-    data: { taskId: params.taskId, userId: user.id, type: "comment_added" },
+    data: { taskId, userId: user.id, type: "comment_added" },
   });
 
   return NextResponse.json({ comment }, { status: 201 });
