@@ -11,7 +11,10 @@
       "Bash(npx tsc *)",
       "Bash(npm run *)",
       "Read(//home/runner/**)",
-      "Bash(find / -maxdepth 4 -name \"*.log\")"
+      "Bash(find / -maxdepth 4 -name \"*.log\")",
+      "Bash(sed -n '44,50p;88,95p' app/api/rehab/[projectId]/sow/apply-template/route.ts)",
+      "Bash(sed -n '118,128p' app/api/rehab/[projectId]/sow/add-phases/route.ts)",
+      "Bash(sed -n '50,58p' app/api/rehab/[projectId]/change-orders/route.ts)"
     ]
   }
 }

@@ -122,7 +122,7 @@ export async function POST(
 
   const phases = await prisma.phase.findMany({
     where: { projectId: project.id },
-    orderBy: { number: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { number: "asc" }],
   });
   return NextResponse.json({ phases }, { status: 201 });
 }
