@@ -30,9 +30,21 @@ export async function POST(req: NextRequest) {
   try {
     await startPhoneVerification(normalized);
   } catch (e) {
-    console.error("[phone/send-code] Twilio error:", e);
+    // Surface Twilio's status/code (never secret values) so logs and the client
+    // can distinguish causes: 20404 = wrong/missing Verify Service SID,
+    // 20003 = wrong auth token.
+    const err = e as { status?: number; code?: number | string; message?: string };
+    console.error(
+      "[phone/send-code] Twilio error:",
+      err.status,
+      err.code,
+      err.message
+    );
     return NextResponse.json(
-      { error: "We couldn't send a code to that number. Check the number and try again." },
+      {
+        error: "We couldn't send a code to that number. Check the number and try again.",
+        code: err.code ?? null,
+      },
       { status: 502 }
     );
   }
