@@ -270,21 +270,21 @@ body {
   --glass-bg: rgba(255, 255, 255, 0.48);
   --glass-bg-strong: rgba(255, 255, 255, 0.66);
   --glass-border: rgba(255, 255, 255, 0.72);
-  --glass-line: rgba(78, 97, 139, 0.14);
-  --glass-shadow: 0 24px 70px rgba(68, 83, 124, 0.16), 0 3px 12px rgba(68, 83, 124, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-line: rgba(31, 77, 92, 0.16);
+  --glass-shadow: 0 24px 70px rgba(31, 77, 92, 0.14), 0 3px 12px rgba(31, 77, 92, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --glass-radius: 24px;
-  --glass-accent: #4057d6;
-  --glass-ink: #17213d;
-  --glass-muted: #66718d;
+  --glass-accent: var(--marine);
+  --glass-ink: var(--ink);
+  --glass-muted: var(--quill);
 }
 
 body {
   position: relative;
   color: var(--glass-ink);
   background:
-    radial-gradient(circle at 78% 4%, rgba(123, 145, 255, 0.30), transparent 28rem),
-    radial-gradient(circle at 12% 88%, rgba(242, 152, 232, 0.22), transparent 24rem),
-    linear-gradient(135deg, #edf4ff 0%, #f7f9ff 52%, #eef2ff 100%);
+    radial-gradient(circle at 78% 4%, rgba(31, 77, 92, 0.16), transparent 28rem),
+    radial-gradient(circle at 12% 88%, rgba(184, 137, 90, 0.18), transparent 24rem),
+    linear-gradient(135deg, #edf1f1 0%, #f7f5f0 52%, #eef0ed 100%);
 }
 
 body::before {
@@ -1016,6 +1016,59 @@ a.ov-kpi.link:hover{background:var(--bg-secondary);}
   border-radius: 14px;
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus,
-.search-input:focus { border-color: rgba(64, 87, 214, 0.5); box-shadow: 0 0 0 4px rgba(64, 87, 214, 0.10); }
+.search-input:focus { border-color: rgba(31, 77, 92, 0.5); box-shadow: 0 0 0 4px rgba(31, 77, 92, 0.10); }
 .btn, .btn-sm { border-radius: 14px; border-color: var(--glass-line); background: rgba(255, 255, 255, 0.34); }
-.btn-primary, .btn-sm.btn-primary { background: rgba(64, 87, 214, 0.88); border-color: rgba(64, 87, 214, 0.5); }
+.btn-primary, .btn-sm.btn-primary { background: var(--marine); border-color: var(--marine); }
+
+/* Shared glass surfaces across dashboard, lists, tables, and portfolio views. */
+:where(.card, .panel, .surface, .content-card, .dashboard-card, .stat-card,
+  .kpi-card, .ov-prop, .ov-kpi, .kpi-strip, .ov-cols-side, .body-side,
+  .data-hd, .sec-hd, .action-bar, .tab-nav, .search-bar, .save-bar,
+  .sow-action-panel, .kpi-modal) {
+  background: var(--glass-bg) !important;
+  border-color: var(--glass-line) !important;
+  box-shadow: 0 10px 34px rgba(31, 77, 92, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
+}
+
+:where(.card, .panel, .surface, .content-card, .dashboard-card, .stat-card,
+  .kpi-card, .ov-prop, .ov-kpi, .kpi-strip, .data-hd, .sec-hd,
+  .action-bar, .tab-nav, .search-bar, .save-bar, .kpi-modal) {
+  border-radius: 18px;
+}
+
+:where(.ph-row, .oi-item, .dr-row, .team-row, .data-row, .table-row,
+  .list-row, .task-row, .task-card) {
+  color: var(--ink);
+  border-color: var(--glass-line) !important;
+  background: rgba(255, 255, 255, 0.30);
+}
+
+:where(.ph-row, .oi-item, .dr-row, .data-row, .table-row, .list-row,
+  .task-row, .task-card):hover {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+:where(.kpi-label, .kpi-sub, .ph-date, .oi-tag, .dr-ph, .dr-et,
+  .form-note, .modal-sub, .proj-ts) { color: var(--quill); }
+
+:where(.kpi-val, .kpi-modal-big, .ph-name, .oi-text, .dr-num,
+  .modal-title, .proj-addr) { color: var(--ink); }
+
+.tab-btn { color: var(--quill); border-radius: 12px 12px 0 0; }
+.tab-btn:hover { color: var(--marine); background: rgba(255, 255, 255, 0.28); }
+.tab-btn.active { color: var(--marine); border-bottom-color: var(--marine); }
+
+.toggle-group { border-color: var(--glass-line); border-radius: 14px; background: rgba(255, 255, 255, 0.25); }
+.tg-btn { background: transparent; color: var(--quill); border-radius: 12px; }
+.tg-btn.active { background: var(--marine); color: var(--paper); }
+
+.kpi-val.amber, .orig-dl { color: var(--brass); }
+.kpi-val.green { color: var(--success); }
+.btn-primary, .btn-sm.btn-primary { background: var(--marine); border-color: var(--marine); }
+.btn-primary:hover, .btn-sm.btn-primary:hover { background: var(--marine-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
