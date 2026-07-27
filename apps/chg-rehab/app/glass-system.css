@@ -358,3 +358,55 @@ body::before {
   .dashboard-card-grid { grid-template-columns: 1fr; }
   .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Property record: reserve space for each rail and collapse them before
+   content becomes narrower than the controls can support. */
+.property-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.property-page > :nth-child(2) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.property-list { width: 220px !important; min-width: 180px; }
+.property-content { min-width: 0; }
+.property-page .proj-bar,
+.property-page .tab-nav { min-width: 0; }
+.property-page .proj-l,
+.property-page .proj-r { min-width: 0; }
+.property-page .proj-l { overflow: hidden; }
+.property-page .proj-addr { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.property-page .proj-r { flex-shrink: 0; }
+.property-page .tab-panel.active { min-height: 0; }
+
+/* Task action menus stay above wrapped task rows without changing document
+   flow or colliding with the next row. */
+.task-row-menu { z-index: 10; }
+.task-row-menu-popover {
+  background: var(--chg-glass-surface-3) !important;
+  border: 1px solid var(--chg-glass-line-strong) !important;
+  border-radius: var(--chg-radius-sm) !important;
+  box-shadow: var(--chg-glass-shadow) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(120%) !important;
+  backdrop-filter: blur(18px) saturate(120%) !important;
+}
+
+@media (max-width: 900px) {
+  .property-page > :nth-child(2) { overflow: auto; }
+  .property-list { width: 190px !important; min-width: 190px; }
+  .property-page .proj-r .proj-ts { display: none; }
+}
+
+@media (max-width: 767px) {
+  .property-page > :nth-child(2) { flex-direction: column; overflow: auto; }
+  .property-list { width: 100% !important; min-width: 0; max-height: 240px; border-right: none !important; border-bottom: 1px solid var(--chg-glass-line) !important; }
+  .property-content { min-height: 520px; }
+  .property-page .proj-bar { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .property-page .proj-r { width: 100%; justify-content: flex-start; }
+}

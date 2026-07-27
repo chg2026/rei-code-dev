@@ -97,7 +97,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
   const selected = selectedId ? all.find((p) => p.id === selectedId) || null : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+    <div className="property-page">
       {/* Top bar */}
       <div className="proj-bar">
         <div className="proj-l">
@@ -127,7 +127,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* LEFT: list */}
-        <div style={{
+        <div className="property-list" style={{
           width: 220, flexShrink: 0,
           borderRight: "0.5px solid var(--border-lo)",
           display: "flex", flexDirection: "column", overflow: "hidden",
@@ -213,7 +213,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
         </div>
 
         {/* RIGHT: tabs + content */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div className="property-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <div className="tab-nav">
             {(
               [

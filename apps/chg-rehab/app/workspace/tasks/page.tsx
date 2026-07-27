@@ -145,8 +145,8 @@ export default function MyTasksPage() {
       </div>
 
       {/* Toolbar: tabs · view toggle · person filter */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", padding: "0 0 14px" }}>
-        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-2, #DCD9D2)" }}>
+      <div className={s.toolbar}>
+        <div className={s.taskTabs}>
           {TABS.map((t) => {
             const active = tab === t.key;
             return (
@@ -154,6 +154,7 @@ export default function MyTasksPage() {
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
+                className={s.taskTab}
                 style={{
                   padding: "8px 12px",
                   fontSize: 13,
@@ -174,6 +175,7 @@ export default function MyTasksPage() {
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
           <select
+            className={s.filterSelect}
             value={personFilter}
             onChange={(e) => setPersonFilter(e.target.value)}
             aria-label="Filter by person"
@@ -195,7 +197,7 @@ export default function MyTasksPage() {
             ))}
           </select>
 
-          <div style={{ display: "inline-flex", background: "var(--bone, #F5F4F0)", border: "1px solid var(--border-2, #DCD9D2)", borderRadius: 9, padding: 2 }}>
+          <div className={s.viewToggle}>
             <ToggleBtn active={view === "list"} onClick={() => setView("list")} label="List" />
             <ToggleBtn active={view === "board"} onClick={() => setView("board")} label="Board" />
           </div>

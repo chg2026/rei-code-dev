@@ -158,6 +158,7 @@ function TaskRow({
       style={{
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
         gap: 12,
         padding: "9px 12px",
         background: "#fff",
@@ -235,17 +236,19 @@ function RowMenu({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   return (
-    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+    <div ref={ref} className="task-row-menu" style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Task actions"
+        className="task-row-menu-trigger"
         style={{ background: "none", border: "none", cursor: "pointer", color: "var(--quill, #6B6862)", fontSize: 16, padding: "0 4px", lineHeight: 1 }}
       >
         ⋯
       </button>
       {open ? (
         <div
+          className="task-row-menu-popover"
           style={{
             position: "absolute",
             top: "100%",
