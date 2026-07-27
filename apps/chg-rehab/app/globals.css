@@ -263,6 +263,130 @@ body {
   .main-col { margin-left: calc(var(--sidebar-width, 64px) + 18px); }
 }
 
+/* ── CHG LIQUID GLASS SHELL ──
+   A restrained glass layer for the application chrome. Feature modules keep
+   their existing layout and data styles until each screen is reviewed. */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.48);
+  --glass-bg-strong: rgba(255, 255, 255, 0.66);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-line: rgba(78, 97, 139, 0.14);
+  --glass-shadow: 0 24px 70px rgba(68, 83, 124, 0.16), 0 3px 12px rgba(68, 83, 124, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-radius: 24px;
+  --glass-accent: #4057d6;
+  --glass-ink: #17213d;
+  --glass-muted: #66718d;
+}
+
+body {
+  position: relative;
+  color: var(--glass-ink);
+  background:
+    radial-gradient(circle at 78% 4%, rgba(123, 145, 255, 0.30), transparent 28rem),
+    radial-gradient(circle at 12% 88%, rgba(242, 152, 232, 0.22), transparent 24rem),
+    linear-gradient(135deg, #edf4ff 0%, #f7f9ff 52%, #eef2ff 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+}
+
+.sidebar,
+.topbar,
+.icon-btn,
+.avatar-chip,
+.sign-out-btn,
+.modal-box {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+
+.sidebar {
+  top: 18px;
+  left: 18px;
+  bottom: 18px;
+  border-radius: 28px;
+  padding: 18px 14px 20px;
+}
+
+.main-col {
+  background: transparent;
+}
+
+.topbar {
+  top: 14px;
+  height: 62px;
+  margin: 14px 18px 0;
+  padding: 10px 14px;
+  border-radius: var(--glass-radius);
+}
+
+.nav-item {
+  border-color: transparent;
+  color: var(--glass-muted);
+  border-radius: 16px;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.nav-item:hover {
+  color: var(--glass-ink);
+  background: rgba(255, 255, 255, 0.38);
+  transform: translateX(2px);
+}
+
+.nav-item.active {
+  color: var(--glass-accent);
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 8px 22px rgba(72, 87, 160, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.sidebar-toggle,
+.topbar input,
+.icon-btn,
+.avatar-chip,
+.sign-out-btn {
+  background: rgba(255, 255, 255, 0.36) !important;
+  border-color: var(--glass-line) !important;
+  color: var(--glass-ink);
+}
+
+.sidebar-toggle:hover,
+.icon-btn:hover,
+.sign-out-btn:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.module.active,
+.module,
+.main-wrap {
+  background: transparent;
+}
+
+.modal-overlay {
+  background: rgba(34, 45, 78, 0.20);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.modal-box {
+  border-radius: 28px;
+}
+
+@media (max-width: 767px) {
+  .sidebar { top: 10px; left: 10px; bottom: 10px; border-radius: 22px; }
+  .topbar { margin: 10px 10px 0; border-radius: 20px; }
+}
+
 /* ── TOPBAR (inside main) ── */
 .topbar {
   display: flex;
@@ -877,3 +1001,21 @@ a.ov-kpi.link:hover{background:var(--bg-secondary);}
 .pm-add-list { color: var(--muted); font-size: 12px; }
 .pm-manage-link { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .pm-tree-empty { color: var(--muted); font-size: 12px; }
+
+/* Final shell overrides: these come after the legacy prototype rules so the
+   glass treatment is not overwritten by older opaque surfaces. */
+.topbar { background: var(--glass-bg) !important; }
+.main-wrap, .module, .module.active { background: transparent !important; }
+.sidebar { background: var(--glass-bg) !important; }
+.modal-box { background: var(--glass-bg-strong) !important; }
+.modal-hd, .modal-foot { background: rgba(255, 255, 255, 0.26); }
+.form-input, .form-select, .form-textarea, .search-input, .filter-sel,
+.admin-input, .admin-select, .sap-input {
+  background: rgba(255, 255, 255, 0.38);
+  border-color: var(--glass-line);
+  border-radius: 14px;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus,
+.search-input:focus { border-color: rgba(64, 87, 214, 0.5); box-shadow: 0 0 0 4px rgba(64, 87, 214, 0.10); }
+.btn, .btn-sm { border-radius: 14px; border-color: var(--glass-line); background: rgba(255, 255, 255, 0.34); }
+.btn-primary, .btn-sm.btn-primary { background: rgba(64, 87, 214, 0.88); border-color: rgba(64, 87, 214, 0.5); }
