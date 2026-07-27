@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import "./glass-system.css";
 import TopNav from "@/components/TopNav";
 import AvatarDropdown from "@/components/AvatarDropdown";
 import BillingStatusBanner from "@/components/BillingStatusBanner";

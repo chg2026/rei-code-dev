@@ -1,0 +1,257 @@
+/*
+ * CHG glass design system
+ * Loaded after globals.css so legacy prototype selectors cannot override the
+ * shared visual contract. This file owns visual language only.
+ */
+
+:root {
+  --chg-glass-canvas: #f5f4f0;
+  --chg-glass-canvas-deep: #e9eff0;
+  --chg-glass-ink: #0a0a0a;
+  --chg-glass-slate: #2a2826;
+  --chg-glass-muted: #6b6862;
+  --chg-glass-faint: #a8a49c;
+  --chg-glass-marine: #1f4d5c;
+  --chg-glass-marine-ink: #143641;
+  --chg-glass-brass: #b8895a;
+  --chg-glass-success: #1f7a4d;
+  --chg-glass-danger: #b43a2e;
+
+  --chg-glass-surface-1: rgba(255, 255, 255, 0.34);
+  --chg-glass-surface-2: rgba(255, 255, 255, 0.52);
+  --chg-glass-surface-3: rgba(255, 255, 255, 0.72);
+  --chg-glass-rim: rgba(255, 255, 255, 0.82);
+  --chg-glass-line: rgba(31, 77, 92, 0.16);
+  --chg-glass-line-strong: rgba(31, 77, 92, 0.26);
+  --chg-glass-shadow: 0 18px 46px rgba(31, 77, 92, 0.10), 0 2px 8px rgba(31, 77, 92, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --chg-glass-shadow-soft: 0 8px 24px rgba(31, 77, 92, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+
+  --chg-radius-xs: 8px;
+  --chg-radius-sm: 12px;
+  --chg-radius-md: 16px;
+  --chg-radius-lg: 22px;
+  --chg-radius-xl: 28px;
+
+  --chg-space-1: 4px;
+  --chg-space-2: 8px;
+  --chg-space-3: 12px;
+  --chg-space-4: 16px;
+  --chg-space-5: 20px;
+  --chg-space-6: 24px;
+  --chg-space-7: 32px;
+
+  --chg-font-sans: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --chg-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  background: var(--chg-glass-canvas);
+  color: var(--chg-glass-ink);
+  font-family: var(--chg-font-sans);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--chg-font-sans) !important;
+}
+
+body {
+  color: var(--chg-glass-ink) !important;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(31, 77, 92, 0.14), transparent 32rem),
+    radial-gradient(circle at 4% 92%, rgba(184, 137, 90, 0.14), transparent 28rem),
+    linear-gradient(135deg, #edf1f1 0%, #f8f6f1 52%, #eef0ed 100%) !important;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body::before {
+  opacity: 0.12 !important;
+}
+
+/* Shared type contract */
+:where(h1, h2, h3, h4, p, label, th, td, button, input, select, textarea) {
+  text-wrap: pretty;
+}
+
+:where(h1, h2, h3, h4) {
+  color: var(--chg-glass-ink) !important;
+  letter-spacing: -0.025em;
+}
+
+:where(h1) { font-size: clamp(1.65rem, 2.2vw, 2.15rem); line-height: 1.1; font-weight: 650; }
+:where(h2) { font-size: clamp(1.25rem, 1.7vw, 1.55rem); line-height: 1.2; font-weight: 620; }
+:where(h3) { font-size: 1rem; line-height: 1.25; font-weight: 600; }
+:where(p, label, td, th, button, input, select, textarea) { letter-spacing: -0.005em; }
+:where(small, .kpi-label, .kpi-sub, .form-note, .modal-sub, .proj-ts, .ph-date, .oi-tag, .dr-ph, .dr-et) {
+  color: var(--chg-glass-muted) !important;
+  font-size: 0.75rem;
+}
+
+/* One stacking contract prevents the floating shell from covering content. */
+.sidebar { z-index: 60 !important; }
+.topbar { z-index: 40 !important; }
+.top-stack { position: relative; z-index: 20; }
+.main-wrap { position: relative; z-index: 1; }
+.modal-overlay, .kpi-modal-backdrop { z-index: 1000 !important; }
+.toast { z-index: 1100 !important; }
+
+/* App chrome */
+.sidebar {
+  background: var(--chg-glass-surface-2) !important;
+  border: 1px solid var(--chg-glass-rim) !important;
+  border-radius: var(--chg-radius-xl) !important;
+  box-shadow: var(--chg-glass-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
+  backdrop-filter: blur(30px) saturate(125%) !important;
+}
+
+.topbar {
+  background: var(--chg-glass-surface-2) !important;
+  border: 1px solid var(--chg-glass-rim) !important;
+  border-radius: var(--chg-radius-lg) !important;
+  box-shadow: var(--chg-glass-shadow) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
+  backdrop-filter: blur(30px) saturate(125%) !important;
+}
+
+.main-col,
+.main-wrap,
+.module,
+.module.active {
+  background: transparent !important;
+}
+
+.nav-item {
+  min-height: 38px;
+  border: 1px solid transparent !important;
+  border-radius: var(--chg-radius-sm) !important;
+  color: var(--chg-glass-muted) !important;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.nav-item:hover {
+  color: var(--chg-glass-marine) !important;
+  background: var(--chg-glass-surface-1) !important;
+  transform: translateX(1px);
+}
+
+.nav-item.active {
+  color: var(--chg-glass-marine) !important;
+  background: var(--chg-glass-surface-3) !important;
+  border-color: var(--chg-glass-rim) !important;
+  box-shadow: var(--chg-glass-shadow-soft) !important;
+}
+
+/* Surface levels: decorative panels are translucent; dense data rows stay
+   more opaque so readability is never traded for the effect. */
+:where(.card, .panel, .surface, .content-card, .dashboard-card, .stat-card,
+  .kpi-card, .ov-prop, .ov-kpi, .kpi-strip, .ov-cols-side, .body-side,
+  .data-hd, .sec-hd, .action-bar, .tab-nav, .search-bar, .save-bar,
+  .sow-action-panel, .kpi-modal) {
+  background: var(--chg-glass-surface-2) !important;
+  border: 1px solid var(--chg-glass-line) !important;
+  border-radius: var(--chg-radius-md) !important;
+  box-shadow: var(--chg-glass-shadow-soft) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+}
+
+:where(.ph-row, .oi-item, .dr-row, .team-row, .data-row, .table-row,
+  .list-row, .task-row, .task-card) {
+  color: var(--chg-glass-ink) !important;
+  background: rgba(255, 255, 255, 0.58) !important;
+  border-color: var(--chg-glass-line) !important;
+}
+
+:where(.ph-row, .oi-item, .dr-row, .data-row, .table-row, .list-row,
+  .task-row, .task-card):hover {
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+:where(.kpi-val, .kpi-modal-big, .ph-name, .oi-text, .dr-num, .modal-title, .proj-addr) {
+  color: var(--chg-glass-ink) !important;
+}
+
+:where(.kpi-val.amber, .orig-dl) { color: var(--chg-glass-brass) !important; }
+:where(.kpi-val.green) { color: var(--chg-glass-success) !important; }
+
+/* Controls */
+:where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn,
+  .tab-btn, .tg-btn, .filter-sel, .form-input, .form-select,
+  .form-textarea, .search-input, .admin-input, .admin-select, .sap-input) {
+  border-radius: var(--chg-radius-sm) !important;
+  border: 1px solid var(--chg-glass-line) !important;
+  color: var(--chg-glass-slate) !important;
+  background: var(--chg-glass-surface-1) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65) !important;
+}
+
+:where(.btn, .btn-sm) {
+  min-height: 36px;
+  padding: 8px 14px !important;
+  font-size: 0.8rem;
+  font-weight: 560;
+  line-height: 1;
+}
+
+:where(.icon-btn, .sidebar-toggle) { min-width: 36px; min-height: 36px; }
+:where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn):hover {
+  background: var(--chg-glass-surface-3) !important;
+  color: var(--chg-glass-marine) !important;
+}
+:where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn):active { transform: translateY(1px) scale(0.99); }
+
+:where(.btn-primary, .btn-sm.btn-primary, .tg-btn.active) {
+  color: #fff !important;
+  background: var(--chg-glass-marine) !important;
+  border-color: var(--chg-glass-marine) !important;
+  box-shadow: 0 7px 16px rgba(31, 77, 92, 0.18) !important;
+}
+
+:where(.btn-primary, .btn-sm.btn-primary, .tg-btn.active):hover { background: var(--chg-glass-marine-ink) !important; }
+
+:where(.form-input, .form-select, .form-textarea, .search-input, .admin-input, .admin-select, .sap-input) {
+  min-height: 38px;
+  padding: 9px 12px !important;
+}
+
+:where(.form-input:focus, .form-select:focus, .form-textarea:focus, .search-input:focus) {
+  outline: none !important;
+  border-color: var(--chg-glass-marine) !important;
+  box-shadow: 0 0 0 3px rgba(31, 77, 92, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
+}
+
+.tab-btn { min-height: 40px; }
+.tab-btn.active { color: var(--chg-glass-marine) !important; border-bottom-color: var(--chg-glass-marine) !important; }
+
+.modal-box, .kpi-modal {
+  background: var(--chg-glass-surface-3) !important;
+  border: 1px solid var(--chg-glass-rim) !important;
+  border-radius: var(--chg-radius-lg) !important;
+  box-shadow: var(--chg-glass-shadow) !important;
+}
+
+.modal-overlay, .kpi-modal-backdrop {
+  background: rgba(20, 35, 40, 0.22) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--chg-glass-marine) !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .sidebar { top: 10px !important; left: 10px !important; bottom: 10px !important; border-radius: var(--chg-radius-lg) !important; }
+  .topbar { margin: 10px 10px 0 !important; border-radius: var(--chg-radius-md) !important; }
+  :where(.btn, .btn-sm) { min-height: 40px; padding-inline: 12px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
