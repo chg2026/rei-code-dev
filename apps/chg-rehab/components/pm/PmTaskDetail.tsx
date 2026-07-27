@@ -38,10 +38,11 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose, onUpdated, onCreated }: {
+export default function PmTaskDetail({ taskId, listId, defaultStatusId, statuses: availableStatuses = [], onClose, onUpdated, onCreated }: {
   taskId?: string | null;
   listId?: string;
   defaultStatusId?: string | null;
+  statuses?: PmStatus[];
   onClose: () => void;
   onUpdated: () => void;
   onCreated?: (id: string) => void;
@@ -62,30 +63,47 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
 
   // Create-mode state.
   const [newName, setNewName] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [newDescription, setNewDescription] = useState("");
+  const [newStatusId, setNewStatusId] = useState(defaultStatusId ?? availableStatuses.find((s) => s.isDefault)?.id ?? availableStatuses[0]?.id ?? "");
+  const [newPriority, setNewPriority] = useState("");
+  const [newTaskType, setNewTaskType] = useState("task");
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newTimeEstimate, setNewTimeEstimate] = useState("");
+  const [newSprintPoints, setNewSprintPoints] = useState("");
+  const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([]);
   const newNameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (isCreate && mounted) newNameRef.current?.focus(); }, [isCreate, mounted]);
 
   const createTask = async () => {
     const n = newName.trim();
-    if (!n || !listId || creating) return;
-    setCreating(true);
+    if (!n || !listId) return;
     try {
       const r = await fetch(`/api/pm/lists/${listId}/tasks`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: n, statusId: defaultStatusId ?? undefined }),
+        body: JSON.stringify({
+          name: n,
+          description: newDescription.trim() || null,
+          statusId: newStatusId || undefined,
+          priority: newPriority || null,
+          taskType: newTaskType,
+          startDate: newStartDate || null,
+          dueDate: newDueDate || null,
+          timeEstimate: newTimeEstimate ? Number(newTimeEstimate) : null,
+          sprintPoints: newSprintPoints ? Number(newSprintPoints) : null,
+          assigneeIds: newAssigneeIds,
+        }),
       });
-      if (r.ok) {
-        const d = await r.json().catch(() => null);
-        const id: string | undefined = d?.task?.id ?? d?.id;
-        if (id) {
-          setActiveTaskId(id);
-          onCreated?.(id);
-        }
+      if (!r.ok) return;
+      const d = await r.json().catch(() => null);
+      const id: string | undefined = d?.task?.id ?? d?.id;
+      if (id) {
+        onCreated?.(id);
+        onClose();
       }
-    } finally {
-      setCreating(false);
+    } catch {
+      // Keep the form open so the user does not lose entered details.
     }
   };
 
@@ -174,20 +192,23 @@ export default function PmTaskDetail({ taskId, listId, defaultStatusId, onClose,
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
             <Label>Task name</Label>
-            <input
-              ref={newNameRef}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") createTask(); if (e.key === "Escape") onClose(); }}
-              placeholder="What needs to be done?"
-              style={{ width: "100%", fontSize: 19, fontWeight: 600, fontFamily: "inherit", color: "var(--text-primary)", border: "none", outline: "none", marginBottom: 16, background: "transparent" }}
-            />
+            <input ref={newNameRef} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="What needs to be done?" style={{ width: "100%", fontSize: 19, fontWeight: 600, fontFamily: "inherit", color: "var(--text-primary)", border: "none", outline: "none", marginBottom: 16, background: "transparent" }} />
+            <Field label="Status"><select value={newStatusId} onChange={(e) => setNewStatusId(e.target.value)} style={selectStyle}><option value="">No status</option>{availableStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "14px 0" }}>
+              <Field label="Priority"><select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} style={selectStyle}><option value="">None</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select></Field>
+              <Field label="Task type"><select value={newTaskType} onChange={(e) => setNewTaskType(e.target.value)} style={selectStyle}>{["task", "bug", "feature", "milestone"].map((p) => <option key={p} value={p}>{p}</option>)}</select></Field>
+              <Field label="Start date"><input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} style={selectStyle} /></Field>
+              <Field label="Due date"><input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} style={selectStyle} /></Field>
+              <Field label="Time estimate (h)"><input type="number" min={0} value={newTimeEstimate} onChange={(e) => setNewTimeEstimate(e.target.value)} style={selectStyle} /></Field>
+              <Field label="Sprint points"><input type="number" min={0} value={newSprintPoints} onChange={(e) => setNewSprintPoints(e.target.value)} style={selectStyle} /></Field>
+            </div>
+            <Field label="Assignees"><select multiple value={newAssigneeIds} onChange={(e) => setNewAssigneeIds(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ ...selectStyle, minHeight: 86 }}>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+            <Label>Description</Label>
+            <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Add details…" rows={5} style={{ ...selectStyle, resize: "vertical", marginTop: 6 }} />
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: "0.5px solid var(--border-lo)" }}>
             <button type="button" onClick={onClose} style={{ padding: "7px 14px", fontSize: 13, background: "var(--bg-secondary)", color: "var(--text-secondary)", border: "0.5px solid var(--border-lo)", borderRadius: 6, cursor: "pointer" }}>Cancel</button>
-            <button type="button" onClick={createTask} disabled={!newName.trim() || creating} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", opacity: !newName.trim() || creating ? 0.6 : 1 }}>
-              {creating ? "Creating…" : "Create task"}
-            </button>
+            <button type="button" onClick={createTask} disabled={!newName.trim()} style={{ padding: "7px 14px", fontSize: 13, background: "var(--marine)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", opacity: !newName.trim() ? 0.6 : 1 }}>Save task</button>
           </div>
         </div>
       </>,

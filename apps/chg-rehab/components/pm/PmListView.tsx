@@ -121,6 +121,7 @@ export default function PmListView({
           taskId={null}
           listId={listId}
           defaultStatusId={createStatusId ?? defaultStatus}
+          statuses={statuses}
           onClose={() => setCreating(false)}
           onUpdated={() => { refresh(); }}
           onCreated={() => { refresh(); }}

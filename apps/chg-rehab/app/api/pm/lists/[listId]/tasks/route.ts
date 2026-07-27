@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { enqueueWorkspaceInApp } from "@/lib/workspace/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
     startDate?: string;
     assigneeIds?: string[];
     parentTaskId?: string;
+    taskType?: string;
+    timeEstimate?: number | null;
+    sprintPoints?: number | null;
   };
   const name = (body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
@@ -148,8 +152,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
       parentTaskId,
       name,
       description: body.description ?? null,
+      taskType: body.taskType ?? "task",
       statusId,
       priority: body.priority ?? null,
+      timeEstimate: body.timeEstimate ?? null,
+      sprintPoints: body.sprintPoints ?? null,
       dueDate: body.dueDate ? new Date(body.dueDate) : null,
       startDate: body.startDate ? new Date(body.startDate) : null,
       assignees: assigneeIds.length ? { create: assigneeIds.map((id) => ({ userId: id })) } : undefined,
@@ -159,6 +166,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
   await prisma.pmActivity.create({
     data: { taskId: task.id, userId: user.id, type: "task_created" },
   });
+
+  const creatorName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Someone";
+  for (const assigneeId of assigneeIds) {
+    if (assigneeId === user.id) continue;
+    await enqueueWorkspaceInApp({
+      companyId: user.companyId,
+      userId: assigneeId,
+      event: "workspace.task.assigned",
+      title: `New task: ${name}`,
+      body: `${creatorName} assigned you a department task.`,
+      link: `/pm/${list.spaceId}/${listId}`,
+      urgent: body.priority === "urgent" || body.priority === "Urgent",
+      dedupeKey: `pm-task:${task.id}:assigned:${assigneeId}`,
+    });
+  }
 
   return NextResponse.json({ id: task.id });
 }
