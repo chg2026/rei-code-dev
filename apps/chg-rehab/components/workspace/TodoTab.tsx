@@ -11,8 +11,6 @@ type Task = {
   done: boolean;
   linkLabel: string | null;
   assignee: { id: string; name: string; initials: string } | null;
-  source?: "workspace" | "pm";
-  pmDoneStatusId?: string | null;
 };
 
 const FILTERS = [
@@ -53,18 +51,11 @@ export default function TodoTab({ refreshKey }: { refreshKey?: number }) {
 
   const toggleDone = async (t: Task) => {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
-    const response = t.source === "pm"
-      ? await fetch(`/api/pm/tasks/${t.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ statusId: !t.done ? t.pmDoneStatusId : null }),
-        })
-      : await fetch(`/api/workspace/tasks/${t.id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ done: !t.done }),
-        });
-    if (!response.ok) setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: t.done } : x)));
+    await fetch(`/api/workspace/tasks/${t.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ done: !t.done }),
+    });
   };
 
   const open = tasks.filter((t) => !t.done);

@@ -20,81 +20,46 @@ export async function GET(req: Request) {
     where.assigneeId = { not: user.id };
   }
 
-  const [workspaceTasks, pmTasks] = await Promise.all([
-    prisma.wsTask.findMany({
-      where,
-      orderBy: [{ done: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
-      take: 200,
-      include: {
-        assignee: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
-        createdBy: { select: { id: true, firstName: true, lastName: true } },
-      },
-    }),
-    prisma.pmTask.findMany({
-      where: {
-        list: { space: { companyId: user.companyId } },
-        parentTaskId: null,
-        ...(filter === "mine" ? { assignees: { some: { userId: user.id } } } : {}),
-        ...(includeDone ? {} : { status: { type: { notIn: ["done", "closed"] } } }),
-      },
-      orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-      take: 200,
-      include: {
-        status: true,
-        assignees: { include: { user: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } } } },
-        list: { include: { space: { include: { statuses: true } } } },
-      },
-    }),
-  ]);
-
-  const ws = workspaceTasks.map((t) => ({
-    id: t.id,
-    title: t.title,
-    priority: t.priority,
-    dueDate: t.dueDate?.toISOString() ?? null,
-    done: t.done,
-    doneAt: t.doneAt?.toISOString() ?? null,
-    source: "workspace" as const,
-    linkType: t.linkType,
-    linkId: t.linkId,
-    linkLabel: t.linkLabel,
-    assignee: t.assignee
-      ? {
-          id: t.assignee.id,
-          name: [t.assignee.firstName, t.assignee.lastName].filter(Boolean).join(" ") || t.assignee.email || "User",
-          initials: (t.assignee.initials || [(t.assignee.firstName ?? "")[0], (t.assignee.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase(),
-        }
-      : null,
-    createdBy: t.createdBy
-      ? { id: t.createdBy.id, name: [t.createdBy.firstName, t.createdBy.lastName].filter(Boolean).join(" ") || "User" }
-      : null,
-    createdAt: t.createdAt.toISOString(),
-  }));
-
-  const pm = pmTasks.map((t) => {
-    const assignedUser = t.assignees.find((a) => a.userId === user.id)?.user;
-    return {
-      id: t.id,
-      title: t.name,
-      priority: ({ urgent: "Urgent", high: "Medium", normal: "Medium", low: "Low" } as Record<string, string>)[t.priority ?? "normal"] ?? "Medium",
-      dueDate: t.dueDate?.toISOString() ?? null,
-      done: t.status?.type === "done" || t.status?.type === "closed",
-      doneAt: null,
-      source: "pm" as const,
-      linkType: "pm-task",
-      linkId: t.id,
-      linkLabel: `${t.list.space.name} · ${t.list.name}`,
-      pmStatusId: t.statusId,
-      pmDoneStatusId: t.list.space.statuses.find((s) => s.type === "done")?.id ?? t.list.space.statuses.find((s) => s.type === "closed")?.id ?? null,
-      assignee: assignedUser
-        ? { id: assignedUser.id, name: [assignedUser.firstName, assignedUser.lastName].filter(Boolean).join(" ") || assignedUser.email || "User", initials: (assignedUser.initials || [(assignedUser.firstName ?? "")[0], (assignedUser.lastName ?? "")[0]].filter(Boolean).join("") || "?").toUpperCase() }
-        : null,
-      createdBy: null,
-      createdAt: t.createdAt.toISOString(),
-    };
+  const tasks = await prisma.wsTask.findMany({
+    where,
+    orderBy: [{ done: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
+    take: 200,
+    include: {
+      assignee: { select: { id: true, firstName: true, lastName: true, initials: true, email: true } },
+      createdBy: { select: { id: true, firstName: true, lastName: true } },
+    },
   });
 
-  return NextResponse.json({ tasks: [...ws, ...pm].sort((a, b) => Number(a.done) - Number(b.done) || new Date(a.dueDate ?? a.createdAt).getTime() - new Date(b.dueDate ?? b.createdAt).getTime()).slice(0, 300) });
+  return NextResponse.json({
+    tasks: tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      priority: t.priority,
+      dueDate: t.dueDate?.toISOString() ?? null,
+      done: t.done,
+      doneAt: t.doneAt?.toISOString() ?? null,
+      linkType: t.linkType,
+      linkId: t.linkId,
+      linkLabel: t.linkLabel,
+      assignee: t.assignee
+        ? {
+            id: t.assignee.id,
+            name: [t.assignee.firstName, t.assignee.lastName].filter(Boolean).join(" ") ||
+              t.assignee.email || "User",
+            initials: (t.assignee.initials ||
+              [(t.assignee.firstName ?? "")[0], (t.assignee.lastName ?? "")[0]]
+                .filter(Boolean).join("") || "?").toUpperCase(),
+          }
+        : null,
+      createdBy: t.createdBy
+        ? {
+            id: t.createdBy.id,
+            name: [t.createdBy.firstName, t.createdBy.lastName].filter(Boolean).join(" ") || "User",
+          }
+        : null,
+      createdAt: t.createdAt.toISOString(),
+    })),
+  });
 }
 
 export async function POST(req: Request) {

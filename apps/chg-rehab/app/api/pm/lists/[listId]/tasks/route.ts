@@ -61,14 +61,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lis
   const body = await req.json();
   if (!body.name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
-  const requestedAssigneeIds = Array.isArray(body.assigneeIds) ? body.assigneeIds.filter((id: unknown): id is string => typeof id === "string") : [];
-  const validAssignees = requestedAssigneeIds.length
-    ? await prisma.user.findMany({
-        where: { id: { in: requestedAssigneeIds }, companyId: user.companyId, active: true },
-        select: { id: true },
-      })
-    : [];
-
   const task = await prisma.pmTask.create({
     data: {
       listId,
@@ -79,8 +71,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lis
       parentTaskId: body.parentTaskId ?? null,
       dueDate:   body.dueDate   ? new Date(body.dueDate)   : null,
       startDate: body.startDate ? new Date(body.startDate) : null,
-      ...(validAssignees.length
-        ? { assignees: { create: validAssignees.map(({ id }) => ({ userId: id })) } }
+      ...(body.assigneeIds?.length
+        ? { assignees: { create: body.assigneeIds.map((uid: string) => ({ userId: uid })) } }
         : {}),
       activity: {
         create: { userId: user.id, type: "task_created" },

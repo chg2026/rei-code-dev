@@ -2,7 +2,7 @@
 
 import React from "react";
 import PmBoardView from "./PmBoardView";
-import PmCreateTaskModal from "./PmCreateTaskModal";
+import PmQuickCreate from "./PmQuickCreate";
 import PmTaskDetail from "./PmTaskDetail";
 
 interface PmListViewProps {
@@ -31,7 +31,7 @@ const MARINE = "#1F4D5C";
 export default function PmListView({ tasks: initialTasks, statuses, listId, spaceId }: PmListViewProps) {
   const [view, setView] = React.useState<"list" | "board">("list");
   const [tasks, setTasks] = React.useState<any[]>(initialTasks);
-  const [createStatusId, setCreateStatusId] = React.useState<string | undefined>();
+  const [quickCreate, setQuickCreate] = React.useState<string | null>(null);
   const [taskDetailId, setTaskDetailId] = React.useState<string | null>(null);
 
   const tasksByStatus = React.useMemo(() => {
@@ -56,7 +56,7 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
   if (view === "board") {
     return (
       <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-        <Toolbar view={view} onViewChange={setView} statuses={statuses} onTaskCreated={handleTaskCreated} onCreate={(statusId) => setCreateStatusId(statusId)} />
+        <Toolbar view={view} onViewChange={setView} listId={listId} onTaskCreated={handleTaskCreated} />
         <div style={{ flex: 1, overflow: "hidden" }}>
           <PmBoardView
             tasks={tasks}
@@ -73,22 +73,13 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
             onUpdated={handleTaskUpdated}
           />
         )}
-        {createStatusId !== undefined && (
-          <PmCreateTaskModal
-            listId={listId}
-            statuses={statuses}
-            defaultStatusId={createStatusId}
-            onCreated={handleTaskCreated}
-            onClose={() => setCreateStatusId(undefined)}
-          />
-        )}
       </div>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      <Toolbar view={view} onViewChange={setView} statuses={statuses} onTaskCreated={handleTaskCreated} onCreate={(statusId) => setCreateStatusId(statusId)} />
+      <Toolbar view={view} onViewChange={setView} listId={listId} onTaskCreated={handleTaskCreated} />
 
       <div style={{ flex: 1, overflowY: "auto" }}>
         {statuses.map((status) => {
@@ -118,7 +109,7 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
                   <span style={{ fontWeight: 400, color: "#9CA3AF", marginLeft: 6 }}>{groupTasks.length}</span>
                 </span>
                 <button
-                  onClick={() => setCreateStatusId(status.id)}
+                  onClick={() => setQuickCreate(status.id)}
                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#9CA3AF", padding: "2px 4px" }}
                 >
                   + Add task
@@ -129,6 +120,19 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
               {groupTasks.map((task) => (
                 <TaskRow key={task.id} task={task} onClick={() => setTaskDetailId(task.id)} />
               ))}
+
+              {/* Quick create in this group */}
+              {quickCreate === status.id && (
+                <div style={{ padding: "6px 16px", borderBottom: "1px solid #E5E7EB" }}>
+                  <PmQuickCreate
+                    listId={listId}
+                    statusId={status.id}
+                    defaultStatus={status}
+                    onCreated={(t) => { handleTaskCreated(t); setQuickCreate(null); }}
+                    onCancel={() => setQuickCreate(null)}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -141,15 +145,6 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
           onUpdated={handleTaskUpdated}
         />
       )}
-      {createStatusId !== undefined && (
-        <PmCreateTaskModal
-          listId={listId}
-          statuses={statuses}
-          defaultStatusId={createStatusId}
-          onCreated={handleTaskCreated}
-          onClose={() => setCreateStatusId(undefined)}
-        />
-      )}
     </div>
   );
 }
@@ -157,16 +152,16 @@ export default function PmListView({ tasks: initialTasks, statuses, listId, spac
 function Toolbar({
   view,
   onViewChange,
-  statuses,
+  listId,
   onTaskCreated,
-  onCreate,
 }: {
   view: "list" | "board";
   onViewChange: (v: "list" | "board") => void;
-  statuses: any[];
+  listId: string;
   onTaskCreated: (t: any) => void;
-  onCreate: (statusId?: string) => void;
 }) {
+  const [showCreate, setShowCreate] = React.useState(false);
+
   return (
     <div
       style={{
@@ -203,21 +198,31 @@ function Toolbar({
 
       <div style={{ flex: 1 }} />
 
-      <button
-        onClick={() => onCreate()}
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          padding: "5px 12px",
-          background: MARINE,
-          color: "#fff",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-        }}
-      >
-        + New Task
-      </button>
+      {showCreate ? (
+        <div style={{ width: 280 }}>
+          <PmQuickCreate
+            listId={listId}
+            onCreated={(t) => { onTaskCreated(t); setShowCreate(false); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowCreate(true)}
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "5px 12px",
+            background: MARINE,
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          + New Task
+        </button>
+      )}
     </div>
   );
 }
