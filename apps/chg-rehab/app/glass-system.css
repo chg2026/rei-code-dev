@@ -42,6 +42,35 @@
 
   --chg-font-sans: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --chg-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Compatibility map for the legacy module CSS. */
+  --paper: var(--chg-glass-surface-3);
+  --bone: var(--chg-glass-canvas);
+  --stone: var(--chg-glass-faint);
+  --quill: var(--chg-glass-muted);
+  --slate: var(--chg-glass-slate);
+  --ink: var(--chg-glass-ink);
+  --marine: var(--chg-glass-marine);
+  --marine-ink: var(--chg-glass-marine-ink);
+  --blue: var(--chg-glass-marine);
+  --blue-bg: rgba(31, 77, 92, 0.10);
+  --blue-txt: var(--chg-glass-marine-ink);
+  --green: var(--chg-glass-success);
+  --green-bg: rgba(31, 122, 77, 0.11);
+  --green-txt: #185d3b;
+  --amber: var(--chg-glass-brass);
+  --amber-bg: rgba(184, 137, 90, 0.14);
+  --amber-txt: #70481e;
+  --bg-primary: transparent;
+  --bg-secondary: var(--chg-glass-surface-2);
+  --bg-tertiary: var(--chg-glass-surface-1);
+  --text-primary: var(--chg-glass-ink);
+  --text-secondary: var(--chg-glass-slate);
+  --text-tertiary: var(--chg-glass-muted);
+  --border-1: var(--chg-glass-line);
+  --border-2: var(--chg-glass-line-strong);
+  --border-lo: var(--chg-glass-line);
+  --border-mid: var(--chg-glass-line-strong);
 }
 
 html {
@@ -179,6 +208,30 @@ body::before {
 :where(.kpi-val.amber, .orig-dl) { color: var(--chg-glass-brass) !important; }
 :where(.kpi-val.green) { color: var(--chg-glass-success) !important; }
 
+/* Inventory shell and dense data surfaces. */
+.wh-kpi-strip {
+  background: var(--chg-glass-surface-2) !important;
+  border: 1px solid var(--chg-glass-line) !important;
+  border-radius: var(--chg-radius-md) !important;
+  box-shadow: var(--chg-glass-shadow-soft) !important;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+}
+.wh-kc { border-color: var(--chg-glass-line) !important; }
+.wh-left {
+  background: var(--chg-glass-surface-1) !important;
+  border-color: var(--chg-glass-line) !important;
+}
+.wh-main { background: transparent !important; min-width: 0; }
+.wh-dept-hd, .wh-sub-item, .wh-tbl-hd, .wh-tbl-row, .wh-footer {
+  border-color: var(--chg-glass-line) !important;
+}
+.wh-dept-hd.active, .wh-sub-item.active, .wh-tbl-row:hover { background: var(--chg-glass-surface-2) !important; }
+.wh-tbl-hd { background: var(--chg-glass-surface-1) !important; }
+.wh-tbl-row { background: rgba(255, 255, 255, 0.44) !important; }
+.wh-footer { background: var(--chg-glass-surface-1) !important; }
+
 /* Controls */
 :where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn,
   .tab-btn, .tg-btn, .filter-sel, .form-input, .form-select,
@@ -254,4 +307,54 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Dashboard surfaces use explicit classes so inline legacy styles cannot
+   recreate a second, opaque visual language. */
+.dashboard-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--chg-space-6);
+  background: transparent;
+}
+.dashboard-page > div { width: min(100%, 1100px); margin: 0 auto; }
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--chg-space-3);
+  margin-bottom: var(--chg-space-6);
+}
+.dashboard-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--chg-space-4);
+}
+.dashboard-stat-card,
+.dashboard-card {
+  min-width: 0;
+  padding: var(--chg-space-5) !important;
+  background: var(--chg-glass-surface-2) !important;
+  border: 1px solid var(--chg-glass-line) !important;
+  border-radius: var(--chg-radius-md) !important;
+  box-shadow: var(--chg-glass-shadow-soft) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+}
+.dashboard-stat-card { min-height: 82px; }
+.dashboard-list-row,
+.dashboard-action-link {
+  color: var(--chg-glass-ink) !important;
+  border-color: var(--chg-glass-line) !important;
+  transition: background 180ms ease, padding 180ms ease;
+}
+.dashboard-list-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; text-decoration: none; }
+.dashboard-list-row:hover,
+.dashboard-action-link:hover { background: var(--chg-glass-surface-1); }
+.dashboard-action-link { display: block; padding: 8px 0; text-decoration: none; color: var(--chg-glass-marine) !important; }
+
+@media (max-width: 767px) {
+  .dashboard-page { padding: var(--chg-space-4); }
+  .dashboard-card-grid { grid-template-columns: 1fr; }
+  .dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

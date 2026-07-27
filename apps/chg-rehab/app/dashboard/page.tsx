@@ -7,12 +7,7 @@ export const dynamic = "force-dynamic";
 
 function StatCard({ value, label, color, href }: { value: number | string; label: string; color: string; href?: string }) {
   const content = (
-    <div style={{
-      background: "#fff", borderRadius: 10,
-      border: "0.5px solid rgba(0,0,0,0.06)",
-      padding: "16px 18px",
-      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    }}>
+    <div className="dashboard-stat-card">
       <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", color, marginBottom: 4 }}>{value}</div>
       <div style={{ fontSize: 11, color: "#6B6862", fontWeight: 500 }}>{label}</div>
     </div>
@@ -60,7 +55,7 @@ export default async function DashboardPage() {
   today.setHours(0, 0, 0, 0);
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: 24, background: "#F5F4F0" }}>
+    <div className="dashboard-page">
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
 
         {/* Header */}
@@ -74,7 +69,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 }}>
+        <div className="dashboard-kpi-grid">
           <StatCard value={totalProperties} label="Total properties" color="#0A0A0A" href="/property" />
           <StatCard value={activeRehabs.length} label="Active rehabs" color="#1F4D5C" href="/rehab" />
           <StatCard value={activeRentals.length} label="Active rentals" color="#1F7A4D" href="/property" />
@@ -83,10 +78,10 @@ export default async function DashboardPage() {
           <StatCard value={deals.length} label="Open deals" color="#2A2826" href="/pipeline" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="dashboard-card-grid">
 
           {/* Active Rehabs */}
-          <div style={{ background: "#fff", borderRadius: 10, border: "0.5px solid rgba(0,0,0,0.06)", padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="dashboard-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>Active Rehabs</div>
               <Link href="/rehab" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
@@ -95,7 +90,7 @@ export default async function DashboardPage() {
               <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No active rehab projects.</div>
             ) : (
               activeRehabs.slice(0, 5).map(p => (
-                <Link key={p.id} href={`/rehab/${encodeURIComponent(p.code)}/overview`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "0.5px solid #F5F4F0", textDecoration: "none", color: "inherit" }}>
+                <Link key={p.id} href={`/rehab/${encodeURIComponent(p.code)}/overview`} className="dashboard-list-row">
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 500 }}>{p.property.address.split(",")[0]}</div>
                     <div style={{ fontSize: 10, color: "#A8A49C" }}>{p.code}</div>
@@ -107,7 +102,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Pipeline */}
-          <div style={{ background: "#fff", borderRadius: 10, border: "0.5px solid rgba(0,0,0,0.06)", padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="dashboard-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>Open Deals</div>
               <Link href="/pipeline" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
@@ -116,7 +111,7 @@ export default async function DashboardPage() {
               <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No open deals in pipeline.</div>
             ) : (
               deals.map(d => (
-                <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "0.5px solid #F5F4F0" }}>
+                <div key={d.id} className="dashboard-list-row">
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 500 }}>{d.address.split(",")[0]}</div>
                     <div style={{ fontSize: 10, color: "#A8A49C" }}>{d.stage}</div>
@@ -128,7 +123,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* All Properties */}
-          <div style={{ background: "#fff", borderRadius: 10, border: "0.5px solid rgba(0,0,0,0.06)", padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="dashboard-card">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>Property Portfolio</div>
               <Link href="/property" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
@@ -137,7 +132,7 @@ export default async function DashboardPage() {
               <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No properties added yet.</div>
             ) : (
               properties.slice(0, 5).map(p => (
-                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "0.5px solid #F5F4F0" }}>
+                <div key={p.id} className="dashboard-list-row">
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 500 }}>{p.address.split(",")[0]}</div>
                     <div style={{ fontSize: 10, color: "#A8A49C" }}>{[p.city, p.state].filter(Boolean).join(", ")}</div>
@@ -153,7 +148,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Quick Links */}
-          <div style={{ background: "#fff", borderRadius: 10, border: "0.5px solid rgba(0,0,0,0.06)", padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="dashboard-card">
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Quick Actions</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[
@@ -164,7 +159,7 @@ export default async function DashboardPage() {
                 { label: "→ Run underwriting analysis", href: "/underwriting" },
                 { label: "→ My tasks & calendar", href: "/command-center" },
               ].map(({ label, href }) => (
-                <Link key={href} href={href} style={{ fontSize: 12, color: "#1F4D5C", textDecoration: "none", padding: "6px 0", borderBottom: "0.5px solid #F5F4F0" }}>
+                <Link key={href} href={href} className="dashboard-action-link">
                   {label}
                 </Link>
               ))}
