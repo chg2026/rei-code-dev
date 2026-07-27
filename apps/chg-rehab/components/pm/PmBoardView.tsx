@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import PmQuickCreate from "./PmQuickCreate";
+import PmCreateTaskModal from "./PmCreateTaskModal";
 
 interface PmBoardViewProps {
   tasks: any[];
@@ -126,12 +126,12 @@ export default function PmBoardView({ tasks, statuses, listId, onTaskClick, onTa
 
               {/* Quick create */}
               {quickCreate === status.id ? (
-                <PmQuickCreate
+                <PmCreateTaskModal
                   listId={listId}
-                  statusId={status.id}
-                  defaultStatus={status}
+                  statuses={statuses}
+                  defaultStatusId={status.id}
                   onCreated={(t) => { onTaskCreated(t); setQuickCreate(null); }}
-                  onCancel={() => setQuickCreate(null)}
+                  onClose={() => setQuickCreate(null)}
                 />
               ) : (
                 <button
