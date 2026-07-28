@@ -107,8 +107,14 @@ const BASE_SECTIONS: NavSection[] = [
 
 type PmList = { id: string; name: string; color: string | null };
 type PmSpace = { id: string; name: string; color: string | null; lists: PmList[] };
+type PointerNavigationHandler = (event: React.MouseEvent<HTMLAnchorElement>) => void;
 
-function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin: boolean; iconOnly: boolean }) {
+function PmNavTree({ pathname, isAdmin, iconOnly, onPointerNavigate }: {
+  pathname: string;
+  isAdmin: boolean;
+  iconOnly: boolean;
+  onPointerNavigate: PointerNavigationHandler;
+}) {
   const [spaces, setSpaces] = useState<PmSpace[]>([]);
   const [openSpaces, setOpenSpaces] = useState<Set<string>>(new Set());
 
@@ -139,6 +145,7 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
         href="/pm"
         className={`nav-item${isPmActive ? " active" : ""}`}
         title="Company Departments"
+        onClick={onPointerNavigate}
       >
         <LayoutGrid className="nav-icon" size={18} />
       </Link>
@@ -148,7 +155,7 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
   return (
     <div className="pm-nav-tree pm-tree-spaces">
       {spaces.length === 0 && isAdmin && (
-        <Link href="/pm" className="nav-item pm-tree-empty">
+        <Link href="/pm" className="nav-item pm-tree-empty" onClick={onPointerNavigate}>
           + New Department
         </Link>
       )}
@@ -183,6 +190,7 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
                       key={list.id}
                       href={href}
                       className={`nav-item pm-list-item${pathname.startsWith(href) ? " active" : ""}`}
+                      onClick={onPointerNavigate}
                     >
                       <span
                         className="pm-list-dot"
@@ -192,7 +200,7 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
                     </Link>
                   );
                 })}
-                <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list">
+                <Link href={`/pm/${space.id}`} className="nav-item pm-list-item pm-add-list" onClick={onPointerNavigate}>
                   + New List
                 </Link>
               </div>
@@ -201,7 +209,7 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
         );
       })}
       {spaces.length > 0 && (
-        <Link href="/pm" className="nav-item pm-manage-link">
+        <Link href="/pm" className="nav-item pm-manage-link" onClick={onPointerNavigate}>
           Manage departments ›
         </Link>
       )}
@@ -312,6 +320,12 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
 
+  const onPointerNavigate: PointerNavigationHandler = (event) => {
+    // Pointer clicks retain focus on the selected link. Collapse explicitly so
+    // mouse navigation still returns to the icon rail once the route changes.
+    if (!isMobile && event.detail > 0) setExpanded(false);
+  };
+
   const brandLabel = companyName || "CHG";
 
   return (
@@ -335,7 +349,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
       }}
     >
       <div className="sidebar-head">
-        <Link href="/" className="brand" title={brandLabel}>
+        <Link href="/" className="brand" title={brandLabel} onClick={onPointerNavigate}>
           <span className="brand-mark" style={{ fontSize: iconOnly ? 20 : (brandLabel.length > 12 ? 16 : 26) }}>
             {iconOnly ? brandLabel.charAt(0).toUpperCase() : brandLabel}
           </span>
@@ -353,7 +367,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
               </div>
             ) : null}
             {section.items.map((item) => {
-              if (item.href === "/pm") return <PmNavTree key="/pm" pathname={pathname} isAdmin={isAdmin} iconOnly={iconOnly} />;
+              if (item.href === "/pm") return <PmNavTree key="/pm" pathname={pathname} isAdmin={isAdmin} iconOnly={iconOnly} onPointerNavigate={onPointerNavigate} />;
               const active = isActive(item.href);
               const Icon = ICONS[item.href];
               return (
@@ -362,6 +376,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
                   href={item.href}
                   className={active ? "nav-item active" : "nav-item"}
                   title={iconOnly ? item.label : undefined}
+                  onClick={onPointerNavigate}
                 >
                   {Icon ? <Icon className="nav-icon" size={18} /> : null}
                   {!iconOnly ? item.label : null}

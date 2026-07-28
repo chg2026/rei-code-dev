@@ -75,6 +75,45 @@ describe("TopNav hover rail", () => {
     expect(sidebar).toHaveClass("collapsed");
   });
 
+  it("collapses after pointer navigation even though the clicked link retains focus", () => {
+    render(<TopNav user={user} companyName="CHG" />);
+
+    const sidebar = document.querySelector("aside.sidebar");
+    const calendar = screen.getByTitle("Calendar");
+    expect(sidebar).not.toBeNull();
+
+    fireEvent.mouseEnter(sidebar!);
+    calendar.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(calendar, { detail: 1 });
+
+    expect(sidebar).toHaveClass("collapsed");
+  });
+
+  it("collapses after pointer navigation to a nested Company Departments list", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      json: async () => ({
+        spaces: [{
+          id: "operations",
+          name: "Operations",
+          color: null,
+          lists: [{ id: "work-queue", name: "Work queue", color: null }],
+        }],
+      }),
+    } as Response);
+    render(<TopNav user={user} companyName="CHG" />);
+
+    const sidebar = document.querySelector("aside.sidebar");
+    expect(sidebar).not.toBeNull();
+    fireEvent.mouseEnter(sidebar!);
+
+    fireEvent.click(await screen.findByRole("button", { name: /operations/i }), { detail: 1 });
+    const workQueue = await screen.findByText("Work queue");
+    workQueue.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(workQueue, { detail: 1 });
+
+    expect(sidebar).toHaveClass("collapsed");
+  });
+
   it("collapses after a resize drag ends outside the rail", () => {
     render(<TopNav user={user} companyName="CHG" />);
 
@@ -92,12 +131,15 @@ describe("TopNav hover rail", () => {
     expect(sidebar).toHaveClass("collapsed");
   });
 
-  it("opens for keyboard focus and preserves the 64px mobile rail", () => {
+  it("preserves keyboard navigation and the 64px mobile rail", () => {
     const { unmount } = render(<TopNav user={user} companyName="CHG" />);
     const sidebar = document.querySelector("aside.sidebar");
+    const dashboard = screen.getByTitle("Dashboard");
     expect(sidebar).not.toBeNull();
 
-    fireEvent.focus(screen.getByTitle("Dashboard"));
+    fireEvent.focus(dashboard);
+    dashboard.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(dashboard, { detail: 0 });
     expect(sidebar).not.toHaveClass("collapsed");
 
     unmount();
