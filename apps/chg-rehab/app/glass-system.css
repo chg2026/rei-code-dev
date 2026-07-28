@@ -16,6 +16,9 @@
   --chg-glass-brass: #b8895a;
   --chg-glass-success: #1f7a4d;
   --chg-glass-danger: #b43a2e;
+  --chg-glass-amber: #9a631c;
+  --chg-glass-amber-soft: rgba(182, 130, 53, 0.13);
+  --chg-glass-sky: #8ea3b2;
 
   --chg-glass-surface-1: rgba(255, 255, 255, 0.34);
   --chg-glass-surface-2: rgba(255, 255, 255, 0.52);
@@ -25,6 +28,7 @@
   --chg-glass-line-strong: rgba(31, 77, 92, 0.26);
   --chg-glass-shadow: 0 18px 46px rgba(31, 77, 92, 0.10), 0 2px 8px rgba(31, 77, 92, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   --chg-glass-shadow-soft: 0 8px 24px rgba(31, 77, 92, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+
 
   --chg-radius-xs: 8px;
   --chg-radius-sm: 12px;
@@ -42,6 +46,12 @@
 
   --chg-font-sans: "Geist", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --chg-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --chg-font-display: "Source Serif 4", "Source Serif Pro", Georgia, serif;
+
+  /* T3 consumes these rails. They are tokens only in this task; behavior
+     remains unchanged until the app-shell task is approved and implemented. */
+  --chg-sidebar-rail-width: 76px;
+  --chg-sidebar-expanded-width: 252px;
 
   /* Compatibility map for the legacy module CSS. */
   --paper: var(--chg-glass-surface-3);
@@ -90,9 +100,10 @@ textarea {
 body {
   color: var(--chg-glass-ink) !important;
   background:
-    radial-gradient(circle at 88% 0%, rgba(31, 77, 92, 0.14), transparent 32rem),
-    radial-gradient(circle at 4% 92%, rgba(184, 137, 90, 0.14), transparent 28rem),
-    linear-gradient(135deg, #edf1f1 0%, #f8f6f1 52%, #eef0ed 100%) !important;
+    radial-gradient(circle at 12% -12%, rgba(182, 130, 53, 0.26), transparent 38rem),
+    radial-gradient(circle at 96% 0%, rgba(142, 163, 178, 0.24), transparent 42rem),
+    radial-gradient(circle at 64% 112%, rgba(219, 175, 112, 0.18), transparent 38rem),
+    linear-gradient(155deg, #f8f6f3 0%, #efebe5 48%, #e8e8e6 100%) !important;
   font-size: 14px;
   line-height: 1.45;
 }
@@ -111,7 +122,13 @@ body::before {
   letter-spacing: -0.025em;
 }
 
-:where(h1) { font-size: clamp(1.65rem, 2.2vw, 2.15rem); line-height: 1.1; font-weight: 650; }
+:where(h1) {
+  font-family: var(--chg-font-display);
+  font-size: clamp(1.85rem, 2.35vw, 2.45rem);
+  line-height: 1.04;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
 :where(h2) { font-size: clamp(1.25rem, 1.7vw, 1.55rem); line-height: 1.2; font-weight: 620; }
 :where(h3) { font-size: 1rem; line-height: 1.25; font-weight: 600; }
 :where(p, label, td, th, button, input, select, textarea) { letter-spacing: -0.005em; }
@@ -130,21 +147,21 @@ body::before {
 
 /* App chrome */
 .sidebar {
-  background: var(--chg-glass-surface-2) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.42)) !important;
   border: 1px solid var(--chg-glass-rim) !important;
   border-radius: var(--chg-radius-xl) !important;
   box-shadow: var(--chg-glass-shadow) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
-  backdrop-filter: blur(30px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(165%) !important;
+  backdrop-filter: blur(30px) saturate(165%) !important;
 }
 
 .topbar {
-  background: var(--chg-glass-surface-2) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.40)) !important;
   border: 1px solid var(--chg-glass-rim) !important;
   border-radius: var(--chg-radius-lg) !important;
   box-shadow: var(--chg-glass-shadow) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(125%) !important;
-  backdrop-filter: blur(30px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(165%) !important;
+  backdrop-filter: blur(30px) saturate(165%) !important;
 }
 
 .main-col,
@@ -170,8 +187,8 @@ body::before {
 
 .nav-item.active {
   color: var(--chg-glass-marine) !important;
-  background: var(--chg-glass-surface-3) !important;
-  border-color: var(--chg-glass-rim) !important;
+  background: linear-gradient(90deg, var(--chg-glass-amber-soft), rgba(255, 255, 255, 0.34)) !important;
+  border-color: rgba(182, 130, 53, 0.28) !important;
   box-shadow: var(--chg-glass-shadow-soft) !important;
 }
 
@@ -266,6 +283,31 @@ body::before {
 }
 
 :where(.btn-primary, .btn-sm.btn-primary, .tg-btn.active):hover { background: var(--chg-glass-marine-ink) !important; }
+
+/* Shared desktop interaction contract. Individual modules may add contextual
+   behavior, but their defaults should feel like one product. */
+:where(button, [role="button"], a, select, input, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn, .tab-btn, .tg-btn, .filter-sel, .view-btn) {
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+:where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn, .view-btn):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.btn, .btn-sm, .icon-btn, .sidebar-toggle, .sign-out-btn, .tab-btn, .tg-btn, .filter-sel, .view-btn) {
+    transition: none !important;
+  }
+}
+
+::selection {
+  background: rgba(182, 130, 53, 0.26);
+  color: var(--chg-glass-ink);
+}
 
 :where(.form-input, .form-select, .form-textarea, .search-input, .admin-input, .admin-select, .sap-input) {
   min-height: 38px;
