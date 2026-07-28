@@ -11,7 +11,7 @@
    ========================================================================== */
 
 :root {
-  --sidebar-width: 240px;
+  --sidebar-width: 76px;
   --paper:        #FFFFFF;
   --bone:         #F5F4F0;
   --mist:         #EDEBE6;
@@ -260,6 +260,7 @@ body {
   transition: margin-left 180ms ease;
 }
 @media (max-width: 767px) {
+  :root { --sidebar-width: 64px; }
   .main-col { margin-left: calc(var(--sidebar-width, 64px) + 18px); }
 }
 

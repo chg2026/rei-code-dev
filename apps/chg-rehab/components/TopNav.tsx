@@ -24,8 +24,6 @@ import {
   Settings,
   ShieldCheck,
   UserCog,
-  PanelLeftClose,
-  PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/session";
@@ -211,72 +209,73 @@ function PmNavTree({ pathname, isAdmin, iconOnly }: { pathname: string; isAdmin:
   );
 }
 
-const MIN_WIDTH = 60;
+const MIN_EXPANDED_WIDTH = 200;
 const MAX_WIDTH = 340;
-const DEFAULT_WIDTH = 240;
-const COLLAPSED_WIDTH = 64;
+const DEFAULT_EXPANDED_WIDTH = 252;
+const DESKTOP_RAIL_WIDTH = 76;
+const MOBILE_RAIL_WIDTH = 64;
 
 export default function TopNav({ user, companyName }: { user: SessionUser; companyName?: string | null }) {
   const pathname = usePathname();
   const isAdmin = user.role === "Admin";
 
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(DEFAULT_EXPANDED_WIDTH);
+  const [expanded, setExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dragging, setDragging] = useState(false);
   const asideRef = useRef<HTMLElement | null>(null);
   const draggingRef = useRef(false);
+  const pointerInsideRef = useRef(false);
 
-  // Hydrate persisted state + mobile auto-collapse.
+  // The desktop shell is an icon rail at rest. Hovering or keyboard focus
+  // reveals the full navigation without changing the workspace width.
   useEffect(() => {
     setMounted(true);
     const stored = Number(localStorage.getItem("chg-sidebar-width"));
-    if (stored >= MIN_WIDTH && stored <= MAX_WIDTH) setWidth(stored);
-    const storedCollapsed = localStorage.getItem("chg-sidebar-collapsed");
-    if (window.innerWidth < 768) setCollapsed(true);
-    else if (storedCollapsed === "1") setCollapsed(true);
+    if (stored >= MIN_EXPANDED_WIDTH && stored <= MAX_WIDTH) setWidth(stored);
+    setIsMobile(window.innerWidth < 768);
   }, []);
 
-  // Auto-collapse on small viewports.
+  // Mobile stays compact until its dedicated navigation pattern is designed.
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth < 768) setCollapsed(true);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setExpanded(false);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const iconOnly = collapsed || width < 120;
-  const effWidth = collapsed ? COLLAPSED_WIDTH : width;
+  const iconOnly = !expanded;
+  const railWidth = isMobile ? MOBILE_RAIL_WIDTH : DESKTOP_RAIL_WIDTH;
 
-  // Expose width to the layout so the main column margin tracks the sidebar.
+  // The workspace always reserves the rail only. The expanded navigation
+  // overlays it, so hovering never pushes boards, tables, or property panes.
   useEffect(() => {
-    document.documentElement.style.setProperty("--sidebar-width", `${effWidth}px`);
-  }, [effWidth]);
+    document.documentElement.style.setProperty("--sidebar-width", `${railWidth}px`);
+  }, [railWidth]);
 
   // Persist.
   useEffect(() => {
     if (mounted) localStorage.setItem("chg-sidebar-width", String(width));
   }, [width, mounted]);
-  useEffect(() => {
-    if (mounted) localStorage.setItem("chg-sidebar-collapsed", collapsed ? "1" : "0");
-  }, [collapsed, mounted]);
-
   // Drag-to-resize.
   const onHandleDown = useCallback((e: React.MouseEvent) => {
-    if (collapsed) return;
+    if (!expanded) return;
     e.preventDefault();
     draggingRef.current = true;
     setDragging(true);
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
-  }, [collapsed]);
+  }, [expanded]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!draggingRef.current || !asideRef.current) return;
       const left = asideRef.current.getBoundingClientRect().left;
-      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX - left));
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_EXPANDED_WIDTH, e.clientX - left));
       setWidth(next);
     };
     const onUp = () => {
@@ -285,6 +284,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
       setDragging(false);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
+      if (!pointerInsideRef.current && !asideRef.current?.contains(document.activeElement)) setExpanded(false);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -318,7 +318,21 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
     <aside
       ref={asideRef}
       className={`sidebar${iconOnly ? " collapsed" : ""}${dragging ? " dragging" : ""}`}
-      style={{ width: effWidth }}
+      style={expanded ? { width } : undefined}
+      onMouseEnter={() => {
+        pointerInsideRef.current = true;
+        if (!isMobile) setExpanded(true);
+      }}
+      onMouseLeave={() => {
+        pointerInsideRef.current = false;
+        if (!isMobile && !dragging && !asideRef.current?.contains(document.activeElement)) setExpanded(false);
+      }}
+      onFocusCapture={() => {
+        if (!isMobile) setExpanded(true);
+      }}
+      onBlurCapture={(event) => {
+        if (!isMobile && !pointerInsideRef.current && !event.currentTarget.contains(event.relatedTarget)) setExpanded(false);
+      }}
     >
       <div className="sidebar-head">
         <Link href="/" className="brand" title={brandLabel}>
@@ -327,15 +341,6 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
           </span>
           {!iconOnly ? <span className="brand-sub">Rehab Platform</span> : null}
         </Link>
-        <button
-          type="button"
-          className="sidebar-toggle"
-          onClick={() => setCollapsed((v) => !v)}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
       </div>
 
       <div className="sidebar-scroll">
@@ -368,7 +373,7 @@ export default function TopNav({ user, companyName }: { user: SessionUser; compa
         {!iconOnly ? <OnboardingChecklist /> : null}
       </div>
 
-      {!collapsed ? (
+      {expanded ? (
         <div
           className="sidebar-resize"
           onMouseDown={onHandleDown}
