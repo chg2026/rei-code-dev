@@ -5,14 +5,14 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-function StatCard({ value, label, color, href }: { value: number | string; label: string; color: string; href?: string }) {
+function StatCard({ value, label, tone, href }: { value: number | string; label: string; tone: string; href?: string }) {
   const content = (
-    <div className="dashboard-stat-card">
-      <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", color, marginBottom: 4 }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#6B6862", fontWeight: 500 }}>{label}</div>
+    <div className={`dashboard-stat-card dashboard-stat-card--${tone}`}>
+      <div className="dashboard-stat-value">{value}</div>
+      <div className="dashboard-stat-label">{label}</div>
     </div>
   );
-  if (href) return <Link href={href} style={{ textDecoration: "none" }}>{content}</Link>;
+  if (href) return <Link href={href} className="dashboard-stat-link">{content}</Link>;
   return content;
 }
 
@@ -56,46 +56,46 @@ export default async function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <div className="dashboard-content">
 
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 4px", color: "#0A0A0A" }}>
+        <header className="dashboard-header">
+          <h1 className="dashboard-title">
             Company Overview
           </h1>
-          <div style={{ fontSize: 12, color: "#6B6862" }}>
+          <div className="dashboard-date">
             {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </div>
-        </div>
+        </header>
 
         {/* KPI row */}
         <div className="dashboard-kpi-grid">
-          <StatCard value={totalProperties} label="Total properties" color="#0A0A0A" href="/property" />
-          <StatCard value={activeRehabs.length} label="Active rehabs" color="#1F4D5C" href="/rehab" />
-          <StatCard value={activeRentals.length} label="Active rentals" color="#1F7A4D" href="/property" />
-          <StatCard value={acquired.length} label="Acquired" color="#B8895A" href="/property" />
-          <StatCard value={listed.length} label="Listed" color="#7D4A00" href="/property" />
-          <StatCard value={deals.length} label="Open deals" color="#2A2826" href="/pipeline" />
+          <StatCard value={totalProperties} label="Total properties" tone="ink" href="/property" />
+          <StatCard value={activeRehabs.length} label="Active rehabs" tone="marine" href="/rehab" />
+          <StatCard value={activeRentals.length} label="Active rentals" tone="green" href="/property" />
+          <StatCard value={acquired.length} label="Acquired" tone="bronze" href="/property" />
+          <StatCard value={listed.length} label="Listed" tone="amber" href="/property" />
+          <StatCard value={deals.length} label="Open deals" tone="charcoal" href="/pipeline" />
         </div>
 
         <div className="dashboard-card-grid">
 
           {/* Active Rehabs */}
           <div className="dashboard-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Active Rehabs</div>
-              <Link href="/rehab" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
+            <div className="dashboard-card-header">
+              <div className="dashboard-card-title">Active Rehabs</div>
+              <Link href="/rehab" className="dashboard-view-all">View all →</Link>
             </div>
             {activeRehabs.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No active rehab projects.</div>
+              <div className="dashboard-empty-state">No active rehab projects.</div>
             ) : (
               activeRehabs.slice(0, 5).map(p => (
                 <Link key={p.id} href={`/rehab/${encodeURIComponent(p.code)}/overview`} className="dashboard-list-row">
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{p.property.address.split(",")[0]}</div>
-                    <div style={{ fontSize: 10, color: "#A8A49C" }}>{p.code}</div>
+                    <div className="dashboard-row-primary">{p.property.address.split(",")[0]}</div>
+                    <div className="dashboard-row-secondary">{p.code}</div>
                   </div>
-                  {p.budget && <div style={{ fontSize: 11, color: "#1F4D5C", fontWeight: 500 }}>${Math.round(Number(p.budget)).toLocaleString()}</div>}
+                  {p.budget && <div className="dashboard-row-value">${Math.round(Number(p.budget)).toLocaleString()}</div>}
                 </Link>
               ))
             )}
@@ -103,20 +103,20 @@ export default async function DashboardPage() {
 
           {/* Pipeline */}
           <div className="dashboard-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Open Deals</div>
-              <Link href="/pipeline" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
+            <div className="dashboard-card-header">
+              <div className="dashboard-card-title">Open Deals</div>
+              <Link href="/pipeline" className="dashboard-view-all">View all →</Link>
             </div>
             {deals.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No open deals in pipeline.</div>
+              <div className="dashboard-empty-state">No open deals in pipeline.</div>
             ) : (
               deals.map(d => (
                 <div key={d.id} className="dashboard-list-row">
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{d.address.split(",")[0]}</div>
-                    <div style={{ fontSize: 10, color: "#A8A49C" }}>{d.stage}</div>
+                    <div className="dashboard-row-primary">{d.address.split(",")[0]}</div>
+                    <div className="dashboard-row-secondary">{d.stage}</div>
                   </div>
-                  {d.askingPrice && <div style={{ fontSize: 11, color: "#2A2826", fontWeight: 500 }}>${Math.round(Number(d.askingPrice)).toLocaleString()}</div>}
+                  {d.askingPrice && <div className="dashboard-row-value dashboard-row-value--ink">${Math.round(Number(d.askingPrice)).toLocaleString()}</div>}
                 </div>
               ))
             )}
@@ -124,21 +124,21 @@ export default async function DashboardPage() {
 
           {/* All Properties */}
           <div className="dashboard-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Property Portfolio</div>
-              <Link href="/property" style={{ fontSize: 11, color: "#1F4D5C", textDecoration: "none" }}>View all →</Link>
+            <div className="dashboard-card-header">
+              <div className="dashboard-card-title">Property Portfolio</div>
+              <Link href="/property" className="dashboard-view-all">View all →</Link>
             </div>
             {properties.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#A8A49C", padding: "12px 0" }}>No properties added yet.</div>
+              <div className="dashboard-empty-state">No properties added yet.</div>
             ) : (
               properties.slice(0, 5).map(p => (
                 <div key={p.id} className="dashboard-list-row">
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{p.address.split(",")[0]}</div>
-                    <div style={{ fontSize: 10, color: "#A8A49C" }}>{[p.city, p.state].filter(Boolean).join(", ")}</div>
+                    <div className="dashboard-row-primary">{p.address.split(",")[0]}</div>
+                    <div className="dashboard-row-secondary">{[p.city, p.state].filter(Boolean).join(", ")}</div>
                   </div>
                   {p.status && (
-                    <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 999, background: "#E8EFF1", color: "#1F4D5C", fontWeight: 500 }}>
+                    <span className="dashboard-status-chip" title={p.status}>
                       {p.status}
                     </span>
                   )}
@@ -149,8 +149,8 @@ export default async function DashboardPage() {
 
           {/* Quick Links */}
           <div className="dashboard-card">
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Quick Actions</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="dashboard-card-title">Quick Actions</div>
+            <div className="dashboard-actions">
               {[
                 { label: "→ Add a property", href: "/property" },
                 { label: "→ New pipeline deal", href: "/pipeline?new=1" },
