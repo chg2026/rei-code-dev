@@ -104,11 +104,7 @@ function TypeBadge({ type }: { type: "sfr" | "mf" | null }) {
   if (!type) return null;
   const isMf = type === "mf";
   return (
-    <span style={{
-      fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
-      background: isMf ? "rgba(52,199,89,0.1)" : "rgba(31,77,92,0.1)",
-      color: isMf ? "#1A6B35" : "#143641",
-    }}>
+    <span className={`pipeline-badge pipeline-badge--${isMf ? "mf" : "sfr"}`}>
       {isMf ? "MF" : "SFR"}
     </span>
   );
@@ -119,11 +115,7 @@ function StrategyBadge({ deal }: { deal: PipelineDealRow }) {
   if (!s) return null;
   const isBrrrr = s === "brrrr";
   return (
-    <span style={{
-      fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 10,
-      background: isBrrrr ? "rgba(155,89,182,0.12)" : "rgba(255,159,10,0.12)",
-      color: isBrrrr ? "#6B2FA0" : "#7D4A00",
-    }}>
+    <span className={`pipeline-badge pipeline-badge--${isBrrrr ? "brrrr" : "flip"}`}>
       {isBrrrr ? "BRRRR" : "Flip"}
     </span>
   );
@@ -131,13 +123,7 @@ function StrategyBadge({ deal }: { deal: PipelineDealRow }) {
 
 function Avatar({ initials }: { initials: string }) {
   return (
-    <div style={{
-      width: 20, height: 20, borderRadius: "50%",
-      background: "linear-gradient(135deg,#A8C4D0,#5B8FA8)",
-      color: "#fff", fontSize: 8, fontWeight: 700,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      flexShrink: 0,
-    }}>
+    <div className="pipeline-avatar">
       {initials}
     </div>
   );
@@ -155,29 +141,19 @@ function DealCard({ deal }: { deal: PipelineDealRow }) {
   const initials = assignee === "—" ? "??" : assignee.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div style={{
-      background: "#fff", borderRadius: 8, padding: "11px 12px",
-      border: overdue ? "0.5px solid rgba(255,59,48,0.4)" : "0.5px solid rgba(0,0,0,0.06)",
-      borderLeft: overdue ? "3px solid #FF3B30" : undefined,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-      cursor: "pointer",
-      opacity: isClosed ? 0.75 : 1,
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: overdue ? "#8C1515" : "#1D1D1F", marginBottom: 5, letterSpacing: "-0.01em" }}>
+    <div className={`pipeline-deal-card${overdue ? " pipeline-deal-card--overdue" : ""}${isClosed ? " pipeline-deal-card--closed" : ""}`}>
+      <div className="pipeline-deal-address">
         {overdue ? `⚠ ${deal.address}` : deal.address}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7, flexWrap: "wrap" }}>
+      <div className="pipeline-deal-badges">
         <TypeBadge type={type} />
         <StrategyBadge deal={deal} />
       </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "#1D1D1F" }}>{formatMoney(price)}</div>
-      <div style={{ fontSize: 10, color: overdue ? "#8C1515" : isClosed ? "#1A6B35" : "#AEAEB2", marginTop: 2 }}>{metric}</div>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginTop: 8, paddingTop: 7, borderTop: "0.5px solid rgba(0,0,0,0.06)",
-      }}>
+      <div className="pipeline-deal-price">{formatMoney(price)}</div>
+      <div className="pipeline-deal-metric">{metric}</div>
+      <div className="pipeline-deal-footer">
         <Avatar initials={initials} />
-        <span style={{ fontSize: 9, color: overdue ? "#8C1515" : "#AEAEB2" }}>
+        <span className="pipeline-deal-days">
           {isClosed && deal.closedAt
             ? new Date(deal.closedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
             : `Day ${days}`}
@@ -216,82 +192,64 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
 
   const filtered = filterDeals(activeDeals);
 
-  const btnActive: React.CSSProperties = {
-    background: "#E8EFF1", color: "#143641", border: "0.5px solid rgba(31,77,92,0.3)",
-  };
-  const btnInactive: React.CSSProperties = {
-    background: "#F2F2F7", color: "#6E6E73", border: "0.5px solid rgba(0,0,0,0.12)",
-  };
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
+    <div className="pipeline-view">
 
       {/* ── Header ── */}
-      <div style={{
-        background: "#fff", borderBottom: "0.5px solid rgba(0,0,0,0.06)",
-        padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
-      }}>
+      <header className="pipeline-header">
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.025em", color: "#1D1D1F" }}>Pipeline</div>
-          <div style={{ fontSize: 12, color: "#6E6E73", marginTop: 3 }}>
+          <h1 className="pipeline-title">Pipeline</h1>
+          <div className="pipeline-subtitle">
             Deal tracking · Identified → Offer Submitted → Under Contract → Due Diligence → Closed/Acquired
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="pipeline-header-actions">
           <button
             onClick={() => setView("board")}
-            style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", ...(view === "board" ? btnActive : btnInactive) }}
+            className={`pipeline-view-toggle${view === "board" ? " pipeline-view-toggle--active" : ""}`}
           >Board</button>
           <button
             onClick={() => setView("list")}
-            style={{ fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", ...(view === "list" ? btnActive : btnInactive) }}
+            className={`pipeline-view-toggle${view === "list" ? " pipeline-view-toggle--active" : ""}`}
           >List</button>
           <AddDealButton />
         </div>
-      </div>
+      </header>
 
       {/* ── Scrollable body ── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16, background: "#F5F5F7", minHeight: 0 }}>
+      <div className="pipeline-body">
 
         {/* ── Stats row ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+        <div className="pipeline-stats-grid">
           {[
-            { val: activeDeals.filter((d) => d.stage !== STAGES.Closed).length, lbl: "Total active",               color: "#143641" },
-            { val: underContractCount,                                             lbl: "Under contract",             color: "#7D4A00" },
-            { val: closedCount,                                                    lbl: "Closed this quarter",        color: "#1A6B35" },
-            { val: overdueCount,                                                   lbl: "Overdue / follow-up needed", color: "#8C1515" },
-          ].map(({ val, lbl, color }) => (
-            <div key={lbl} style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.06)", padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 3, color }}>{val}</div>
-              <div style={{ fontSize: 11, color: "#AEAEB2", fontWeight: 500 }}>{lbl}</div>
+            { val: activeDeals.filter((d) => d.stage !== STAGES.Closed).length, lbl: "Total active",               tone: "marine" },
+            { val: underContractCount,                                             lbl: "Under contract",             tone: "amber" },
+            { val: closedCount,                                                    lbl: "Closed this quarter",        tone: "success" },
+            { val: overdueCount,                                                   lbl: "Overdue / follow-up needed", tone: "danger" },
+          ].map(({ val, lbl, tone }) => (
+            <div key={lbl} className={`pipeline-stat pipeline-stat--${tone}`}>
+              <div className="pipeline-stat-value">{val}</div>
+              <div className="pipeline-stat-label">{lbl}</div>
             </div>
           ))}
         </div>
 
         {/* ── Filter bar ── */}
-        <div style={{
-          background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.06)",
-          padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap",
-        }}>
+        <div className="pipeline-filters">
           {(["all", "sfr", "mf", "mine"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setTypeFilter(f)}
-              style={{
-                fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 20,
-                border: "none", cursor: "pointer", fontFamily: "inherit",
-                background: typeFilter === f ? "#E8EFF1" : "transparent",
-                color: typeFilter === f ? "#143641" : "#6E6E73",
-              }}
+              className={`pipeline-filter${typeFilter === f ? " pipeline-filter--active" : ""}`}
             >
               {f === "all" ? "All deals" : f === "sfr" ? "SFR" : f === "mf" ? "Multifamily" : "Mine"}
             </button>
           ))}
-          <div style={{ flex: 1 }} />
+          <div className="pipeline-filter-spacer" />
           <select
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value)}
-            style={{ fontSize: 11, padding: "5px 10px", borderRadius: 20, border: "0.5px solid rgba(0,0,0,0.12)", background: "#F2F2F7", fontFamily: "inherit", color: "#6E6E73" }}
+            className="pipeline-filter-select"
           >
             <option value="">All stages</option>
             {WIREFRAME_COLS.map((c) => <option key={c.label}>{c.label}</option>)}
@@ -299,7 +257,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
           <select
             value={teamFilter}
             onChange={(e) => setTeamFilter(e.target.value)}
-            style={{ fontSize: 11, padding: "5px 10px", borderRadius: 20, border: "0.5px solid rgba(0,0,0,0.12)", background: "#F2F2F7", fontFamily: "inherit", color: "#6E6E73" }}
+            className="pipeline-filter-select"
           >
             <option value="">All team</option>
           </select>
@@ -307,26 +265,23 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
 
         {/* ── Board view ── */}
         {view === "board" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10, minHeight: 400 }}>
+          <div className="pipeline-board">
             {WIREFRAME_COLS.map((col) => {
               const colDeals = filtered.filter((d) => col.stages.includes(d.stage));
               return (
-                <div key={col.label} style={{ background: "#FAFAFA", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
-                  <div style={{
-                    padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between",
-                    borderBottom: "0.5px solid rgba(0,0,0,0.06)", background: "#fff",
-                  }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#6E6E73" }}>
+                <div key={col.label} className="pipeline-column">
+                  <div className="pipeline-column-header">
+                    <span className="pipeline-column-label">
                       {col.label}
                     </span>
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10, background: "#F2F2F7", color: "#AEAEB2" }}>
+                    <span className="pipeline-column-count">
                       {colDeals.length}
                     </span>
                   </div>
-                  <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div className="pipeline-column-deals">
                     {colDeals.map((d) => <DealCard key={d.id} deal={d} />)}
                     {colDeals.length === 0 && (
-                      <div style={{ fontSize: 10, color: "#AEAEB2", textAlign: "center", padding: "16px 0" }}>—</div>
+                      <div className="pipeline-column-empty">—</div>
                     )}
                   </div>
                 </div>
@@ -337,16 +292,12 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
 
         {/* ── List view ── */}
         {view === "list" && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "0.5px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="pipeline-list-shell">
+            <table className="pipeline-list-table">
               <thead>
-                <tr style={{ background: "#FAFAFA" }}>
+                <tr>
                   {["Address", "Type", "Stage", "Price", "Key metric", "Assigned", "Days"].map((h) => (
-                    <th key={h} style={{
-                      padding: "10px 14px", textAlign: h === "Price" ? "right" : "left",
-                      fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                      color: "#AEAEB2", borderBottom: "0.5px solid rgba(0,0,0,0.06)",
-                    }}>{h}</th>
+                    <th key={h} className={h === "Price" ? "pipeline-table-price" : undefined}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -360,29 +311,29 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
                   const overdue = isOverdue(d) && d.stage !== STAGES.Closed;
                   const initials = assignee === "—" ? "??" : assignee.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
                   return (
-                    <tr key={d.id} style={{ cursor: "pointer", background: overdue ? "rgba(255,59,48,0.03)" : undefined }}>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)", fontWeight: 600, fontSize: 12, color: overdue ? "#8C1515" : "#1D1D1F" }}>
+                    <tr key={d.id} className={overdue ? "pipeline-table-row--overdue" : undefined}>
+                      <td className="pipeline-table-address">
                         {overdue ? `⚠ ${d.address}` : d.address}
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
-                        <div style={{ display: "flex", gap: 4 }}>
+                      <td>
+                        <div className="pipeline-table-badges">
                           <TypeBadge type={type} />
                           <StrategyBadge deal={d} />
                         </div>
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)", fontSize: 11, color: "#6E6E73" }}>
+                      <td className="pipeline-table-stage">
                         {getDealStageLabel(d.stage)}
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)", textAlign: "right", fontWeight: 600 }}>
+                      <td className="pipeline-table-price">
                         {formatMoney(price)}
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)", fontSize: 11, color: overdue ? "#8C1515" : "#6E6E73" }}>
+                      <td className="pipeline-table-metric">
                         {metric}
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
+                      <td>
                         <Avatar initials={initials} />
                       </td>
-                      <td style={{ padding: "10px 14px", borderBottom: "0.5px solid rgba(0,0,0,0.06)", fontSize: 11, color: overdue ? "#8C1515" : "#AEAEB2" }}>
+                      <td className="pipeline-table-days">
                         {days}
                       </td>
                     </tr>
@@ -390,7 +341,7 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: "40px 14px", textAlign: "center", color: "#AEAEB2", fontSize: 11 }}>
+                    <td colSpan={7} className="pipeline-list-empty">
                       No deals match the current filters.
                     </td>
                   </tr>
