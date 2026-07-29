@@ -64,6 +64,12 @@ function matchesFilter(status: string | null, f: Filter): boolean {
   return true;
 }
 
+function propertyTitle(property: { address: string; city: string | null; state: string | null }): string {
+  const address = property.address.trim();
+  const place = [property.city, property.state].filter(Boolean).join(", ");
+  return place && !address.toLowerCase().includes(place.toLowerCase()) ? `${address}, ${place}` : address;
+}
+
 export default async function PropertyPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -102,7 +108,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
       <div className="proj-bar">
         <div className="proj-l">
           <span className="proj-addr">
-            {selected ? `${selected.address}${selected.city ? `, ${selected.city} ${selected.state ?? ""}` : ""}` : "Property Record"}
+            {selected ? propertyTitle(selected) : "Property Record"}
           </span>
           {selected && <span className="proj-chip">{selected.code}</span>}
           {selected && (selected.meta as PropertyMeta)?.spec && (
@@ -671,7 +677,7 @@ async function SmartStatusBanner({
   const status = (property.status || "").toLowerCase();
 
   // Determine which banner to show
-  let banner: { color: string; bg: string; border: string; icon: string; title: string; body: string; cta: string; href: string } | null = null;
+  let banner: { tone: "amber" | "marine" | "success" | "violet"; icon: string; title: string; body: string; cta: string; href: string } | null = null;
 
   if (status.includes("acquired") && !status.includes("rehab")) {
     const hasAnalysis = await prisma.propertyFinancialSection.count({
@@ -679,7 +685,7 @@ async function SmartStatusBanner({
     });
     if (!hasAnalysis) {
       banner = {
-        bg: "#FAEEDA", border: "rgba(99,56,6,0.2)", color: "#633806",
+        tone: "amber",
         icon: "📊",
         title: "Run your underwriting analysis",
         body: "This property is acquired. Compare Flip, BRRRR, and Flip & Rent before committing to a strategy.",
@@ -690,7 +696,7 @@ async function SmartStatusBanner({
   } else if (status.includes("rehab")) {
     if (!project) {
       banner = {
-        bg: "#E8EFF1", border: "rgba(31,77,92,0.2)", color: "#143641",
+        tone: "marine",
         icon: "🏗️",
         title: "Set up your rehab project",
         body: "Track scope, budget, schedule, and contractor assignments for this active rehab.",
@@ -699,7 +705,7 @@ async function SmartStatusBanner({
       };
     } else if (!meta.purchasePrice) {
       banner = {
-        bg: "#FEF9EC", border: "rgba(146,64,14,0.2)", color: "#92400E",
+        tone: "amber",
         icon: "💰",
         title: "Add financial inputs",
         body: "Purchase price and rehab budget are missing. Add them so your financials tab calculates correctly.",
@@ -711,7 +717,7 @@ async function SmartStatusBanner({
     const leaseCount = await prisma.lease.count({ where: { propertyId: property.id } });
     if (!leaseCount) {
       banner = {
-        bg: "#EAF3DE", border: "rgba(29,158,117,0.2)", color: "#27500A",
+        tone: "success",
         icon: "🏠",
         title: "Add tenant & lease information",
         body: "This is an active rental. Add the current lease agreement and tenant details.",
@@ -721,7 +727,7 @@ async function SmartStatusBanner({
     }
   } else if (status.includes("listed")) {
     banner = {
-      bg: "#EDE9FE", border: "rgba(109,40,217,0.2)", color: "#4C1D95",
+      tone: "violet",
       icon: "🏷️",
       title: "Property is listed for sale",
       body: "Track your listing activity, price changes, days on market, and buyer leads in the Documents and Financials tabs.",
@@ -733,21 +739,12 @@ async function SmartStatusBanner({
   if (!banner) return null;
 
   return (
-    <div style={{
-      margin: "0 16px 12px",
-      padding: "12px 16px",
-      background: banner.bg,
-      border: `0.5px solid ${banner.border}`,
-      borderRadius: 8,
-      display: "flex",
-      alignItems: "flex-start",
-      gap: 12,
-    }}>
-      <span style={{ fontSize: 20, flexShrink: 0 }}>{banner.icon}</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: banner.color, marginBottom: 3 }}>{banner.title}</div>
-        <div style={{ fontSize: 12, color: banner.color, opacity: 0.85, lineHeight: 1.5, marginBottom: 8 }}>{banner.body}</div>
-        <a href={banner.href} style={{ fontSize: 12, fontWeight: 600, color: banner.color, textDecoration: "none", borderBottom: `1px solid ${banner.color}` }}>
+    <div className={`property-status-banner property-status-banner--${banner.tone}`}>
+      <span className="property-status-banner-icon">{banner.icon}</span>
+      <div className="property-status-banner-content">
+        <div className="property-status-banner-title">{banner.title}</div>
+        <div className="property-status-banner-body">{banner.body}</div>
+        <a href={banner.href} className="property-status-banner-link">
           {banner.cta}
         </a>
       </div>
@@ -934,8 +931,8 @@ async function DocumentsTab({ propertyId, companyId }: { propertyId: string; com
     orderBy: { uploadedAt: "desc" },
   });
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      <div className="action-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="property-tab-shell property-documents">
+      <div className="property-tab-toolbar">
         <select className="filter-sel" defaultValue="all">
           <option value="all">All categories</option>
           <option>Title</option>
@@ -946,8 +943,8 @@ async function DocumentsTab({ propertyId, companyId }: { propertyId: string; com
         </select>
         <UploadDocButton propertyId={propertyId} />
       </div>
-      <div style={{ overflowY: "auto", flex: 1 }}>
-        <div className="doc-tbl-hd">
+      <div className="property-tab-scroll">
+        <div className="property-documents-header">
           <span className="col-lbl">Document</span>
           <span className="col-lbl">Category</span>
           <span className="col-lbl">Status</span>
@@ -955,15 +952,15 @@ async function DocumentsTab({ propertyId, companyId }: { propertyId: string; com
           <span />
         </div>
         {docs.length === 0 && (
-          <div style={{ padding: 20, color: "var(--text-tertiary)", fontSize: 11 }}>No property documents on file.</div>
+          <div className="property-documents-empty">No property documents on file.</div>
         )}
         {docs.map((d) => (
-          <div key={d.id} className="doc-tbl-row">
+          <div key={d.id} className="property-document-row">
             <div>
               <div className="doc-name">{d.name}</div>
               {d.expiresAt && <div className="doc-meta">Expires {formatET(d.expiresAt, false)}</div>}
             </div>
-            <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{d.category}</div>
+            <div className="property-document-category">{d.category}</div>
             <span className={d.status === "Active" ? "s-ok" : "s-warn"}>
               {d.status === "Active" ? "✓ Active" : d.status}
             </span>

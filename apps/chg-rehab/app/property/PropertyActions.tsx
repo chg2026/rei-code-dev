@@ -224,7 +224,7 @@ export function DocRowActions({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+      <div className="property-document-actions">
         <button className="btn-xs" onClick={() => setOpen(true)}>View</button>
         {doc.objectKey && (
           <a className="btn-xs" href={`/api/objects/${doc.objectKey}`} target="_blank" rel="noreferrer">
