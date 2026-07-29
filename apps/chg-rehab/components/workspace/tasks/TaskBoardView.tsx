@@ -12,6 +12,7 @@ import {
 } from "@/lib/workspace/taskMeta";
 import StatusPill from "./StatusPill";
 import AssigneeAvatars from "./AssigneeAvatars";
+import s from "../styles.module.css";
 
 const NO_DEPT = "__none__";
 
@@ -46,7 +47,7 @@ export default function TaskBoardView({
     tasks.filter((t) => (spaceId === null ? !t.space : t.space?.id === spaceId));
 
   return (
-    <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" }}>
+    <div className={s.taskBoard} aria-label="Task board">
       {columns.map((col) => {
         const list = colTasks(col.spaceId);
         const dot = col.color ?? "#A8A49C";

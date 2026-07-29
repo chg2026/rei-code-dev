@@ -117,6 +117,20 @@
 .taskGroupChevron { margin-left: auto; color: var(--chg-glass-muted); font-size: 0.75rem; transition: transform 150ms ease; }
 .taskGroupChevronCollapsed { transform: rotate(-90deg); }
 
+.taskBoard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 220px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 4px 18px;
+  scrollbar-color: var(--chg-glass-line-strong) transparent;
+  scrollbar-width: thin;
+}
+.taskBoard::-webkit-scrollbar { height: 10px; }
+.taskBoard::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: var(--chg-glass-line-strong); background-clip: padding-box; }
+
 .row {
   display: flex;
   align-items: center;
