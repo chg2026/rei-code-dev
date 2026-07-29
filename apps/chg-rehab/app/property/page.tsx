@@ -110,7 +110,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
           )}
           <AddPropertyButton />
         </div>
-        <div className="proj-r" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="proj-r">
           {selected?.status && (
             <span className="proj-mode" style={statusBadgeStyle(selected.status)}>● {selected.status}</span>
           )}
@@ -125,17 +125,12 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="property-workspace">
         {/* LEFT: list */}
-        <div className="property-list" style={{
-          width: 220, flexShrink: 0,
-          borderRight: "0.5px solid var(--border-lo)",
-          display: "flex", flexDirection: "column", overflow: "hidden",
-          background: "var(--bg-secondary)",
-        }}>
-          <div style={{ padding: "8px 10px", borderBottom: "0.5px solid var(--border-lo)", flexShrink: 0 }}>
+        <aside className="property-list" aria-label="Properties">
+          <div className="property-list-controls">
             <PropertySearchInput initialValue={q} />
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+            <div className="property-filter-row">
               {(["all", "rehab", "rental", "acq", "sold"] as Filter[]).map((f) => (
                 <Link
                   key={f}
@@ -148,46 +143,31 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
             </div>
           </div>
 
-          <div style={{
-            padding: "4px 10px",
-            fontSize: 9,
-            color: "var(--text-tertiary)",
-            borderBottom: "0.5px solid var(--border-lo)",
-          }}>
+          <div className="property-list-summary">
             {q || filter !== "all"
               ? `Showing ${visible.length} of ${filtered.length} matching · ${all.length} total`
               : `Showing ${visible.length} of ${all.length} properties`}
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div className="property-list-scroll">
             {visible.map((p) => {
               const active = p.id === selectedId;
               const isRehab = (p.status || "").toLowerCase().includes("rehab");
               const bg = isRehab ? "background:#E8EFF1;color:#143641;" : "background:#EAF3DE;color:#27500A;";
               return (
-                <div key={p.id} style={{ position: "relative" }}>
+                <div key={p.id} className="property-list-item-wrap">
                 <Link
                   href={`/property?id=${p.id}&tab=${tab}${filter !== "all" ? `&filter=${filter}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-                  className={`ln-item${active ? " active" : ""}`}
-                  style={{
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    padding: "9px 10px",
-                    gap: 2,
-                    borderBottom: "0.5px solid var(--border-lo)",
-                    cursor: "pointer",
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
+                  className={`ln-item property-list-item${active ? " active" : ""}`}
                 >
-                  <div style={{ fontSize: 11, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>
+                  <div className="property-list-item-address">
                     {p.address.split(",")[0]}
                   </div>
-                  <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
+                  <div className="property-list-item-meta">
                     {[p.city, (p.meta as PropertyMeta)?.spec].filter(Boolean).join(" · ")}
                   </div>
                   {p.status && (
-                    <div style={{ marginTop: 3 }}>
+                    <div className="property-list-item-status">
                       <span style={{
                         fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 500,
                         ...parseInlineStyle(bg),
@@ -200,20 +180,20 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
               );
             })}
             {filtered.length > PAGE_SIZE && (
-              <div style={{ padding: 10, textAlign: "center", fontSize: 10, color: "var(--text-tertiary)", borderTop: "0.5px solid var(--border-lo)" }}>
+              <div className="property-list-more">
                 {filtered.length - PAGE_SIZE} more — refine your search to narrow results
               </div>
             )}
             {filtered.length === 0 && (
-              <div style={{ padding: 20, textAlign: "center", fontSize: 11, color: "var(--text-tertiary)" }}>
+              <div className="property-list-empty">
                 No matching properties.
               </div>
             )}
           </div>
-        </div>
+        </aside>
 
         {/* RIGHT: tabs + content */}
-        <div className="property-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div className="property-content">
           <div className="tab-nav">
             {(
               [
