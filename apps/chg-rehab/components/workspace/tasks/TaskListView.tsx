@@ -12,6 +12,7 @@ import {
 import StatusPill from "./StatusPill";
 import PriorityFlag from "./PriorityFlag";
 import AssigneeAvatars from "./AssigneeAvatars";
+import s from "../styles.module.css";
 
 type Tab = "all" | "private" | "assignedOut";
 
@@ -38,7 +39,7 @@ export default function TaskListView({
 
   if (tasks.length === 0) {
     return (
-      <div style={emptyStyle}>
+      <div className={s.taskEmpty}>
         No tasks here yet. Click <strong>+ New task</strong> to create one.
       </div>
     );
@@ -48,9 +49,9 @@ export default function TaskListView({
     return (
       <div>
         {tab === "private" ? (
-          <div style={bannerStyle}>Your private workspace — only you can see these tasks.</div>
+          <div className={s.taskPrivateBanner}>Your private workspace — only you can see these tasks.</div>
         ) : null}
-        <div style={{ display: "grid", gap: 6 }}>
+        <div className={s.taskRows}>
           {tasks.map((t) => (
             <TaskRow
               key={t.id}
@@ -77,7 +78,7 @@ export default function TaskListView({
   if (noDept.length) groups.push({ key: NO_DEPT, name: "No Department", color: null, tasks: noDept });
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className={s.taskGroups}>
       {groups.map((g) => {
         const isCollapsed = collapsed.has(g.key);
         const dot = g.color ?? "#A8A49C";
@@ -85,6 +86,7 @@ export default function TaskListView({
           <div key={g.key}>
             <button
               type="button"
+              aria-expanded={!isCollapsed}
               onClick={() =>
                 setCollapsed((prev) => {
                   const next = new Set(prev);
@@ -93,30 +95,20 @@ export default function TaskListView({
                   return next;
                 })
               }
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                padding: "8px 12px",
-                background: tint(g.color, 0.1),
-                border: "none",
-                borderRadius: 10,
-                cursor: "pointer",
-                marginBottom: 6,
-              }}
+              className={s.taskGroupHeader}
+              style={{ background: tint(g.color, 0.1) }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: dot, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--slate, #2A2826)" }}>
+              <span className={s.taskColorDot} style={{ background: dot }} />
+              <span className={s.taskGroupName}>
                 {g.name}
               </span>
-              <span style={countBadge}>{g.tasks.length}</span>
-              <span style={{ marginLeft: "auto", color: "var(--quill, #6B6862)", fontSize: 12, transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform .15s" }}>
+              <span className={s.taskCountBadge}>{g.tasks.length}</span>
+              <span className={`${s.taskGroupChevron} ${isCollapsed ? s.taskGroupChevronCollapsed : ""}`}>
                 ▾
               </span>
             </button>
             {!isCollapsed ? (
-              <div style={{ display: "grid", gap: 6 }}>
+              <div className={s.taskRows}>
                 {g.tasks.map((t) => (
                   <TaskRow
                     key={t.id}

@@ -154,18 +154,7 @@ export default function MyTasksPage() {
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={s.taskTab}
-                style={{
-                  padding: "8px 12px",
-                  fontSize: 13,
-                  fontWeight: active ? 700 : 500,
-                  color: active ? "var(--marine, #1F4D5C)" : "var(--quill, #6B6862)",
-                  background: "none",
-                  border: "none",
-                  borderBottom: `2px solid ${active ? "var(--marine, #1F4D5C)" : "transparent"}`,
-                  marginBottom: -1,
-                  cursor: "pointer",
-                }}
+                className={`${s.taskTab} ${active ? s.taskTabActive : ""}`}
               >
                 {t.label}
               </button>
@@ -173,21 +162,13 @@ export default function MyTasksPage() {
           })}
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div className={s.toolbarControls}>
           <select
             className={s.filterSelect}
             value={personFilter}
             onChange={(e) => setPersonFilter(e.target.value)}
             aria-label="Filter by person"
-            style={{
-              padding: "7px 10px",
-              fontSize: 13,
-              color: "var(--slate, #2A2826)",
-              background: "#fff",
-              border: "1px solid var(--border-2, #DCD9D2)",
-              borderRadius: 8,
-              cursor: "pointer",
-            }}
+
           >
             <option value="">Everyone</option>
             {personOptions.map((m) => (
@@ -206,7 +187,7 @@ export default function MyTasksPage() {
 
       <div className={s.body}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: "center", color: "var(--quill, #6B6862)" }}>Loading tasks…</div>
+          <div className={s.empty}>Loading tasks…</div>
         ) : view === "list" ? (
           <TaskListView
             tab={tab}
@@ -274,17 +255,7 @@ function ToggleBtn({ active, onClick, label }: { active: boolean; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      style={{
-        padding: "5px 14px",
-        fontSize: 13,
-        fontWeight: 600,
-        color: active ? "var(--ink, #0A0A0A)" : "var(--quill, #6B6862)",
-        background: active ? "#fff" : "transparent",
-        border: "none",
-        borderRadius: 7,
-        cursor: "pointer",
-        boxShadow: active ? "0 1px 2px rgba(10,10,10,0.08)" : "none",
-      }}
+      className={`${s.toggleButton} ${active ? s.toggleButtonActive : ""}`}
     >
       {label}
     </button>
