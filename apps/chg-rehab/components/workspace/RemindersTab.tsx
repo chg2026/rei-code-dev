@@ -132,7 +132,7 @@ export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey
   const derived = items.filter((r) => r.kind !== "manual");
 
   return (
-    <div className={s.card}>
+    <div className={`${s.card} ${s.remindersCard}`}>
       <div className={s.cardTitle}>Active reminders</div>
       {loading ? (
         <div className={s.empty} style={{ padding: 20 }}>Loading…</div>
@@ -151,7 +151,7 @@ export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey
                   style={{ flex: 1, minWidth: 0, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}
                   title="Edit reminder"
                 >
-                  <div className={s.row} style={{ marginBottom: 6 }}>
+                  <div className={`${s.row} ${s.reminderRow}`} style={{ marginBottom: 6 }}>
                     <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 4 }} title={r.urgency ?? "medium"} />
                     <div className={s.rowMain}>
                       <div className={s.rowTitle}>{r.title}</div>
@@ -196,7 +196,7 @@ export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey
           {derived.map((r) => {
             const pill = derivedPill(r);
             const content = (
-              <div className={s.row} style={{ marginBottom: 6 }}>
+              <div className={`${s.row} ${s.reminderRow}`} style={{ marginBottom: 6 }}>
                 <span style={{ fontSize: 16 }}>{derivedIcon(r)}</span>
                 <div className={s.rowMain}>
                   <div className={s.rowTitle}>{r.title}</div>
