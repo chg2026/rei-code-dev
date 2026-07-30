@@ -234,6 +234,21 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
           ))}
         </div>
 
+        {activeDeals.length === 0 ? (
+          <section className="pipeline-empty-state" aria-labelledby="pipeline-empty-title">
+            <div className="pipeline-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" focusable="false">
+                <path d="M8 23.5 24 10l16 13.5V39a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2Z" />
+                <path d="M18 41V28h12v13M34 14v-4h6v9" />
+              </svg>
+            </div>
+            <div className="pipeline-empty-copy">
+              <h2 id="pipeline-empty-title">Build your acquisition pipeline</h2>
+              <p>Use Add deal above to begin tracking offers, diligence, and closings.</p>
+            </div>
+          </section>
+        ) : (
+          <>
         {/* ── Filter bar ── */}
         <div className="pipeline-filters">
           {(["all", "sfr", "mf", "mine"] as const).map((f) => (
@@ -349,6 +364,8 @@ export default function PipelineView({ deals }: { deals: PipelineDealRow[] }) {
               </tbody>
             </table>
           </div>
+        )}
+          </>
         )}
 
       </div>

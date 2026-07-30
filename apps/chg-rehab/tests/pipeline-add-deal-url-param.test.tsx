@@ -50,6 +50,7 @@ vi.mock("@/lib/useBillingHealth", () => ({
 
 import AddDealButton from "@/app/pipeline/AddDealButton";
 import AddDealLink from "@/app/pipeline/AddDealLink";
+import PipelineView from "@/components/pipeline/PipelineView";
 
 // ---------------------------------------------------------------------------
 // AddDealButton — URL param ?new=1 opens the modal
@@ -149,5 +150,64 @@ describe("AddDealLink — click sets ?new=1 in the URL", () => {
 
     const [calledUrl] = mockPush.mock.calls[0] as [string];
     expect(calledUrl).toContain("view=board");
+  });
+});
+
+describe("PipelineView — true empty state", () => {
+  const deal = (overrides: Partial<React.ComponentProps<typeof PipelineView>["deals"][number]> = {}) => ({
+    id: "deal-1",
+    code: "DL-001",
+    address: "100 Main Street",
+    stage: "Underwriting",
+    askingPrice: "125000",
+    estimatedRoi: "18",
+    closedAt: null,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    meta: { type: "Single family" },
+    ...overrides,
+  });
+
+  it("replaces blank board columns with guidance and the existing add-deal action", () => {
+    render(<PipelineView deals={[]} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Build your acquisition pipeline" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Use Add deal above to begin tracking offers, diligence, and closings."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /add deal/i })).toHaveLength(1);
+    expect(screen.queryByText("Identified")).not.toBeInTheDocument();
+  });
+
+  it("derives the same true-empty state when every deal is Lost", () => {
+    render(<PipelineView deals={[deal({ stage: "Lost" })]} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Build your acquisition pipeline" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("100 Main Street")).not.toBeInTheDocument();
+  });
+
+  it("preserves filters and board content for a non-Lost deal", () => {
+    render(<PipelineView deals={[deal()]} />);
+
+    expect(screen.getByText(/100 Main Street/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All deals" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Build your acquisition pipeline" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps filtered-empty messaging distinct from dataset onboarding", async () => {
+    render(<PipelineView deals={[deal({ meta: { type: "Multi-family" } })]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "List" }));
+    await userEvent.click(screen.getByRole("button", { name: "SFR" }));
+
+    expect(screen.getByText("No deals match the current filters.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Build your acquisition pipeline" }),
+    ).not.toBeInTheDocument();
   });
 });
