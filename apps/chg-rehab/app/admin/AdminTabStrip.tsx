@@ -18,16 +18,7 @@ export default function AdminTabStrip({
   current: string;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 0,
-        borderBottom: "0.5px solid var(--border-lo)",
-        background: "#fff",
-        padding: "0 16px",
-        flexShrink: 0,
-      }}
-    >
+    <nav className="admin-top-tabs" aria-label="Admin sections">
       {TABS.map((t) => {
         const active = (t.value === "account" && (!current || current === "account")) ||
           current === t.value;
@@ -35,22 +26,13 @@ export default function AdminTabStrip({
           <Link
             key={t.value}
             href={t.value === "account" ? "/admin" : `/admin?tab=${t.value}`}
-            style={{
-              padding: "10px 14px",
-              fontSize: 12,
-              color: active ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: active ? 500 : 400,
-              borderBottom: active
-                ? "2px solid var(--marine, #1F4D5C)"
-                : "2px solid transparent",
-              cursor: "pointer",
-              textDecoration: "none",
-            }}
+            className={`admin-top-tab${active ? " active" : ""}`}
+            aria-current={active ? "page" : undefined}
           >
             {t.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

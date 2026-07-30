@@ -192,22 +192,24 @@ export default function AdminClient({
       </div>
 
       <div className="admin-layout">
-        <div className="admin-left">
+        <nav className="admin-left" aria-label="Account settings">
           {Array.from(sections.entries()).map(([sec, items]) => (
             <div key={sec}>
               <div className="admin-nav-section">{sec}</div>
               {items.map((p) => (
-                <div
+                <button
+                  type="button"
                   key={p.key}
                   className={"admin-nav-item" + (panel === p.key ? " active" : "")}
                   onClick={() => selectPanel(p.key)}
+                  aria-current={panel === p.key ? "page" : undefined}
                 >
                   {p.label}
-                </div>
+                </button>
               ))}
             </div>
           ))}
-        </div>
+        </nav>
 
         <div className="admin-main">
           {panel === "general" && (
@@ -1290,7 +1292,7 @@ function ProvisionContractorForm({ isAdmin }: { isAdmin: boolean }) {
             <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
               Password
             </label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="admin-password-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ position: "relative", flex: 1 }}>
                 <input
                   className="admin-input"

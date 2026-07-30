@@ -320,6 +320,50 @@ body::before {
   box-shadow: 0 0 0 3px rgba(31, 77, 92, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75) !important;
 }
 
+/* Account settings: keep desktop controls inside the flexible panel and make
+   both navigation levels intentionally reachable at narrow widths. */
+.admin-top-tabs {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--chg-glass-line);
+  background: var(--chg-glass-surface-2);
+  padding: 0 var(--chg-space-4);
+  scrollbar-width: thin;
+}
+.admin-top-tab {
+  flex: 0 0 auto;
+  padding: 11px 14px 9px;
+  border-bottom: 2px solid transparent;
+  color: var(--chg-glass-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-top-tab:hover { color: var(--chg-glass-ink); background: var(--chg-glass-surface-1); }
+.admin-top-tab.active { border-bottom-color: var(--chg-glass-marine); color: var(--chg-glass-marine-ink); }
+.admin-layout,
+.admin-layout .admin-main,
+.admin-layout .admin-panel,
+.admin-layout .admin-group,
+.admin-layout .admin-row,
+.admin-layout .admin-info { min-width: 0; }
+.admin-layout .admin-main { overflow-x: hidden; }
+.admin-layout .admin-panel.active { max-width: 100%; }
+.admin-layout .admin-info { flex: 1 1 auto; }
+.admin-layout .admin-main :where(input, select, textarea) { max-width: 100%; }
+.admin-layout .admin-nav-item {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
 .tab-btn { min-height: 40px; }
 .tab-btn.active { color: var(--chg-glass-marine) !important; border-bottom-color: var(--chg-glass-marine) !important; }
 
@@ -345,6 +389,29 @@ body::before {
   .sidebar { top: 10px !important; left: 10px !important; bottom: 10px !important; border-radius: var(--chg-radius-lg) !important; }
   .topbar { margin: 10px 10px 0 !important; border-radius: var(--chg-radius-md) !important; }
   :where(.btn, .btn-sm) { min-height: 40px; padding-inline: 12px !important; }
+  .admin-top-tabs { padding-inline: var(--chg-space-2); }
+  .admin-layout { flex-direction: column; overflow: hidden; }
+  .admin-layout .admin-left {
+    display: flex;
+    width: 100%;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid var(--chg-glass-line);
+    background: var(--chg-glass-surface-2);
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+  .admin-layout .admin-left > div { display: flex; flex: 0 0 auto; }
+  .admin-layout .admin-nav-section { display: none; }
+  .admin-layout .admin-nav-item { width: auto; flex: 0 0 auto; padding: 10px 12px; }
+  .admin-layout .admin-main { padding: var(--chg-space-4); overflow: auto; }
+  .admin-layout .admin-row { align-items: stretch; flex-direction: column; gap: var(--chg-space-3); }
+  .admin-layout .admin-row > :where(.admin-input, .admin-select) { width: 100% !important; }
+  .admin-layout .admin-password-row { align-items: stretch !important; flex-direction: column !important; }
+  .admin-layout .admin-password-row > div { width: 100%; }
+  .admin-layout .save-bar { margin-right: calc(-1 * var(--chg-space-4)); margin-left: calc(-1 * var(--chg-space-4)); padding-right: var(--chg-space-4); padding-left: var(--chg-space-4); }
 }
 
 @media (prefers-reduced-motion: reduce) {
