@@ -32,15 +32,25 @@ export default function MessagesPage() {
   const params = useSearchParams();
   const initialId = params.get("channel");
   const [channels, setChannels] = useState<Channels>(EMPTY);
+  const [channelsLoading, setChannelsLoading] = useState(true);
+  const [channelsError, setChannelsError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(initialId);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [taskModal, setTaskModal] = useState<{ open: boolean; initial: string; src: string | null }>({ open: false, initial: "", src: null });
   const [newChanOpen, setNewChanOpen] = useState(false);
   const [newChanName, setNewChanName] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminAccess, setAdminAccess] = useState<"checking" | "allowed" | "denied" | "unavailable">("checking");
   const threadRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const activeIdRef = useRef<string | null>(activeId);
+  const messagesRef = useRef<Msg[]>(messages);
+  const fullRequestRef = useRef(0);
+  const incrementalInFlightRef = useRef(false);
+  activeIdRef.current = activeId;
+  messagesRef.current = messages;
 
   // @ mention picker state.
   const [mentionUsers, setMentionUsers] = useState<{ id: string; name: string; initials: string }[]>([]);
@@ -68,30 +78,79 @@ export default function MessagesPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // Detect admin (best-effort, used to show + channel button).
+  // Resolve channel-creation access without treating an unresolved request as denial.
   useEffect(() => {
-    fetch("/api/auth/user").then((r) => r.ok ? r.json() : null).then((d) => {
-      if (d?.user?.role === "Admin" || d?.role === "Admin") setIsAdmin(true);
-    }).catch(() => undefined);
+    fetch("/api/auth/user")
+      .then((r) => {
+        if (!r.ok) throw new Error("Unable to check channel permissions");
+        return r.json();
+      })
+      .then((d) => {
+        setAdminAccess(d?.user?.role === "Admin" || d?.role === "Admin" ? "allowed" : "denied");
+      })
+      .catch(() => setAdminAccess("unavailable"));
   }, []);
 
-  const loadChannels = useCallback(async () => {
-    const r = await fetch("/api/workspace/channels", { cache: "no-store" });
-    if (!r.ok) return;
-    const data = (await r.json()) as Channels;
-    setChannels(data);
-    if (!activeId && data.team[0]) setActiveId(data.team[0].id);
-  }, [activeId]);
+  const loadChannels = useCallback(async (silent = false) => {
+    if (!silent) {
+      setChannelsLoading(true);
+      setChannelsError(null);
+    }
+    try {
+      const r = await fetch("/api/workspace/channels", { cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load conversations");
+      const data = (await r.json()) as Channels;
+      setChannels(data);
+      setActiveId((current) => current ?? data.team[0]?.id ?? null);
+    } catch {
+      if (!silent) setChannelsError("Unable to load conversations. Check your connection and try again.");
+    } finally {
+      if (!silent) setChannelsLoading(false);
+    }
+  }, []);
 
   useEffect(() => { loadChannels(); }, [loadChannels]);
 
   const loadMessages = useCallback(async (chId: string, opts?: { incremental?: boolean }) => {
-    const after = opts?.incremental && messages.length ? `?after=${encodeURIComponent(messages[messages.length - 1].createdAt)}` : "";
-    const r = await fetch(`/api/workspace/channels/${chId}/messages${after}`, { cache: "no-store" });
-    if (!r.ok) return;
-    const data = await r.json();
-    setMessages((prev) => opts?.incremental ? [...prev, ...(data.messages ?? [])] : (data.messages ?? []));
-  }, [messages]);
+    const incremental = Boolean(opts?.incremental);
+    if (incremental && incrementalInFlightRef.current) return;
+
+    const requestId = incremental ? null : ++fullRequestRef.current;
+    const currentMessages = messagesRef.current;
+    const after = incremental && currentMessages.length
+      ? `?after=${encodeURIComponent(currentMessages[currentMessages.length - 1].createdAt)}`
+      : "";
+
+    if (incremental) {
+      incrementalInFlightRef.current = true;
+    } else {
+      setMessagesLoading(true);
+      setMessagesError(null);
+    }
+    try {
+      const r = await fetch(`/api/workspace/channels/${chId}/messages${after}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load messages");
+      const data = await r.json();
+      if (activeIdRef.current !== chId || (!incremental && requestId !== fullRequestRef.current)) return;
+
+      const incoming = (data.messages ?? []) as Msg[];
+      setMessages((prev) => {
+        if (!incremental) return incoming;
+        const existing = new Set(prev.map((message) => message.id));
+        return [...prev, ...incoming.filter((message) => !existing.has(message.id))];
+      });
+    } catch {
+      if (!incremental && activeIdRef.current === chId && requestId === fullRequestRef.current) {
+        setMessagesError("Unable to load messages. Check your connection and try again.");
+      }
+    } finally {
+      if (incremental) {
+        incrementalInFlightRef.current = false;
+      } else if (activeIdRef.current === chId && requestId === fullRequestRef.current) {
+        setMessagesLoading(false);
+      }
+    }
+  }, []);
 
   // Load messages on channel switch.
   useEffect(() => {
@@ -99,7 +158,7 @@ export default function MessagesPage() {
     setMessages([]);
     loadMessages(activeId);
     // mark as read
-    fetch(`/api/workspace/channels/${activeId}/read`, { method: "PATCH" }).then(loadChannels).catch(() => undefined);
+    fetch(`/api/workspace/channels/${activeId}/read`, { method: "PATCH" }).then(() => loadChannels(true)).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -124,6 +183,7 @@ export default function MessagesPage() {
     const all = [...channels.team, ...channels.contractors, ...channels.investors];
     return all.find((c) => c.id === activeId) ?? null;
   }, [channels, activeId]);
+  const channelCount = channels.team.length + channels.contractors.length + channels.investors.length;
 
   const send = async () => {
     const text = composer.trim();
@@ -229,17 +289,54 @@ export default function MessagesPage() {
       <div className={s.msgWrap}>
         <div className={s.msgSidebar}>
           <div className={s.msgList}>
-            {renderListGroup("Team", channels.team,
-              isAdmin ? (
-                <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => setNewChanOpen(true)}>+</button>
-              ) : null
+            {channelsLoading ? (
+              <div className={s.workspaceStateCompact}>Loading channels…</div>
+            ) : channelsError ? (
+              <div className={s.workspaceStateCompact}>Channels unavailable</div>
+            ) : channelCount === 0 ? (
+              <div className={s.workspaceStateCompact}>No channels</div>
+            ) : (
+              <>
+                {renderListGroup("Team", channels.team,
+                  adminAccess === "allowed" ? (
+                    <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => setNewChanOpen(true)}>+</button>
+                  ) : null
+                )}
+                {renderListGroup("Contractors", channels.contractors)}
+                {renderListGroup("Investors", channels.investors)}
+              </>
             )}
-            {renderListGroup("Contractors", channels.contractors)}
-            {renderListGroup("Investors", channels.investors)}
           </div>
         </div>
         <div className={s.threadPane}>
-          {activeChannel ? (
+          {channelsLoading ? (
+            <section className={s.workspaceState} role="status" aria-live="polite">
+              <div className={s.workspaceStateIcon} aria-hidden="true">◎</div>
+              <h2 className={s.workspaceStateTitle}>Loading conversations…</h2>
+              <p className={s.workspaceStateCopy}>Gathering your team, contractor, and investor channels.</p>
+            </section>
+          ) : channelsError ? (
+            <section className={`${s.workspaceState} ${s.workspaceStateError}`} role="alert">
+              <div className={s.workspaceStateIcon} aria-hidden="true">!</div>
+              <h2 className={s.workspaceStateTitle}>Unable to load conversations</h2>
+              <p className={s.workspaceStateCopy}>{channelsError}</p>
+              <button type="button" className={s.btn} onClick={() => loadChannels()}>Try again</button>
+            </section>
+          ) : channelCount === 0 ? (
+            <section className={s.workspaceState}>
+              <div className={s.workspaceStateIcon} aria-hidden="true">◇</div>
+              <h2 className={s.workspaceStateTitle}>No conversations yet.</h2>
+              <p className={s.workspaceStateCopy} role={adminAccess === "checking" ? "status" : undefined}>
+                {adminAccess === "checking" ? "Checking channel creation access…" :
+                 adminAccess === "allowed" ? "Create a team channel to start a shared conversation." :
+                 adminAccess === "denied" ? "Ask an administrator to create a team channel." :
+                 "Channel creation access could not be verified. Refresh to try again."}
+              </p>
+              {adminAccess === "allowed" ? (
+                <button type="button" className={s.btn} onClick={() => setNewChanOpen(true)}>Create team channel</button>
+              ) : null}
+            </section>
+          ) : activeChannel ? (
             <>
               <div className={s.threadHead}>
                 <div className={s.threadHeadTitle}>{activeChannel.name}</div>
@@ -250,8 +347,19 @@ export default function MessagesPage() {
                 </div>
               </div>
               <div className={s.threadBody} ref={threadRef}>
-                {messages.length === 0 ? (
-                  <div className={s.empty}>No messages yet. Say hi 👋</div>
+                {messagesLoading ? (
+                  <div className={s.workspaceStateCompact} role="status" aria-live="polite">Loading messages…</div>
+                ) : messagesError ? (
+                  <div className={`${s.workspaceStateCompact} ${s.workspaceStateError}`} role="alert">
+                    <strong>Unable to load messages</strong>
+                    <span>{messagesError}</span>
+                    <button type="button" className={`${s.btn} ${s.small}`} onClick={() => loadMessages(activeChannel.id)}>Try again</button>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className={s.workspaceStateCompact}>
+                    <strong>No messages yet.</strong>
+                    <span>Start the conversation below.</span>
+                  </div>
                 ) : messages.map((m) => (
                   <div key={m.id} className={`${s.msgBubble} ${m.mine ? s.mine : s.theirs}`}>
                     {!m.mine ? (
@@ -282,6 +390,7 @@ export default function MessagesPage() {
                 <div style={{ position: "relative", flex: 1, display: "flex" }}>
                   {mentionOpen && mentionMatches.length ? (
                     <div
+                      className={s.mentionPicker}
                       style={{
                         position: "absolute",
                         bottom: "100%",

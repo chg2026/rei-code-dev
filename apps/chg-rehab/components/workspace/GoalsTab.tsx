@@ -26,16 +26,21 @@ function currentQuarter() {
 export default function GoalsTab() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState<null | "company" | "user">(null);
   const [draft, setDraft] = useState({ title: "", target: 1, metricMode: "count" });
   const [taskGoal, setTaskGoal] = useState<{ id: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await fetch("/api/workspace/goals", { cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load goals");
       const data = await r.json();
       setGoals(data.goals ?? []);
+    } catch {
+      setLoadError("Unable to load goals. Check your connection and try again.");
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -104,24 +109,51 @@ export default function GoalsTab() {
     );
   };
 
+  if (loading) {
+    return (
+      <section className={s.workspaceState} role="status" aria-live="polite">
+        <div className={s.workspaceStateIcon} aria-hidden="true">◎</div>
+        <h2 className={s.workspaceStateTitle}>Loading goals…</h2>
+        <p className={s.workspaceStateCopy}>Gathering company and individual progress.</p>
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className={`${s.workspaceState} ${s.workspaceStateError}`} role="alert">
+        <div className={s.workspaceStateIcon} aria-hidden="true">!</div>
+        <h2 className={s.workspaceStateTitle}>Unable to load goals</h2>
+        <p className={s.workspaceStateCopy}>{loadError}</p>
+        <button type="button" className={s.btn} onClick={load}>Try again</button>
+      </section>
+    );
+  }
+
   return (
     <div className={s.grid2}>
-      <div className={s.card}>
+      <div className={`${s.card} ${s.goalCard}`}>
         <div className={s.cardTitle}>
           <span>Company goals — {currentQuarter()}</span>
           <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => setAdding("company")}>+ Goal</button>
         </div>
-        {loading ? <div className={s.empty}>Loading…</div> :
-          company.length === 0 ? <div className={s.empty} style={{ padding: 20 }}>No company goals yet.</div> :
+        {company.length === 0 ? <div className={s.workspaceStateInline}>
+          <div className={s.workspaceStateIcon} aria-hidden="true">◇</div>
+          <h3 className={s.workspaceStateTitle}>No company goals yet.</h3>
+          <p className={s.workspaceStateCopy}>Use “+ Goal” above to define the team’s next measurable outcome.</p>
+        </div> :
           company.map(renderGoal)}
       </div>
-      <div className={s.card}>
+      <div className={`${s.card} ${s.goalCard}`}>
         <div className={s.cardTitle}>
           <span>Individual goals</span>
           <button type="button" className={`${s.btn} ${s.ghost} ${s.small}`} onClick={() => setAdding("user")}>+ Goal</button>
         </div>
-        {loading ? <div className={s.empty}>Loading…</div> :
-          userGoals.length === 0 ? <div className={s.empty} style={{ padding: 20 }}>No individual goals yet.</div> :
+        {userGoals.length === 0 ? <div className={s.workspaceStateInline}>
+          <div className={s.workspaceStateIcon} aria-hidden="true">○</div>
+          <h3 className={s.workspaceStateTitle}>No individual goals yet.</h3>
+          <p className={s.workspaceStateCopy}>Use “+ Goal” above to create an owner-specific objective.</p>
+        </div> :
           [...byOwner.entries()].map(([key, arr]) => (
             <div key={key} style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "var(--quill)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
