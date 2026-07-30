@@ -271,7 +271,7 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 .workspaceStateTitle { margin: 2px 0 0; color: var(--chg-glass-ink); font-size: 0.96rem; font-weight: 650; letter-spacing: -0.015em; }
-.workspaceStateCopy { max-width: 440px; margin: 0; color: var(--chg-glass-muted); font-size: 0.77rem; line-height: 1.55; }
+.workspaceStateCopy { width: 100%; max-width: 440px; min-width: 0; margin: 0; color: var(--chg-glass-muted); font-size: 0.77rem; line-height: 1.55; overflow-wrap: anywhere; }
 .workspaceStateError { border-color: rgba(160, 76, 64, 0.28); background-color: rgba(255, 247, 244, 0.74); }
 .workspaceStateError .workspaceStateIcon { color: var(--danger); border-color: rgba(160, 76, 64, 0.28); }
 
@@ -374,12 +374,20 @@
 .msgList { flex: 1; overflow-y: auto; }
 .msgListItem {
   display: flex; align-items: center; gap: 10px;
+  width: 100%;
   padding: 8px 14px;
   cursor: pointer;
+  appearance: none;
+  background: transparent;
+  border: 0;
   border-bottom: 1px solid var(--border-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 .msgListItem:hover { background: var(--bone); }
 .msgListItem.active { background: var(--marine-soft); }
+.msgListItem:focus-visible { outline: 2px solid var(--chg-glass-marine); outline-offset: -2px; }
 .msgListMain { flex: 1; min-width: 0; }
 .msgListTitle { font-size: 13px; color: var(--ink); font-weight: 500; display: flex; justify-content: space-between; gap: 6px; }
 .msgListPreview { font-size: 11px; color: var(--quill); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }

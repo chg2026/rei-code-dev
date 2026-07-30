@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { formatET } from "@/lib/datetime";
 import { formatMoney } from "@/lib/pipeline";
+import { propertyTitle } from "@/lib/propertyTitle";
 import {
   AddPropertyButton,
   ChangeToRentalButton,
@@ -62,12 +63,6 @@ function matchesFilter(status: string | null, f: Filter): boolean {
   if (f === "sold")   return s.includes("sold");
   if (f === "acq")    return s.includes("acquired") || s.includes("active rehab") || s.includes("listed");
   return true;
-}
-
-function propertyTitle(property: { address: string; city: string | null; state: string | null }): string {
-  const address = property.address.trim();
-  const place = [property.city, property.state].filter(Boolean).join(", ");
-  return place && !address.toLowerCase().includes(place.toLowerCase()) ? `${address}, ${place}` : address;
 }
 
 export default async function PropertyPage({ searchParams }: { searchParams: Promise<SP> }) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import s from "./styles.module.css";
 import ReminderModal, { ReminderDraft } from "./ReminderModal";
@@ -23,6 +23,50 @@ type Reminder = {
   assigneeName?: string | null;
   assigneeInitials?: string | null;
 };
+
+const REMINDER_KINDS = new Set<Reminder["kind"]>(["doc", "task", "manual", "deal"]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isReminder(value: unknown): value is Reminder {
+  if (!isRecord(value)) return false;
+  const validBase = typeof value.id === "string"
+    && typeof value.title === "string"
+    && typeof value.source === "string"
+    && isNullableString(value.link)
+    && isNullableString(value.when)
+    && typeof value.urgent === "boolean"
+    && typeof value.kind === "string"
+    && REMINDER_KINDS.has(value.kind as Reminder["kind"]);
+  if (!validBase) return false;
+  if (value.kind === "manual") {
+    return typeof value.reminderId === "string"
+      && isNullableString(value.notes)
+      && Array.isArray(value.tags)
+      && value.tags.every((tag) => typeof tag === "string")
+      && isNullableString(value.dueDate)
+      && isNullableString(value.dueTime)
+      && isNullableString(value.urgency)
+      && isNullableString(value.assigneeId)
+      && isNullableString(value.assigneeName)
+      && isNullableString(value.assigneeInitials);
+  }
+  return value.reminderId === undefined
+    && value.notes === undefined
+    && value.tags === undefined
+    && value.dueDate === undefined
+    && value.dueTime === undefined
+    && value.urgency === undefined
+    && value.assigneeId === undefined
+    && value.assigneeName === undefined
+    && value.assigneeInitials === undefined;
+}
 
 const URGENCY_COLORS: Record<string, string> = {
   low: "#10b981",
@@ -90,18 +134,33 @@ function derivedIcon(r: Reminder) {
 export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey?: number; onChanged?: () => void }) {
   const [items, setItems] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ReminderDraft | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const loadGenerationRef = useRef(0);
 
   const load = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await fetch("/api/workspace/reminders", { cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load reminders right now.");
       const data = await r.json();
-      setItems(data.items ?? []);
-    } finally { setLoading(false); }
+      if (!Array.isArray(data.items) || !data.items.every(isReminder)) throw new Error("The reminder response was incomplete.");
+      if (generation === loadGenerationRef.current) setItems(data.items);
+    } catch (error: unknown) {
+      if (generation === loadGenerationRef.current) {
+        setLoadError(error instanceof Error ? error.message : "Unable to load reminders right now.");
+      }
+    } finally {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    }
   }, []);
-  useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => {
+    load();
+    return () => { loadGenerationRef.current += 1; };
+  }, [load, refreshKey]);
 
   const openEdit = (r: Reminder) => {
     setEditing({
@@ -135,7 +194,18 @@ export default function RemindersTab({ refreshKey = 0, onChanged }: { refreshKey
     <div className={`${s.card} ${s.remindersCard}`}>
       <div className={s.cardTitle}>Active reminders</div>
       {loading ? (
-        <div className={s.empty} style={{ padding: 20 }}>Loading…</div>
+        <div className={s.workspaceStateCompact} role="status" aria-live="polite">
+          <div className={s.workspaceStateIcon} aria-hidden="true">◎</div>
+          <div className={s.workspaceStateTitle}>Loading reminders…</div>
+          <p className={s.workspaceStateCopy}>Checking upcoming work and deadlines.</p>
+        </div>
+      ) : loadError ? (
+        <div className={`${s.workspaceStateCompact} ${s.workspaceStateError}`} role="alert">
+          <div className={s.workspaceStateIcon} aria-hidden="true">!</div>
+          <div className={s.workspaceStateTitle}>Unable to load reminders</div>
+          <p className={s.workspaceStateCopy}>{loadError}</p>
+          <button type="button" className={s.btn} onClick={load}>Try again</button>
+        </div>
       ) : items.length === 0 ? (
         <div className={s.empty} style={{ padding: 20 }}>You&apos;re all caught up. ✨</div>
       ) : (

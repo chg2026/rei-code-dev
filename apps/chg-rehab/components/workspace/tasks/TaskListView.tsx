@@ -153,8 +153,8 @@ function TaskRow({
         flexWrap: "wrap",
         gap: 12,
         padding: "9px 12px",
-        background: "#fff",
-        border: "1px solid var(--border-2, #DCD9D2)",
+        background: "var(--chg-glass-surface-1)",
+        border: "1px solid var(--chg-glass-line)",
         borderRadius: 10,
       }}
     >

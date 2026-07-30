@@ -4,11 +4,28 @@ import { useCallback, useEffect, useState } from "react";
 
 type Department = { id: string; name: string; color: string | null };
 
+function isDepartment(value: unknown): value is Department {
+  if (!value || typeof value !== "object") return false;
+  const department = value as Record<string, unknown>;
+  return (
+    typeof department.id === "string" &&
+    typeof department.name === "string" &&
+    (department.color === null || typeof department.color === "string")
+  );
+}
+
+function apiError(body: unknown, fallback: string) {
+  if (!body || typeof body !== "object") return fallback;
+  const error = (body as Record<string, unknown>).error;
+  return typeof error === "string" && error ? error : fallback;
+}
+
 const COLORS = ["#6366f1", "#1F4D5C", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#6B7280"];
 
 export default function DepartmentsPanel() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const [creating, setCreating] = useState(false);
@@ -21,10 +38,24 @@ export default function DepartmentsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await fetch("/api/pm/spaces", { cache: "no-store" });
-      const d = await r.json().catch(() => ({}));
-      setDepartments(d.spaces ?? []);
+      let body: unknown;
+      try {
+        body = await r.json();
+      } catch {
+        throw new Error("Failed to load departments");
+      }
+      if (!r.ok) throw new Error(apiError(body, "Failed to load departments"));
+      if (!body || typeof body !== "object") throw new Error("Failed to load departments");
+      const spaces = (body as Record<string, unknown>).spaces;
+      if (!Array.isArray(spaces) || !spaces.every(isDepartment)) {
+        throw new Error("Failed to load departments");
+      }
+      setDepartments(spaces);
+    } catch (e) {
+      setLoadError((e as Error).message || "Failed to load departments");
     } finally {
       setLoading(false);
     }
@@ -95,10 +126,10 @@ export default function DepartmentsPanel() {
   };
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 640 }}>
+    <div className="departments-panel" style={{ padding: "24px 28px", maxWidth: 640 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>Departments</h1>
-        {!creating ? (
+        {!creating && !loading && !loadError ? (
           <button type="button" onClick={() => { setCreating(true); setErr(null); }} style={btnPrimary}>+ New Department</button>
         ) : null}
       </div>
@@ -106,7 +137,7 @@ export default function DepartmentsPanel() {
         Company departments organize tasks across the workspace. Only admins can manage them.
       </p>
 
-      {err ? <div style={{ fontSize: 12, color: "var(--danger, #EF4444)", marginBottom: 12 }}>{err}</div> : null}
+      {err ? <div className="departments-mutation-error" style={{ fontSize: 12, color: "var(--danger, #EF4444)", marginBottom: 12 }}>{err}</div> : null}
 
       {creating ? (
         <div style={{ ...card, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -143,16 +174,30 @@ export default function DepartmentsPanel() {
       ) : null}
 
       {loading ? (
-        <div style={{ ...card, padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>Loading…</div>
+        <section className="settings-state-panel" role="status" aria-live="polite">
+          <div className="settings-state-icon" aria-hidden="true">◎</div>
+          <h2>Loading departments…</h2>
+          <p>Gathering your company&apos;s workspace structure.</p>
+        </section>
+      ) : loadError ? (
+        <section className="settings-state-panel settings-state-error" role="alert">
+          <div className="settings-state-icon" aria-hidden="true">!</div>
+          <h2>Unable to load departments</h2>
+          <p>{loadError}</p>
+          <button type="button" className="settings-state-button" onClick={() => void load()}>Try again</button>
+        </section>
       ) : departments.length === 0 ? (
-        <div style={{ ...card, padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-          No departments yet.
-        </div>
+        <section className="settings-state-panel settings-state-empty">
+          <div className="settings-state-icon" aria-hidden="true">◇</div>
+          <h2>No departments yet.</h2>
+          <p>Create your first department to organize lists, statuses, and workspace tasks.</p>
+        </section>
       ) : (
-        <div style={{ ...card, overflow: "hidden" }}>
+        <div className="departments-list" style={{ ...card, overflow: "hidden" }}>
           {departments.map((dep, i) => (
             <div
               key={dep.id}
+              className="department-row"
               style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
                 borderBottom: i < departments.length - 1 ? "0.5px solid var(--border-lo)" : "none",
@@ -172,7 +217,7 @@ export default function DepartmentsPanel() {
                   style={{ ...input, flex: 1 }}
                 />
               ) : (
-                <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{dep.name}</span>
+                <span className="department-name" style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{dep.name}</span>
               )}
               <button
                 type="button"
@@ -197,9 +242,10 @@ export default function DepartmentsPanel() {
 }
 
 const card: React.CSSProperties = {
-  background: "var(--bg-primary, #fff)",
-  border: "0.5px solid var(--border-lo)",
-  borderRadius: 10,
+  background: "var(--chg-glass-surface-1)",
+  border: "1px solid var(--chg-glass-line)",
+  borderRadius: "var(--chg-radius-sm)",
+  padding: 16,
 };
 const fieldLabel: React.CSSProperties = {
   display: "block", fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", marginBottom: 6,

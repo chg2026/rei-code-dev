@@ -261,10 +261,12 @@ export default function MessagesPage() {
           None yet.
         </div>
       ) : items.map((c) => (
-        <div
+        <button
+          type="button"
           key={c.id}
           className={`${s.msgListItem} ${activeId === c.id ? s.active : ""}`}
           onClick={() => setActiveId(c.id)}
+          aria-current={activeId === c.id ? "true" : undefined}
         >
           <div className={s.msgListMain}>
             <div className={s.msgListTitle}>
@@ -273,7 +275,7 @@ export default function MessagesPage() {
             </div>
             {c.preview ? <div className={s.msgListPreview}>{c.preview}</div> : null}
           </div>
-        </div>
+        </button>
       ))}
     </>
   );
@@ -391,6 +393,9 @@ export default function MessagesPage() {
                   {mentionOpen && mentionMatches.length ? (
                     <div
                       className={s.mentionPicker}
+                      id="message-mention-options"
+                      role="listbox"
+                      aria-label="Mention a teammate"
                       style={{
                         position: "absolute",
                         bottom: "100%",
@@ -406,8 +411,12 @@ export default function MessagesPage() {
                       }}
                     >
                       {mentionMatches.map((u, i) => (
-                        <div
+                        <button
+                          type="button"
                           key={u.id}
+                          id={`message-mention-${u.id}`}
+                          role="option"
+                          aria-selected={i === mentionIndex}
                           onMouseDown={(e) => { e.preventDefault(); applyMention(u); }}
                           style={{
                             display: "flex",
@@ -416,19 +425,28 @@ export default function MessagesPage() {
                             padding: "6px 10px",
                             cursor: "pointer",
                             background: i === mentionIndex ? "#f0f7ff" : "#fff",
+                            border: 0,
+                            width: "100%",
+                            color: "inherit",
+                            font: "inherit",
+                            textAlign: "left",
                           }}
                         >
                           <span className={s.avatar} style={{ width: 20, height: 20, fontSize: 9 }}>{u.initials}</span>
                           <span style={{ fontSize: 12 }}>{u.name}</span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   ) : null}
                   <textarea
                     ref={composerRef}
+                    role="combobox"
                     className={s.composerInput}
                     style={{ width: "100%" }}
                     value={composer}
+                    aria-expanded={mentionOpen && mentionMatches.length > 0}
+                    aria-controls={mentionOpen && mentionMatches.length > 0 ? "message-mention-options" : undefined}
+                    aria-activedescendant={mentionOpen && mentionMatches.length > 0 ? `message-mention-${mentionMatches[mentionIndex]?.id}` : undefined}
                     onChange={onComposerChange}
                     onKeyDown={(e) => {
                       if (mentionOpen && mentionMatches.length) {

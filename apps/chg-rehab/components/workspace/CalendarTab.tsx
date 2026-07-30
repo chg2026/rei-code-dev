@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import s from "./styles.module.css";
 import CreateTaskModal from "./CreateTaskModal";
@@ -20,6 +20,44 @@ type ReminderPayload = {
 };
 type Ev = { id: string; title: string; when: string; kind: string; link: string | null; color?: string | null; reminder?: ReminderPayload };
 type SpaceLite = { id: string; name: string; color: string | null };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isReminderPayload(value: unknown): value is ReminderPayload {
+  return isRecord(value)
+    && typeof value.id === "string"
+    && typeof value.title === "string"
+    && isNullableString(value.notes)
+    && Array.isArray(value.tags)
+    && value.tags.every((tag) => typeof tag === "string")
+    && isNullableString(value.dueDate)
+    && isNullableString(value.dueTime)
+    && isNullableString(value.urgency)
+    && isNullableString(value.assigneeId)
+    && (value.assigneeName === undefined || isNullableString(value.assigneeName))
+    && (value.assigneeInitials === undefined || isNullableString(value.assigneeInitials));
+}
+
+function isCalendarEvent(value: unknown): value is Ev {
+  if (!isRecord(value)) return false;
+  const validBase = typeof value.id === "string"
+    && typeof value.title === "string"
+    && typeof value.when === "string"
+    && !Number.isNaN(Date.parse(value.when))
+    && typeof value.kind === "string"
+    && isNullableString(value.link)
+    && (value.color === undefined || isNullableString(value.color));
+  if (!validBase) return false;
+  return value.kind === "reminder"
+    ? isReminderPayload(value.reminder)
+    : value.reminder === undefined;
+}
 
 const KIND_LABELS: Record<string, string> = {
   task: "Task due",
@@ -60,9 +98,11 @@ export default function CalendarTab({
   const [cursor, setCursor] = useState<{ y: number; m: number } | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createDate, setCreateDate] = useState<string | null>(null);
   const [editingReminder, setEditingReminder] = useState<ReminderDraft | null>(null);
   const [spaces, setSpaces] = useState<SpaceLite[]>([]);
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
     const n = new Date();
@@ -78,14 +118,27 @@ export default function CalendarTab({
 
   const load = useCallback(async () => {
     if (!cursor) return;
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
+    setLoadError(null);
     try {
       const r = await fetch(`/api/workspace/calendar?month=${cursor.y}-${String(cursor.m).padStart(2, "0")}`, { cache: "no-store" });
+      if (!r.ok) throw new Error("Unable to load calendar right now.");
       const data = await r.json();
-      setEvents(data.events ?? []);
-    } finally { setLoading(false); }
+      if (!Array.isArray(data.events) || !data.events.every(isCalendarEvent)) throw new Error("The calendar response was incomplete.");
+      if (generation === loadGenerationRef.current) setEvents(data.events);
+    } catch (error: unknown) {
+      if (generation === loadGenerationRef.current) {
+        setLoadError(error instanceof Error ? error.message : "Unable to load calendar right now.");
+      }
+    } finally {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    }
   }, [cursor]);
-  useEffect(() => { load(); }, [load, refreshKey]);
+  useEffect(() => {
+    load();
+    return () => { loadGenerationRef.current += 1; };
+  }, [load, refreshKey]);
 
   const openReminder = useCallback((ev: Ev) => {
     if (!ev.reminder) return;
@@ -141,6 +194,27 @@ export default function CalendarTab({
 
   // Render nothing on the server / first client paint to keep markup identical.
   if (!cursor) return <div className={s.calWrap}><div className={s.empty}>Loading calendar…</div></div>;
+
+  if (loading) {
+    return (
+      <section className={`${s.workspaceState} ${s.workspaceStateCompact}`} role="status" aria-live="polite">
+        <div className={s.workspaceStateIcon} aria-hidden="true">◎</div>
+        <h2 className={s.workspaceStateTitle}>Loading calendar…</h2>
+        <p className={s.workspaceStateCopy}>Gathering events for this month.</p>
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className={`${s.workspaceState} ${s.workspaceStateCompact} ${s.workspaceStateError}`} role="alert">
+        <div className={s.workspaceStateIcon} aria-hidden="true">!</div>
+        <h2 className={s.workspaceStateTitle}>Unable to load calendar</h2>
+        <p className={s.workspaceStateCopy}>{loadError}</p>
+        <button type="button" className={s.btn} onClick={load}>Try again</button>
+      </section>
+    );
+  }
 
   return (
     <div className={s.calWrap}>
@@ -264,9 +338,7 @@ export default function CalendarTab({
       <div>
         <div className={s.card}>
           <div className={s.cardTitle}>Upcoming events</div>
-          {loading ? (
-            <div className={s.empty} style={{ padding: 20 }}>Loading…</div>
-          ) : upcoming.length === 0 ? (
+          {upcoming.length === 0 ? (
             <div className={s.empty} style={{ padding: 20 }}>No upcoming events this month</div>
           ) : upcoming.map((e) => {
             const d = new Date(e.when);

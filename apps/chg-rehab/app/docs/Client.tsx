@@ -150,14 +150,16 @@ export default function DocsClient(props: {
           <div className="ln-sec">
             <div className="ln-hd">Level</div>
             {LEVELS.map((l) => (
-              <div
+              <button
+                type="button"
                 key={l.code}
                 className={`ln-item${level === l.code ? " active" : ""}`}
                 onClick={() => setLevel(l.code)}
+                aria-pressed={level === l.code}
               >
                 {l.label} docs
                 <span className="ln-count">{levelCounts[l.code]}</span>
-              </div>
+              </button>
             ))}
           </div>
           <div className="ln-sec">
@@ -166,7 +168,8 @@ export default function DocsClient(props: {
               const warn = s.code === "expiring" || s.code === "expired";
               const c = statusCounts[s.code] ?? 0;
               return (
-                <div
+                <button
+                  type="button"
                   key={s.code}
                   className={`ln-item${statusFilter === s.code ? " active" : ""}`}
                   style={
@@ -175,24 +178,27 @@ export default function DocsClient(props: {
                       : undefined
                   }
                   onClick={() => setStatusFilter(s.code)}
+                  aria-pressed={statusFilter === s.code}
                 >
                   {s.label}
                   <span className={warn && c > 0 ? "ln-warn" : "ln-count"}>{c}</span>
-                </div>
+                </button>
               );
             })}
           </div>
           <div className="ln-sec">
             <div className="ln-hd">Category</div>
             {CATEGORIES.map((c) => (
-              <div
+              <button
+                type="button"
                 key={c.code}
                 className={`ln-item${catFilter === c.code ? " active" : ""}`}
                 onClick={() => setCatFilter(c.code)}
+                aria-pressed={catFilter === c.code}
               >
                 {c.label}
                 <span className="ln-count">{catCounts[c.code] ?? 0}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>

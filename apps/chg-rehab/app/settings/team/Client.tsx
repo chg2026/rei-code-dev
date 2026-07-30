@@ -75,6 +75,8 @@ function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         position: "fixed",
         bottom: 24,
@@ -224,44 +226,27 @@ export default function TeamSettingsClient({
   const memberCount = useMemo(() => members.length, [members]);
 
   return (
-    <div className="admin-wrap" style={{ padding: 24, maxWidth: 980 }}>
+    <div className="team-settings admin-wrap" style={{ padding: 24, maxWidth: 980 }}>
       <h1 style={{ margin: "0 0 4px", fontSize: 22 }}>Team</h1>
       <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18 }}>
         {userName}
         {userEmail ? ` · ${userEmail}` : ""} · {roleLabel(role)}
       </div>
 
-      {error && (
-        <div
-          style={{
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            color: "#991b1b",
-            padding: "10px 12px",
-            borderRadius: 6,
-            fontSize: 13,
-            marginBottom: 16,
-          }}
-        >
-          {error}{" "}
-          <button
-            onClick={() => void loadAll()}
-            style={{
-              marginLeft: 8,
-              fontSize: 12,
-              padding: "2px 8px",
-              borderRadius: 4,
-              border: "1px solid #991b1b",
-              background: "transparent",
-              color: "#991b1b",
-              cursor: "pointer",
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
+      {loading ? (
+        <section className="settings-state-panel" role="status" aria-live="polite">
+          <div className="settings-state-icon" aria-hidden="true">◎</div>
+          <h2>Loading team…</h2>
+          <p>Gathering members, roles, and pending invitations.</p>
+        </section>
+      ) : error ? (
+        <section className="settings-state-panel settings-state-error" role="alert">
+          <div className="settings-state-icon" aria-hidden="true">!</div>
+          <h2>Unable to load team</h2>
+          <p>{error}</p>
+          <button type="button" className="settings-state-button" onClick={() => void loadAll()}>Retry</button>
+        </section>
+      ) : (
       <div className="admin-panel active">
         {/* Team Members */}
         <div className="admin-group">
@@ -297,13 +282,10 @@ export default function TeamSettingsClient({
             </div>
           </div>
 
-          {loading ? (
-            <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
-              Loading…
-            </div>
-          ) : members.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
-              No team members yet.
+          {members.length === 0 ? (
+            <div className="settings-inline-empty">
+              <strong>Your team is ready to grow.</strong>
+              <span>{isAdmin ? "Use the invitation form below to add the first teammate." : "An account admin can invite teammates when your organization is ready."}</span>
             </div>
           ) : (
             members.map((m) => {
@@ -432,13 +414,10 @@ export default function TeamSettingsClient({
             Invitations that haven&apos;t been accepted yet.
           </div>
 
-          {loading ? (
-            <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
-              Loading…
-            </div>
-          ) : pending.length === 0 ? (
-            <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "10px 0" }}>
-              No pending invites.
+          {pending.length === 0 ? (
+            <div className="settings-inline-empty settings-inline-empty-compact">
+              <strong>No invitations are waiting.</strong>
+              <span>New invitations will appear here until they are accepted or revoked.</span>
             </div>
           ) : (
             pending.map((p) => (
@@ -503,6 +482,7 @@ export default function TeamSettingsClient({
           )}
         </div>
       </div>
+      )}
 
       <Toast message={toast} />
     </div>

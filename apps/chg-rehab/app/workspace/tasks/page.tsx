@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import s from "@/components/workspace/styles.module.css";
 import {
+  STATUS_ORDER,
   type TaskSpace,
   type TeamMember,
   type WsStatus,
@@ -21,6 +22,48 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "assignedOut", label: "Assigned out" },
 ];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function isTaskSpace(value: unknown): value is TaskSpace {
+  return isRecord(value) && typeof value.id === "string" && typeof value.name === "string" && isNullableString(value.color);
+}
+
+function isTaskAssignee(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.user)) return false;
+  const user = value.user;
+  return typeof user.id === "string" && typeof user.name === "string" && typeof user.initials === "string" && isNullableString(user.avatarUrl);
+}
+
+function isOptionalPerson(value: unknown, includeInitials = false): boolean {
+  if (value === null) return true;
+  return isRecord(value) && typeof value.id === "string" && typeof value.name === "string" && (!includeInitials || typeof value.initials === "string");
+}
+
+function isWorkspaceTask(value: unknown): value is WsTaskDTO {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string"
+    && typeof value.title === "string"
+    && typeof value.priority === "string"
+    && typeof value.status === "string"
+    && STATUS_ORDER.includes(value.status as WsStatus)
+    && typeof value.isPrivate === "boolean"
+    && isNullableString(value.dueDate)
+    && typeof value.done === "boolean"
+    && isNullableString(value.linkLabel)
+    && (value.space === null || isTaskSpace(value.space))
+    && Array.isArray(value.assignees)
+    && value.assignees.every(isTaskAssignee)
+    && isOptionalPerson(value.assignee, true)
+    && isOptionalPerson(value.createdBy)
+    && typeof value.createdAt === "string";
+}
+
 export default function MyTasksPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [view, setView] = useState<ViewMode>("list");
@@ -29,6 +72,7 @@ export default function MyTasksPage() {
   const [spaces, setSpaces] = useState<TaskSpace[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [creating, setCreating] = useState(false);
@@ -54,14 +98,21 @@ export default function MyTasksPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    setLoadError(null);
     const params = new URLSearchParams({ view: tab });
     if (personFilter) params.set("userId", personFilter);
     fetch(`/api/workspace/tasks?${params.toString()}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (alive) setTasks(d.tasks ?? []);
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Unable to load tasks right now.");
+        return r.json();
       })
-      .catch(() => undefined)
+      .then((d) => {
+        if (!Array.isArray(d.tasks) || !d.tasks.every(isWorkspaceTask)) throw new Error("The task response was incomplete.");
+        if (alive) setTasks(d.tasks);
+      })
+      .catch((error: unknown) => {
+        if (alive) setLoadError(error instanceof Error ? error.message : "Unable to load tasks right now.");
+      })
       .finally(() => {
         if (alive) setLoading(false);
       });
@@ -187,7 +238,18 @@ export default function MyTasksPage() {
 
       <div className={s.body}>
         {loading ? (
-          <div className={s.empty}>Loading tasks…</div>
+          <section className={s.workspaceState} role="status" aria-live="polite">
+            <div className={s.workspaceStateIcon} aria-hidden="true">◎</div>
+            <h2 className={s.workspaceStateTitle}>Loading tasks…</h2>
+            <p className={s.workspaceStateCopy}>Gathering work across your departments.</p>
+          </section>
+        ) : loadError ? (
+          <section className={`${s.workspaceState} ${s.workspaceStateError}`} role="alert">
+            <div className={s.workspaceStateIcon} aria-hidden="true">!</div>
+            <h2 className={s.workspaceStateTitle}>Unable to load tasks</h2>
+            <p className={s.workspaceStateCopy}>{loadError}</p>
+            <button type="button" className={s.btn} onClick={refresh}>Try again</button>
+          </section>
         ) : view === "list" ? (
           <TaskListView
             tab={tab}

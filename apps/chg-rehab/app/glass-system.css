@@ -961,6 +961,129 @@ body::before {
   color: var(--red-txt, #8b1a1a);
 }
 
+/* Team and Departments: explicit request states and route-owned glass surfaces. */
+.team-settings,
+.departments-panel {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.team-settings .settings-state-panel,
+.departments-panel .settings-state-panel {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 230px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--chg-space-6);
+  border: 1px solid var(--chg-glass-line);
+  border-radius: var(--chg-radius-lg);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(169, 147, 106, 0.12), transparent 38%),
+    linear-gradient(145deg, var(--chg-glass-surface-3), var(--chg-glass-surface-1));
+  box-shadow: var(--chg-glass-shadow);
+  color: var(--chg-glass-muted);
+  text-align: center;
+  -webkit-backdrop-filter: blur(20px) saturate(118%);
+  backdrop-filter: blur(20px) saturate(118%);
+}
+
+.team-settings .settings-state-icon,
+.departments-panel .settings-state-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--chg-glass-line-strong);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--chg-glass-marine-ink);
+  font-size: 1rem;
+}
+
+.team-settings .settings-state-panel h2,
+.departments-panel .settings-state-panel h2 {
+  margin: 2px 0 0;
+  color: var(--chg-glass-ink);
+  font-family: var(--chg-font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.team-settings .settings-state-panel p,
+.departments-panel .settings-state-panel p {
+  width: 100%;
+  max-width: 500px;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.team-settings .settings-state-error,
+.departments-panel .settings-state-error {
+  border-color: rgba(160, 76, 64, 0.24);
+  background: linear-gradient(145deg, rgba(255, 244, 240, 0.82), rgba(255, 252, 247, 0.68));
+}
+
+.team-settings .settings-state-error .settings-state-icon,
+.departments-panel .settings-state-error .settings-state-icon { color: var(--danger); }
+
+.team-settings .settings-state-button,
+.departments-panel .settings-state-button {
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 1px solid var(--chg-glass-marine);
+  border-radius: var(--chg-radius-sm);
+  background: var(--chg-glass-marine);
+  color: white;
+  cursor: pointer;
+  font: 650 0.74rem var(--chg-font-sans);
+}
+
+.team-settings .settings-inline-empty {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: var(--chg-space-4);
+  border: 1px dashed var(--chg-glass-line-strong);
+  border-radius: var(--chg-radius-md);
+  background: rgba(255, 255, 255, 0.28);
+  color: var(--chg-glass-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.team-settings .settings-inline-empty strong { color: var(--chg-glass-ink); font-size: 0.86rem; }
+.team-settings .settings-inline-empty-compact { min-height: 86px; }
+.team-settings .admin-panel,
+.departments-panel .departments-list { border-color: var(--chg-glass-line); background: var(--chg-glass-surface-2); box-shadow: var(--chg-glass-shadow-soft); }
+.team-settings .admin-row,
+.team-settings .admin-info { min-width: 0; }
+.departments-panel .departments-list,
+.departments-panel .department-row,
+.departments-panel .department-name { min-width: 0; max-width: 100%; }
+.departments-panel .department-name,
+.departments-panel .departments-mutation-error {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @media (max-width: 1120px) {
   .property-documents-header,
   .property-document-row { grid-template-columns: minmax(200px, 1fr) 96px 104px minmax(130px, max-content); }
@@ -992,4 +1115,13 @@ body::before {
   .property-content { min-height: 520px; }
   .property-page .proj-bar { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
   .property-page .proj-r { width: 100%; justify-content: flex-start; }
+  .team-settings,
+  .departments-panel { max-width: 100% !important; padding: 16px !important; }
+  .team-settings .settings-state-panel,
+  .departments-panel .settings-state-panel { min-height: 210px; padding: var(--chg-space-5); }
+  .team-settings .admin-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .team-settings .admin-input { width: 100% !important; max-width: 100%; min-width: 0 !important; }
+  .team-settings form,
+  .team-settings .admin-row > div:last-child { max-width: 100%; flex-wrap: wrap; }
+  .departments-panel > div:first-child { align-items: flex-start !important; flex-wrap: wrap; gap: 10px; }
 }

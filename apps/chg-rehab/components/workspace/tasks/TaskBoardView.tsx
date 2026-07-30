@@ -70,8 +70,8 @@ export default function TaskBoardView({
             style={{
               width: 296,
               flexShrink: 0,
-              background: isOver ? tint(col.color, 0.12) : "var(--bone, #F5F4F0)",
-              border: isOver ? `1.5px dashed ${dot}` : "1px solid var(--border-2, #DCD9D2)",
+              background: isOver ? tint(col.color, 0.12) : "var(--chg-glass-surface-2)",
+              border: isOver ? `1.5px dashed ${dot}` : "1px solid var(--chg-glass-line)",
               borderRadius: 14,
               padding: 10,
               transition: "background .12s",
@@ -110,9 +110,9 @@ export default function TaskBoardView({
                     onDragEnd={() => setDragId(null)}
                     onClick={() => onOpen(t.id)}
                     style={{
-                      background: "#fff",
-                      borderRadius: 10,
-                      border: "1px solid var(--border-2, #DCD9D2)",
+                      background: "var(--chg-glass-surface-1)",
+                      borderRadius: "var(--chg-radius-sm)",
+                      border: "1px solid var(--chg-glass-line)",
                       borderLeft: `3px solid ${dot}`,
                       padding: 11,
                       cursor: "pointer",
@@ -120,8 +120,21 @@ export default function TaskBoardView({
                       boxShadow: "0 1px 2px rgba(10,10,10,0.04)",
                     }}
                   >
-                    <div
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpen(t.id);
+                      }}
+                      aria-label={`Open task: ${t.title}`}
                       style={{
+                        width: "100%",
+                        padding: 0,
+                        background: "none",
+                        border: 0,
+                        font: "inherit",
+                        textAlign: "left",
+                        cursor: "pointer",
                         fontSize: 13.5,
                         fontWeight: 600,
                         color: "var(--ink, #0A0A0A)",
@@ -133,7 +146,7 @@ export default function TaskBoardView({
                       }}
                     >
                       {t.title}
-                    </div>
+                    </button>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }} onClick={(e) => e.stopPropagation()}>
                       <StatusPill value={t.status} onChange={(s) => onStatusChange(t.id, s)} size="sm" />
                       {showPriority ? (
