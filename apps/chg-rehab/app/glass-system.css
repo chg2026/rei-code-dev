@@ -792,6 +792,76 @@ body::before {
 .property-status-banner--success { background: linear-gradient(135deg, rgba(229, 244, 232, 0.9), rgba(247, 252, 245, 0.7)); color: #2c653e; }
 .property-status-banner--violet { background: linear-gradient(135deg, rgba(239, 235, 250, 0.9), rgba(250, 248, 255, 0.68)); color: #543a84; }
 
+/* Documents Hub owns a wider action column than the shared rehab document
+   table. Keep the header and rows in one scroll container so their columns
+   remain aligned at narrower desktop widths. */
+.documents-hub .doc-main {
+  min-width: 0;
+}
+
+.documents-hub-table-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.documents-hub .doc-tbl-hd,
+.documents-hub .doc-tbl-row {
+  grid-template-columns:
+    minmax(180px, 1fr)
+    minmax(72px, 90px)
+    minmax(72px, 80px)
+    minmax(88px, 96px)
+    minmax(210px, max-content);
+  column-gap: 12px;
+  min-width: 700px;
+}
+
+.documents-hub .doc-tbl-hd {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.documents-hub .doc-acts {
+  min-width: 0;
+  gap: 6px;
+}
+
+.documents-hub-action {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--chg-glass-marine-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 5px 4px;
+  text-decoration: none;
+}
+
+.documents-hub-action:hover {
+  color: var(--chg-glass-ink);
+  text-decoration: underline;
+}
+
+.documents-hub-action:focus-visible {
+  outline: 2px solid var(--chg-glass-marine);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.documents-hub-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.documents-hub-delete {
+  color: var(--red-txt, #8b1a1a);
+}
+
 @media (max-width: 1120px) {
   .property-documents-header,
   .property-document-row { grid-template-columns: minmax(200px, 1fr) 96px 104px minmax(130px, max-content); }

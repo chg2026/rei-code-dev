@@ -123,7 +123,7 @@ export default function DocsClient(props: {
   const filtered = props.docs;
 
   return (
-    <div className="module active">
+    <div className="module active documents-hub">
       <div className="proj-bar">
         <div className="proj-l">
           <span className="proj-addr">Documents Hub</span>
@@ -231,16 +231,16 @@ export default function DocsClient(props: {
               </button>
             )}
           </form>
-          <div className="doc-tbl-hd">
-            <span className="col-label">Document</span>
-            <span className="col-label">Type</span>
-            <span className="col-label">Status</span>
-            <span className="col-label">Date (ET)</span>
-            <span className="col-label" style={{ textAlign: "right" }}>
-              Actions
-            </span>
-          </div>
-          <div style={{ overflowY: "auto", flex: 1 }}>
+          <div className="documents-hub-table-scroll">
+            <div className="doc-tbl-hd">
+              <span className="col-label">Document</span>
+              <span className="col-label">Type</span>
+              <span className="col-label">Status</span>
+              <span className="col-label">Date (ET)</span>
+              <span className="col-label" style={{ textAlign: "right" }}>
+                Actions
+              </span>
+            </div>
             {filtered.length === 0 && (
               <div style={{ padding: 24, fontSize: 11, color: "var(--text-tertiary)", textAlign: "center" }}>
                 No documents match these filters.
@@ -315,7 +315,8 @@ export default function DocsClient(props: {
                 </div>
                 <div className="doc-acts">
                   <button
-                    className="view-btn"
+                    className="view-btn documents-hub-action"
+                    aria-label={`View ${d.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       setOpenModal({ kind: "view", doc: d });
@@ -339,27 +340,30 @@ export default function DocsClient(props: {
                     <>
                       <button
                         type="button"
+                        className="documents-hub-action"
+                        aria-label={`Preview ${d.name}`}
                         onClick={(e) => { e.stopPropagation(); fetchPreview(d.id); }}
-                        style={{ marginRight: 8, background: "none", border: "none", cursor: "pointer", color: "var(--marine)", fontSize: 13 }}
                       >
                         Preview
                       </button>
                       <a
                         href={`/api/documents/${d.id}/download`}
-                        className="cell-dl"
+                        className="cell-dl documents-hub-action documents-hub-download"
+                        aria-label={`Download ${d.name}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         ↓
                       </a>
                       <button
                         type="button"
+                        className="documents-hub-action documents-hub-delete"
+                        aria-label={`Delete ${d.name}`}
                         onClick={async (e) => {
                           e.stopPropagation();
                           if (!window.confirm("Delete this document?")) return;
                           const r = await fetch(`/api/documents/${d.id}`, { method: "DELETE" });
                           if (r.ok) refresh();
                         }}
-                        style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 13 }}
                       >
                         Delete
                       </button>
