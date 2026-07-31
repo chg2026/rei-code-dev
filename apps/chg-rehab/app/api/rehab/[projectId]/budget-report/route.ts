@@ -35,6 +35,7 @@ export async function GET(
     select: { name: true },
   });
 
+  try {
   // Same three data sources the Budget & Costs page reads.
   const actualsMap = await computePhaseActualBreakdowns(project.id);
   const pendingCOs = await computePendingChangeOrders(project.id);
@@ -140,12 +141,25 @@ export async function GET(
     .replace(/^-+|-+$/g, "");
   const filename = `budget-report-${safeName}.pdf`;
 
-  return new NextResponse(Buffer.from(pdfBytes), {
+  // Serve the bytes as an ArrayBuffer with an explicit Content-Length so no
+  // proxy can truncate the stream. The whole build is wrapped so that if
+  // anything ever throws we return a JSON 500 — never an HTML error page the
+  // browser would save as a broken .pdf.
+  const body = new Uint8Array(pdfBytes);
+  return new NextResponse(body, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Length": String(body.byteLength),
       "Cache-Control": "no-store",
     },
   });
+  } catch (err) {
+    console.error("[budget-report] failed to build PDF", err);
+    return NextResponse.json(
+      { error: "Could not generate the budget report. Please try again." },
+      { status: 500 }
+    );
+  }
 }

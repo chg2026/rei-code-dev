@@ -55,6 +55,38 @@ export interface BudgetReportInput {
 const fmtUSD = (n: number) =>
   `${n < 0 ? "-" : ""}$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;
 
+/**
+ * Make any string safe for pdf-lib's StandardFont (Helvetica), whose WinAnsi
+ * (CP1252) encoding throws on characters it can't encode — emoji, the true
+ * minus sign (U+2212), arrows, non-Latin scripts, etc. An unsanitised draw
+ * would crash the whole generator, the API route would 500, and the browser
+ * would save the error page as a .pdf ("corrupted, won't open").
+ *
+ * We map the common typographic look-alikes to ASCII, then drop anything still
+ * outside the Latin-1 range so a draw can NEVER throw, whatever the input.
+ */
+function pdfText(input: unknown): string {
+  let s = String(input ?? "");
+  const map: Record<string, string> = {
+    "\u2212": "-", // minus sign → hyphen
+    "\u2013": "-", // en dash
+    "\u2014": "-", // em dash
+    "\u2018": "'", "\u2019": "'", // curly single quotes
+    "\u201C": '"', "\u201D": '"', // curly double quotes
+    "\u2192": "->", "\u2190": "<-", "\u2194": "<->", // arrows
+    "\u2026": "...", // ellipsis
+    "\u00A0": " ", // non-breaking space
+    "\u2022": "-", // bullet
+    "\u2713": "x", "\u2714": "x", "\u2610": "[ ]", "\u2611": "[x]", // check/box marks
+  };
+  s = s.replace(/[\u2212\u2013\u2014\u2018\u2019\u201C\u201D\u2192\u2190\u2194\u2026\u00A0\u2022\u2713\u2714\u2610\u2611]/g, (c) => map[c] ?? c);
+  // Drop anything still outside the WinAnsi-safe Latin-1 printable range so a
+  // draw can never throw. \t and \n aren't drawn here; keep space..ÿ + the
+  // CP1252 punctuation block (·, etc.) which pdf-lib's WinAnsi does support.
+  s = s.replace(/[^\x20-\x7E\u00A1-\u00FF·]/g, "?");
+  return s;
+}
+
 export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -74,13 +106,17 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
   let page: PDFPage = pdf.addPage([PAGE_W, PAGE_H]);
   let y = 0;
 
+  // Every text draw goes through here so no raw string ever reaches WinAnsi.
+  type DrawOpts = { x: number; y: number; size: number; font: PDFFont; color: ReturnType<typeof rgb> };
+  const draw = (text: unknown, opts: DrawOpts) => page.drawText(pdfText(text), opts);
+
   const header = (first: boolean) => {
     page.drawRectangle({ x: 0, y: PAGE_H - 40, width: PAGE_W, height: 40, color: teal });
-    page.drawText("Budget & Costs report", { x: LEFT, y: PAGE_H - 26, size: 16, font: bold, color: rgb(1, 1, 1) });
+    draw("Budget & Costs report", { x: LEFT, y: PAGE_H - 26, size: 16, font: bold, color: rgb(1, 1, 1) });
     if (first) {
-      page.drawText(i.projectName || i.address, { x: LEFT, y: PAGE_H - 66, size: 13, font: bold, color: ink });
-      page.drawText(`${i.address}${i.cityState ? " · " + i.cityState : ""}`, { x: LEFT, y: PAGE_H - 82, size: 10, font, color: muted });
-      page.drawText(
+      draw(i.projectName || i.address, { x: LEFT, y: PAGE_H - 66, size: 13, font: bold, color: ink });
+      draw(`${i.address}${i.cityState ? " · " + i.cityState : ""}`, { x: LEFT, y: PAGE_H - 82, size: 10, font, color: muted });
+      draw(
         `${i.companyName} · Generated ${new Date().toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}`,
         { x: LEFT, y: PAGE_H - 96, size: 9, font, color: muted }
       );
@@ -99,13 +135,13 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
   };
 
   const footer = () => {
-    page.drawText(`${i.companyName} · CHG Rehab — Budget & Costs`, { x: LEFT, y: 32, size: 8, font, color: muted });
-    page.drawText("Generated automatically — figures match the Budget & Costs screen.", { x: 300, y: 32, size: 8, font, color: muted });
+    draw(`${i.companyName} · CHG Rehab — Budget & Costs`, { x: LEFT, y: 32, size: 8, font, color: muted });
+    draw("Generated automatically — figures match the Budget & Costs screen.", { x: 300, y: 32, size: 8, font, color: muted });
   };
 
   const sectionTitle = (t: string) => {
     ensure(30);
-    page.drawText(t, { x: LEFT, y, size: 12, font: bold, color: teal });
+    draw(t, { x: LEFT, y, size: 12, font: bold, color: teal });
     y -= 6;
     page.drawLine({ start: { x: LEFT, y }, end: { x: RIGHT, y }, thickness: 0.5, color: line });
     y -= 16;
@@ -113,8 +149,8 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
 
   const kv = (label: string, value: string, opts: { color?: ReturnType<typeof rgb>; big?: boolean } = {}) => {
     ensure(20);
-    page.drawText(label, { x: LEFT, y, size: 10, font, color: muted });
-    page.drawText(value, {
+    draw(label, { x: LEFT, y, size: 10, font, color: muted });
+    draw(value, {
       x: 300, y, size: opts.big ? 13 : 11,
       font: opts.big ? bold : font,
       color: opts.color ?? ink,
@@ -144,9 +180,9 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
   const cardY = y - 62;
   const drawNeedCard = (x: number, title: string, amount: number, sub: string) => {
     page.drawRectangle({ x, y: cardY, width: cardW, height: 62, color: rgb(0.97, 0.97, 0.94), borderColor: line, borderWidth: 0.5 });
-    page.drawText(title, { x: x + 12, y: cardY + 44, size: 9, font, color: muted });
-    page.drawText(fmtUSD(amount), { x: x + 12, y: cardY + 22, size: 18, font: bold, color: amount < 0 ? red : ink });
-    page.drawText(sub, { x: x + 12, y: cardY + 8, size: 8, font, color: muted });
+    draw(title, { x: x + 12, y: cardY + 44, size: 9, font, color: muted });
+    draw(fmtUSD(amount), { x: x + 12, y: cardY + 22, size: 18, font: bold, color: amount < 0 ? red : ink });
+    draw(sub, { x: x + 12, y: cardY + 8, size: 8, font, color: muted });
   };
   drawNeedCard(LEFT, "Remaining budget", i.remainingBudget, "Working budget - already spent");
   drawNeedCard(LEFT + cardW + 16, "Forecast to complete", i.forecastToComplete, "Projected final - already spent");
@@ -164,7 +200,7 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
   sectionTitle("Job-type breakdown");
   ensure(16);
   const cols = { name: LEFT, budget: 250, labor: 320, mat: 400, spent: 480, pct: 560 };
-  const th = (t: string, x: number) => page.drawText(t, { x, y, size: 8, font: bold, color: muted });
+  const th = (t: string, x: number) => draw(t, { x, y, size: 8, font: bold, color: muted });
   th("Job type", cols.name);
   th("Budget", cols.budget);
   th("Labor", cols.labor);
@@ -179,13 +215,13 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
     ensure(16);
     const spent = jt.actualLabor + jt.actualMaterials + jt.actualOther;
     const over = spent > jt.budget && jt.budget > 0;
-    page.drawText(`${jt.number}. ${jt.name}`.slice(0, 34), { x: cols.name, y, size: 9, font, color: ink });
-    page.drawText(fmtUSD(jt.budget), { x: cols.budget, y, size: 9, font, color: ink });
-    page.drawText(fmtUSD(jt.actualLabor), { x: cols.labor, y, size: 9, font, color: ink });
-    page.drawText(fmtUSD(jt.actualMaterials), { x: cols.mat, y, size: 9, font, color: ink });
-    page.drawText(fmtUSD(spent), { x: cols.spent, y, size: 9, font, color: over ? red : teal });
+    draw(`${jt.number}. ${jt.name}`.slice(0, 34), { x: cols.name, y, size: 9, font, color: ink });
+    draw(fmtUSD(jt.budget), { x: cols.budget, y, size: 9, font, color: ink });
+    draw(fmtUSD(jt.actualLabor), { x: cols.labor, y, size: 9, font, color: ink });
+    draw(fmtUSD(jt.actualMaterials), { x: cols.mat, y, size: 9, font, color: ink });
+    draw(fmtUSD(spent), { x: cols.spent, y, size: 9, font, color: over ? red : teal });
     const pctLabel = jt.percentComplete == null ? "—" : `${Math.round(jt.percentComplete)}%`;
-    page.drawText(pctLabel, { x: cols.pct, y, size: 9, font, color: ink });
+    draw(pctLabel, { x: cols.pct, y, size: 9, font, color: ink });
     y -= 14;
   }
 
@@ -204,22 +240,22 @@ export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8A
   if (withOpen.length > 0) {
     y -= 4;
     ensure(18);
-    page.drawText("Outstanding checklist items:", { x: LEFT, y, size: 10, font: bold, color: ink });
+    draw("Outstanding checklist items:", { x: LEFT, y, size: 10, font: bold, color: ink });
     y -= 16;
     for (const jt of withOpen) {
       ensure(16);
-      page.drawText(`${jt.number}. ${jt.name} (${jt.checklistDone}/${jt.checklistTotal} done)`, {
+      draw(`${jt.number}. ${jt.name} (${jt.checklistDone}/${jt.checklistTotal} done)`, {
         x: LEFT, y, size: 9, font: bold, color: ink,
       });
       y -= 13;
       for (const item of jt.openChecklist.slice(0, 8)) {
         ensure(13);
-        page.drawText(`•  ${item}`.slice(0, 92), { x: LEFT + 14, y, size: 9, font, color: muted });
+        draw(`•  ${item}`.slice(0, 92), { x: LEFT + 14, y, size: 9, font, color: muted });
         y -= 12;
       }
       if (jt.openChecklist.length > 8) {
         ensure(13);
-        page.drawText(`…and ${jt.openChecklist.length - 8} more`, { x: LEFT + 14, y, size: 8, font, color: muted });
+        draw(`…and ${jt.openChecklist.length - 8} more`, { x: LEFT + 14, y, size: 8, font, color: muted });
         y -= 12;
       }
       y -= 2;
