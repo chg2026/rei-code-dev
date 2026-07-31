@@ -108,6 +108,31 @@ export default async function BudgetPage({
   // Committed = every invoice regardless of status (Unpaid, Pending, Paid).
   const totalCommitted = invoiceRows.reduce((acc, inv) => acc + Number(inv.amount), 0);
   const phaseBudgetTotal = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
+  // Project-total labor / materials split. Reuses the same per-phase actualsMap
+  // (invoice-classified spend) and phase.laborBudget / materialsBudget that the
+  // per-Job-Type expand rows use — this band is just their sum, never a second
+  // way of computing money.
+  let laborBudgetTotal = 0;
+  let materialsBudgetTotal = 0;
+  let unsplitBudgetTotal = 0;
+  let actualLaborTotal = 0;
+  let actualMaterialsTotal = 0;
+  let actualOtherTotal = 0;
+  for (const p of project.phases) {
+    const lb = Number(p.laborBudget ?? 0);
+    const mb = Number(p.materialsBudget ?? 0);
+    laborBudgetTotal += lb;
+    materialsBudgetTotal += mb;
+    if (lb + mb === 0) unsplitBudgetTotal += Number(p.budget ?? 0);
+    const bd = actualsMap.get(p.id);
+    actualLaborTotal += Number(bd?.labor ?? 0);
+    actualMaterialsTotal += Number(bd?.materials ?? 0);
+    actualOtherTotal += Number(bd?.other ?? 0);
+  }
+  const splitBands = [
+    { label: "Labor", budget: laborBudgetTotal, actual: actualLaborTotal, tone: "var(--blue-txt, #2563eb)" },
+    { label: "Materials", budget: materialsBudgetTotal, actual: actualMaterialsTotal, tone: "var(--green, #16a34a)" },
+  ];
   // Projected Final / Over-Under come from the shared project-forecast helper
   // (lib/rehab/projectForecast.ts): Σ per-phase EAC with pending COs folded in,
   // measured against the working budget (Σ phase budgets — NOT the signed
@@ -181,13 +206,45 @@ export default async function BudgetPage({
         <div className="kpi-card"><div className="kpi-label">Contractor balance</div><div className={`kpi-val ${pendingBalance > 0 ? "amber" : ""}`}>{fmt$(pendingBalance)}</div><div className="kpi-sub">{project.draws.filter(d => d.status === DrawStatus.Pending).map(d => `Draw #${d.number}`).join(" + ") || "—"}</div></div>
       </div>
 
+      <div className="split-band" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "0 0 12px" }}>
+        {splitBands.map((s) => {
+          const pct = s.budget > 0 ? Math.min(100, Math.round((s.actual / s.budget) * 100)) : 0;
+          const over = s.budget > 0 && s.actual > s.budget;
+          return (
+            <div className="kpi-card" key={s.label} style={{ padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div className="kpi-label">{s.label} budget</div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                  {s.budget > 0 ? `${pct}% spent` : "not split"}
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 2 }}>
+                <div className="kpi-val">{fmt$(s.budget)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: over ? "var(--red-txt)" : "var(--green)" }}>
+                  {fmt$(s.actual)} spent
+                </div>
+              </div>
+              <div className="spend-track" style={{ marginTop: 8 }}>
+                <div className="spend-fill" style={{ width: `${pct}%`, background: over ? "var(--red-txt)" : s.tone }} />
+              </div>
+            </div>
+          );
+        })}
+        {(actualOtherTotal > 0 || unsplitBudgetTotal > 0) && (
+          <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)", display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {actualOtherTotal > 0 && <span>Other spend (permits, dumpster, utilities): {fmt$(actualOtherTotal)}</span>}
+            {unsplitBudgetTotal > 0 && <span>Unsplit budget (no labor/material split set): {fmt$(unsplitBudgetTotal)}</span>}
+          </div>
+        )}
+      </div>
+
       <div className="action-bar">
         <div className="toggle-group">
           <Link href={baseLink} scroll={false} className={`tg-btn ${view === "phase" ? "active" : ""}`}>By phase</Link>
           <Link href={`${baseLink}?view=invoices`} scroll={false} className={`tg-btn ${view === "invoices" ? "active" : ""}`}>Invoices</Link>
           <Link href={`${baseLink}?view=commitments`} scroll={false} className={`tg-btn ${view === "commitments" ? "active" : ""}`}>Commitments</Link>
         </div>
-        <button className="btn">Export</button>
+        <a className="btn" href={`/api/rehab/${encodeURIComponent(project.code)}/budget-report`} target="_blank" rel="noreferrer">Export PDF</a>
         {/* Opens the real invoice form on the Invoices tab (single entry point —
             no more dead document uploads that never become an invoice). */}
         <Link href={`/rehab/${project.code}/invoices?new=1`} className="btn btn-primary">
