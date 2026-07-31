@@ -12,6 +12,7 @@ import SowPhaseDetails from "@/components/rehab/SowPhaseDetails";
 import SowTemplatePicker from "@/components/rehab/SowTemplatePicker";
 import SowAddPhase from "@/components/rehab/SowAddPhase";
 import SowPhaseReorder from "@/components/rehab/SowPhaseReorder";
+import SowPhaseManage from "@/components/rehab/SowPhaseManage";
 import { ensureDefaultTemplates } from "@/lib/rehab/seed-templates";
 
 export const dynamic = "force-dynamic";
@@ -198,6 +199,15 @@ export default async function SowPage({
                   plannedStartDate={p.plannedStartDate ? p.plannedStartDate.toISOString().slice(0, 10) : ""}
                   estimatedDays={p.estimatedDays ?? 0}
                 />
+                {canEdit && (
+                  <SowPhaseManage
+                    projectCode={project.code}
+                    phaseId={p.id}
+                    phaseNumber={p.number}
+                    name={p.name}
+                    canEdit={canEdit}
+                  />
+                )}
                 {section && section.lineItems.length > 0 ? (
                   <>
                     <div className="li-hd">
