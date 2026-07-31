@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -38,6 +39,10 @@ export default function SowTemplatePicker({ projectCode }: { projectCode: string
     if (open) load();
   }, [open, load]);
 
+  // Portal mount guard — createPortal(document.body) must not run during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   function apply(templateId: string) {
     setError(null);
     startTransition(async () => {
@@ -67,19 +72,20 @@ export default function SowTemplatePicker({ projectCode }: { projectCode: string
       <button className="btn" onClick={() => setOpen(true)}>
         Use template
       </button>
-      {open && (
-        <div
-          onClick={() => !pending && setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.35)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
+      {open && mounted &&
+        createPortal(
+          <div
+            onClick={() => !pending && setOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+            }}
+          >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -148,8 +154,9 @@ export default function SowTemplatePicker({ projectCode }: { projectCode: string
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </>
   );
 }

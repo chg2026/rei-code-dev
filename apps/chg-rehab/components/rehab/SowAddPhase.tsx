@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -111,6 +112,10 @@ export default function SowAddPhase({
   useEffect(() => {
     if (open && tab === "template") load();
   }, [open, tab, load]);
+
+  // Portal mount guard — createPortal(document.body) must not run during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   function reset() {
     setSelected(new Set());
@@ -236,9 +241,10 @@ export default function SowAddPhase({
       <button className="btn" onClick={() => setOpen(true)}>
         + Add Job Type
       </button>
-      {open && (
-        <div onClick={close} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={panelStyle}>
+      {open && mounted &&
+        createPortal(
+          <div onClick={close} style={overlayStyle}>
+            <div onClick={(e) => e.stopPropagation()} style={panelStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>Add a phase</div>
               <Link href="/rehab/templates" className="btn-sm" style={{ textDecoration: "none" }}>
@@ -450,9 +456,10 @@ export default function SowAddPhase({
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      )}
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }
