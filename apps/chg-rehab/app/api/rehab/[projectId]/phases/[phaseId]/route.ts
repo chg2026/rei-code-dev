@@ -80,6 +80,14 @@ export async function PATCH(
 
   const data: Prisma.PhaseUpdateInput = {};
 
+  if ("name" in body) {
+    const raw = body.name;
+    if (typeof raw !== "string" || !raw.trim()) {
+      return NextResponse.json({ error: "Job type name cannot be empty" }, { status: 400 });
+    }
+    data.name = raw.trim().slice(0, 120);
+  }
+
   if ("status" in body) {
     const s = body.status;
     if (typeof s !== "string" || !(Object.values(PhaseStatus) as string[]).includes(s)) {
@@ -198,4 +206,63 @@ export async function PATCH(
 
   const updated = await prisma.phase.update({ where: { id: phase.id }, data });
   return NextResponse.json({ phase: updated });
+}
+
+/**
+ * Delete a single job type (phase).
+ *
+ * SAFETY: a job type is only deletable when it carries no financial history.
+ * Invoice job-type links and commitments use onDelete: SetNull, and draws have
+ * a nullable phaseId with no cascade — so deleting a phase with any of these
+ * would silently orphan real money (its spend would vanish from the budget
+ * totals). We therefore BLOCK the delete when any invoice job-type line, draw,
+ * or commitment references the phase. Checklist items are phase-owned and
+ * cascade-delete, so they never block. Cost codes (phase.number) on the
+ * remaining job types are never renumbered.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ projectId: string; phaseId: string }> }
+) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await can(user, "rehab", "edit"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { projectId, phaseId } = await params;
+  const project = await resolveProject(decodeURIComponent(projectId), user.companyId);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const phase = await prisma.phase.findFirst({
+    where: { id: phaseId, projectId: project.id },
+    select: {
+      id: true,
+      name: true,
+      _count: {
+        select: { invoiceJobTypes: true, draws: true, commitments: true },
+      },
+    },
+  });
+  if (!phase) return NextResponse.json({ error: "Phase not found" }, { status: 404 });
+
+  const { invoiceJobTypes, draws, commitments } = phase._count;
+  if (invoiceJobTypes > 0 || draws > 0 || commitments > 0) {
+    const parts: string[] = [];
+    if (invoiceJobTypes > 0) parts.push(`${invoiceJobTypes} invoice line${invoiceJobTypes === 1 ? "" : "s"}`);
+    if (draws > 0) parts.push(`${draws} draw${draws === 1 ? "" : "s"}`);
+    if (commitments > 0) parts.push(`${commitments} commitment${commitments === 1 ? "" : "s"}`);
+    return NextResponse.json(
+      {
+        error:
+          "This job type has financial history and can't be deleted. Zero it out or remove its invoices first.",
+        details: `Attached: ${parts.join(", ")}.`,
+      },
+      { status: 409 }
+    );
+  }
+
+  // Safe to remove: only phase-owned checklist items (cascade) remain.
+  await prisma.phase.delete({ where: { id: phase.id } });
+  return NextResponse.json({ ok: true, deleted: phase.id });
 }
