@@ -23,9 +23,23 @@ export default async function PipelinePage() {
     orderBy: [{ stage: "asc" }, { createdAt: "desc" }],
   });
 
+  const propertyIds = deals.map((deal) => deal.propertyId).filter((id): id is string => Boolean(id));
+  const linkedProjects = propertyIds.length
+    ? await prisma.project.findMany({
+        where: { companyId: user.companyId, propertyId: { in: propertyIds } },
+        select: { propertyId: true, code: true, updatedAt: true },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      })
+    : [];
+  const projectCodeByProperty = new Map<string, string>();
+  for (const project of linkedProjects) {
+    if (!projectCodeByProperty.has(project.propertyId)) projectCodeByProperty.set(project.propertyId, project.code);
+  }
+
   const serialized = deals.map((d) => ({
     id: d.id,
     propertyId: d.propertyId,
+    projectCode: d.propertyId ? projectCodeByProperty.get(d.propertyId) ?? null : null,
     code: d.code,
     address: d.address,
     stage: d.stage,

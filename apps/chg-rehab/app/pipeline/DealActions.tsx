@@ -30,7 +30,14 @@ const NEXT_STAGE: Record<string, DealStage> = {
 export default function DealActions({
   deal,
 }: {
-  deal: { id: string; code: string; stage: DealStage; address: string; propertyId: string | null };
+  deal: {
+    id: string;
+    code: string;
+    stage: DealStage;
+    address: string;
+    propertyId: string | null;
+    projectCode: string | null;
+  };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -43,6 +50,9 @@ export default function DealActions({
   if (isClosed) {
     return (
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {deal.projectCode ? (
+          <Link href={`/rehab/${encodeURIComponent(deal.projectCode)}/overview`} className="btn-sm">Project →</Link>
+        ) : null}
         {deal.propertyId ? (
           <Link href={`/property?id=${deal.propertyId}`} className="btn-sm">Property →</Link>
         ) : null}

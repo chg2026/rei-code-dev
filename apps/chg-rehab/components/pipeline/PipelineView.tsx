@@ -9,6 +9,7 @@ import type { DealStage } from "@prisma/client";
 export type PipelineDealRow = {
   id: string;
   propertyId: string | null;
+  projectCode: string | null;
   code: string;
   address: string;
   stage: string;
@@ -170,6 +171,7 @@ function DealCard({ deal }: { deal: PipelineDealRow }) {
             stage: deal.stage as DealStage,
             address: deal.address,
             propertyId: deal.propertyId,
+            projectCode: deal.projectCode,
           }}
         />
       </div>
