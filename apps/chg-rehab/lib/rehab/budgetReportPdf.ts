@@ -9,6 +9,7 @@
  * distributionStatementPdf.ts so CHG documents feel coherent.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from "pdf-lib";
+import { pdfText } from "@/lib/rehab/pdfSafeText";
 
 export interface BudgetReportJobType {
   number: number;
@@ -54,38 +55,6 @@ export interface BudgetReportInput {
 
 const fmtUSD = (n: number) =>
   `${n < 0 ? "-" : ""}$${Math.abs(Math.round(n)).toLocaleString("en-US")}`;
-
-/**
- * Make any string safe for pdf-lib's StandardFont (Helvetica), whose WinAnsi
- * (CP1252) encoding throws on characters it can't encode — emoji, the true
- * minus sign (U+2212), arrows, non-Latin scripts, etc. An unsanitised draw
- * would crash the whole generator, the API route would 500, and the browser
- * would save the error page as a .pdf ("corrupted, won't open").
- *
- * We map the common typographic look-alikes to ASCII, then drop anything still
- * outside the Latin-1 range so a draw can NEVER throw, whatever the input.
- */
-function pdfText(input: unknown): string {
-  let s = String(input ?? "");
-  const map: Record<string, string> = {
-    "\u2212": "-", // minus sign → hyphen
-    "\u2013": "-", // en dash
-    "\u2014": "-", // em dash
-    "\u2018": "'", "\u2019": "'", // curly single quotes
-    "\u201C": '"', "\u201D": '"', // curly double quotes
-    "\u2192": "->", "\u2190": "<-", "\u2194": "<->", // arrows
-    "\u2026": "...", // ellipsis
-    "\u00A0": " ", // non-breaking space
-    "\u2022": "-", // bullet
-    "\u2713": "x", "\u2714": "x", "\u2610": "[ ]", "\u2611": "[x]", // check/box marks
-  };
-  s = s.replace(/[\u2212\u2013\u2014\u2018\u2019\u201C\u201D\u2192\u2190\u2194\u2026\u00A0\u2022\u2713\u2714\u2610\u2611]/g, (c) => map[c] ?? c);
-  // Drop anything still outside the WinAnsi-safe Latin-1 printable range so a
-  // draw can never throw. \t and \n aren't drawn here; keep space..ÿ + the
-  // CP1252 punctuation block (·, etc.) which pdf-lib's WinAnsi does support.
-  s = s.replace(/[^\x20-\x7E\u00A1-\u00FF·]/g, "?");
-  return s;
-}
 
 export async function buildBudgetReportPdf(i: BudgetReportInput): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
