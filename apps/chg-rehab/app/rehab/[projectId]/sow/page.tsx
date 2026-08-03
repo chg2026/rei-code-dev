@@ -73,7 +73,7 @@ export default async function SowPage({
             Gantt view
           </button>
         </div>
-        <button className="btn">Export PDF</button>
+        <a className="btn" href={`/api/rehab/${encodeURIComponent(project.code)}/sow-report`} target="_blank" rel="noreferrer">Export PDF</a>
         {canEdit && project.phases.length === 0 && (
           <SowTemplatePicker projectCode={project.code} />
         )}
