@@ -725,8 +725,8 @@ function UploadDocModal({ propertyId, onClose }: { propertyId: string; onClose: 
         <ErrorBanner error={error} />
         <Field label="Name"><input name="name" required style={inputStyle()} placeholder="Roof inspection report" /></Field>
         <Field label="Category">
-          <select name="category" defaultValue="Title" style={inputStyle()}>
-            <option>Title</option><option>Permit</option><option>Inspection</option><option>Insurance</option><option>Survey</option><option>Other</option>
+          <select name="category" defaultValue="Purchase agreement" style={inputStyle()}>
+            <option>Purchase agreement</option><option>Deed / Title</option><option>Settlement statement</option><option>Payment confirmation</option><option>Title</option><option>Permit</option><option>Inspection</option><option>Insurance</option><option>Survey</option><option>Other</option>
           </select>
         </Field>
         <Field label="Expires (optional)"><input name="expiresAt" type="date" style={inputStyle()} /></Field>

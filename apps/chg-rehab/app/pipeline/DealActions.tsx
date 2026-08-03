@@ -89,7 +89,9 @@ export default function DealActions({
     const result = await res.json();
     setCloseOpen(false);
     if (result.propertyId) {
-      router.push(`/property?id=${result.propertyId}`);
+      // Land on the property's Documents tab so filing the closing document
+      // set is the obvious next step after closing.
+      router.push(`/property?id=${result.propertyId}&tab=documents`);
     } else {
       startTransition(() => router.refresh());
     }

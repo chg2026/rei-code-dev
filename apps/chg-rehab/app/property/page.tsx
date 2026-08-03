@@ -19,6 +19,8 @@ import {
 } from "./PropertyActions";
 import PropertySearchInput from "./PropertySearchInput";
 import PropertyTasksTab from "./PropertyTasksTab";
+import ClosingChecklist from "@/components/property/ClosingChecklist";
+import { parseClosing } from "@/lib/property/closing";
 import { getPropertyActivity, timeAgo, type PropertyActivityKind } from "@/lib/propertyActivity";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +75,7 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
   }
 
   const sp = await searchParams;
+  const canEditProperty = await can(user, "property", "edit");
   const filter: Filter = sp.filter || "all";
   const q = (sp.q || "").trim();
   const tab: Tab = sp.tab || "overview";
@@ -232,7 +235,12 @@ export default async function PropertyPage({ searchParams }: { searchParams: Pro
             ) : tab === "assets" ? (
               <AssetsTab propertyId={selected.id} />
             ) : tab === "documents" ? (
-              <DocumentsTab propertyId={selected.id} companyId={user.companyId} />
+              <DocumentsTab
+                propertyId={selected.id}
+                companyId={user.companyId}
+                closingItems={parseClosing(selected.meta).items}
+                canEdit={canEditProperty}
+              />
             ) : tab === "analysis" ? (
               <AnalysisPanel propertyId={selected.id} />
             ) : tab === "tasks" ? (
@@ -920,7 +928,17 @@ function extractCost(notes: string | null): string | null {
 }
 
 // ── Documents ─────────────────────────────────────────────────────────
-async function DocumentsTab({ propertyId, companyId }: { propertyId: string; companyId: string }) {
+async function DocumentsTab({
+  propertyId,
+  companyId,
+  closingItems,
+  canEdit,
+}: {
+  propertyId: string;
+  companyId: string;
+  closingItems: import("@/lib/property/closing").ClosingItem[];
+  canEdit: boolean;
+}) {
   const docs = await prisma.document.findMany({
     where: { companyId, propertyId, level: "Property" },
     orderBy: { uploadedAt: "desc" },
@@ -930,6 +948,10 @@ async function DocumentsTab({ propertyId, companyId }: { propertyId: string; com
       <div className="property-tab-toolbar">
         <select className="filter-sel" defaultValue="all">
           <option value="all">All categories</option>
+          <option>Purchase agreement</option>
+          <option>Deed / Title</option>
+          <option>Settlement statement</option>
+          <option>Payment confirmation</option>
           <option>Title</option>
           <option>Permit</option>
           <option>Inspection</option>
@@ -939,6 +961,7 @@ async function DocumentsTab({ propertyId, companyId }: { propertyId: string; com
         <UploadDocButton propertyId={propertyId} />
       </div>
       <div className="property-tab-scroll">
+        <ClosingChecklist propertyId={propertyId} initialItems={closingItems} canEdit={canEdit} />
         <div className="property-documents-header">
           <span className="col-lbl">Document</span>
           <span className="col-lbl">Category</span>
