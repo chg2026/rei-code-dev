@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { loadProjectActivity, loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
+import { can } from "@/lib/permissions";
+import { parseKickoff } from "@/lib/rehab/kickoff";
+import KickoffChecklist from "@/components/rehab/KickoffChecklist";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
@@ -79,6 +82,8 @@ export default async function OverviewPage({
 
   const code = project.code;
   const meta = parseProjectMeta(project.meta);
+  const canEditRehab = await can(user, "rehab", "edit");
+  const kickoffItems = parseKickoff(project.meta).items;
 
   // Parallel aggregates: invoice spend/outstanding, pending change orders,
   // contractor assignments, property meta (acquisition cost), activity feed.
@@ -403,6 +408,15 @@ export default async function OverviewPage({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* ── Kickoff checklist (CON-01 post-acquisition control) ── */}
+        <div style={{ margin: "0 0 4px" }}>
+          <KickoffChecklist
+            projectCode={code}
+            initialItems={kickoffItems}
+            canEdit={canEditRehab}
+          />
         </div>
 
         {/* ── Section 2: KPI grid ── */}
