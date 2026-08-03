@@ -418,6 +418,13 @@ body::before {
 .admin-layout .admin-panel.active { max-width: 100%; }
 .admin-layout .admin-info { flex: 1 1 auto; }
 .admin-layout .admin-main :where(input, select, textarea) { max-width: 100%; }
+.admin-layout .admin-row > .admin-info { min-width: 0; }
+.admin-layout .admin-row > :where(.admin-input, .admin-select, .toggle, .toggle-wrap) {
+  flex: 0 0 auto;
+}
+.admin-layout .admin-row > .admin-select {
+  width: min(220px, 100%);
+}
 .admin-layout .admin-nav-item {
   width: 100%;
   border-top: 0;
