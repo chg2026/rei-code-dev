@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/lib/permissions";
+import { ProjectStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Patch project-level fields editable inline from the Rehab tabs:
+ *   - status (Overview) — updates the Project lifecycle status.
  *   - actualEndDate (Overview) — persisted into `project.meta.actualEndDate`
  *     (the Project model has no dedicated column for it).
  *   - contingency (Budget & Costs header) — the labeled reserve amount on
@@ -39,6 +41,32 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  if ("status" in body) {
+    if (!(await can(user, "rehab", "edit"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const nextStatus = body.status as ProjectStatus;
+    if (!Object.values(ProjectStatus).includes(nextStatus)) {
+      return NextResponse.json({ error: "Invalid project status" }, { status: 400 });
+    }
+    const updated = await prisma.project.update({
+      where: { id: project.id },
+      data: { status: nextStatus },
+      select: { status: true },
+    });
+    await prisma.activityLogEntry.create({
+      data: {
+        companyId: user.companyId,
+        actorId: user.id,
+        action: "project.status_changed",
+        entity: "Project",
+        entityId: project.id,
+        message: `Project ${project.code} status changed to ${nextStatus}`,
+      },
+    });
+    return NextResponse.json({ ok: true, status: updated.status });
   }
 
   if ("contingency" in body) {

@@ -10,6 +10,7 @@ import KickoffChecklist from "@/components/rehab/KickoffChecklist";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
+import ProjectStatusSelect from "@/components/rehab/ProjectStatusSelect";
 import { effectivePct } from "@/lib/rehab/forecast";
 import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import { computePendingChangeOrders } from "@/lib/rehab/changeOrders";
@@ -301,14 +302,6 @@ export default async function OverviewPage({
     contractorAssignments.find((a) => /\bgc\b|general/i.test(a.role)) ?? contractorAssignments[0];
   const contractorName = gc?.contact?.name ?? "—";
 
-  const statusClass =
-    project.status === ProjectStatus.Complete
-      ? "st-done"
-      : project.status === ProjectStatus.Active
-      ? "st-act"
-      : "st-wait";
-  const statusLabel = project.status === ProjectStatus.OnHold ? "On hold" : project.status;
-
   // Phase tracker rows (unchanged)
   const phaseRows = project.phases.map((p) => {
     const draw = p.draws[0];
@@ -357,7 +350,7 @@ export default async function OverviewPage({
             <div className="ov-prop-row">
               <span className="ov-prop-l">Status</span>
               <span className="ov-prop-v">
-                <span className={`st-badge ${statusClass}`}>{statusLabel}</span>
+                <ProjectStatusSelect projectId={code} currentStatus={project.status} canEdit={canEditRehab} />
               </span>
             </div>
             <div className="ov-prop-row">
