@@ -220,30 +220,40 @@ export function ModalShell({ title, onClose, children }: { title: string; onClos
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mounted, onClose]);
+
   if (!mounted) return null;
 
   return createPortal(
     <div
-      style={{
-        position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)",
-        zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
-      }}
+      className="pipeline-modal-overlay"
       onClick={onClose}
+      role="presentation"
     >
       <div
-        style={{
-          background: "#fff", borderRadius: 8, width: 480, maxWidth: "100%",
-          maxHeight: "90vh", overflowY: "auto",
-          boxShadow: "0 8px 24px rgba(15,23,42,0.18)",
-        }}
+        className="pipeline-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pipeline-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-lo)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 13, fontWeight: 500 }}>{title}</div>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", color: "var(--text-tertiary)" }}>×</button>
+        <div className="pipeline-modal__header">
+          <div id="pipeline-modal-title" className="pipeline-modal__title">{title}</div>
+          <button type="button" className="pipeline-modal__close" onClick={onClose} aria-label="Close add deal dialog">×</button>
         </div>
-        <div style={{ padding: 16 }}>{children}</div>
+        <div className="pipeline-modal__body">{children}</div>
       </div>
     </div>,
     document.body,

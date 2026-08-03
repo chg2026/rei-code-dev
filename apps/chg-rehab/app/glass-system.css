@@ -145,6 +145,64 @@ body::before {
 .modal-overlay, .kpi-modal-backdrop { z-index: 1000 !important; }
 .toast { z-index: 1100 !important; }
 
+/* Pipeline Add Deal is portaled to body; these explicit classes keep it above
+   every app-chrome stacking context and give it the product glass treatment. */
+.pipeline-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 4000 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 32px);
+  background: rgba(21, 45, 58, 0.34);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);
+}
+.pipeline-modal {
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(90dvh, 720px);
+  overflow-y: auto;
+  color: var(--chg-glass-ink);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(235, 245, 248, 0.72));
+  border: 1px solid var(--chg-glass-rim);
+  border-radius: var(--chg-radius-xl);
+  box-shadow: 0 28px 80px rgba(24, 58, 72, 0.28), 0 8px 24px rgba(24, 58, 72, 0.14);
+  -webkit-backdrop-filter: blur(28px) saturate(155%);
+  backdrop-filter: blur(28px) saturate(155%);
+}
+.pipeline-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--chg-glass-line);
+}
+.pipeline-modal__title { font-size: 16px; font-weight: 650; letter-spacing: -0.02em; }
+.pipeline-modal__close {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--chg-glass-slate);
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid var(--chg-glass-line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.pipeline-modal__close:hover { background: rgba(255, 255, 255, 0.78); color: var(--chg-glass-ink); }
+.pipeline-modal__close:focus-visible { outline: 2px solid var(--chg-glass-marine); outline-offset: 2px; }
+.pipeline-modal__body { padding: 18px 20px 20px; }
+
+@media (max-width: 520px) {
+  .pipeline-modal-overlay { align-items: flex-start; padding-top: 16px; }
+  .pipeline-modal { max-height: calc(100dvh - 32px); border-radius: var(--chg-radius-lg); }
+}
+
 /* App chrome */
 .sidebar {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.42)) !important;
