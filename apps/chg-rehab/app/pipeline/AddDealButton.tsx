@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { billingAwareErrorMessage } from "@/lib/billing-blocked-client";
 import { useBillingGateProps } from "@/lib/useBillingHealth";
@@ -213,11 +214,19 @@ export function Field({ label, required, children }: { label: string; required?:
 }
 
 export function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       style={{
         position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)",
-        zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
         padding: 20,
       }}
       onClick={onClose}
@@ -236,6 +245,7 @@ export function ModalShell({ title, onClose, children }: { title: string; onClos
         </div>
         <div style={{ padding: 16 }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
