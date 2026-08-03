@@ -53,6 +53,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const arv = (meta.arv as number | undefined) ?? null;
   const rehab = (meta.rehab as number | undefined) ?? rehabBudget ?? null;
 
+  // Preserve the underwriting decision at the acquisition boundary. The
+  // calculator currently saves against properties, while deals carry the
+  // decision inputs/results in meta; this snapshot makes the handoff explicit
+  // and keeps the same numbers available on both new records.
+  const underwriting = Object.fromEntries(
+    Object.entries({
+      purchase: purchasePrice,
+      rehab,
+      arv,
+      strategy: meta.strategy,
+      closing: meta.closing,
+      holding: meta.holding,
+      rehabPeriod: meta.rehabPeriod,
+      financingType: meta.financingType,
+      estimatedRoi: deal.estimatedRoi,
+      monthlyFlow: meta.monthlyFlow,
+      cashOnCash: meta.cashOnCash,
+      equityMultiple: meta.equityMultiple,
+      savedAt: new Date().toISOString(),
+    }).filter(([, value]) => value !== null && value !== undefined),
+  ) as Prisma.InputJsonValue;
+
   const setting = await prisma.companySetting.findUnique({ where: { companyId: user.companyId } });
   const settingMeta = (setting?.meta as Record<string, unknown> | null) ?? {};
   const defaultMode =
@@ -84,6 +106,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         currentRoi: deal.estimatedRoi,
         meta: {
           ...meta,
+          underwriting,
           purchasePrice,
           rehabBudget: rehab ?? undefined,
           mode: defaultMode,
@@ -107,6 +130,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           mode: defaultMode,
           exitStrategy: defaultExitStrategy,
           notStarted: true,
+          underwriting,
         } as Prisma.InputJsonValue,
       },
     });
