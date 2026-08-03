@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { loadProjectByCode } from "@/lib/rehab/queries";
 import { formatET } from "@/lib/datetime";
 import { PhaseStatus } from "@prisma/client";
+import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 import {
   buildSowReportPdf,
   type SowReportJobType,
@@ -38,15 +39,24 @@ export async function GET(
   });
 
   try {
-    const sections = project.sowSections;
     const totalValue = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
+    // Actuals + dates derived exactly like the SOW page: live invoice-based
+    // actuals (not the Phase.actual cache) and planned* dates with legacy
+    // fallback, so the PDF and the screen never disagree.
+    const actualsMap = await computePhaseActualBreakdowns(project.id);
+    const phaseStart = (p: (typeof project.phases)[number]) =>
+      p.plannedStartDate ?? p.startDate ?? null;
+    const phaseEnd = (p: (typeof project.phases)[number]) =>
+      p.plannedEndDate ?? p.endDate ?? null;
+    const phaseDays = (p: (typeof project.phases)[number]) => {
+      if (p.estimatedDays && p.estimatedDays > 0) return p.estimatedDays;
+      const s = phaseStart(p);
+      const e = phaseEnd(p);
+      return s && e ? Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000)) : 0;
+    };
 
-    const jobTypes: SowReportJobType[] = project.phases.map((p, idx) => {
-      const section = sections[idx];
-      const days =
-        p.startDate && p.endDate
-          ? Math.max(1, Math.round((p.endDate.getTime() - p.startDate.getTime()) / 86_400_000) + 1)
-          : 0;
+    const jobTypes: SowReportJobType[] = project.phases.map((p) => {
+      const days = phaseDays(p);
       const statusLabel =
         p.status === PhaseStatus.Done
           ? "Complete"
@@ -54,26 +64,19 @@ export async function GET(
             ? "Active"
             : "Not started";
       const estimated = Number(p.budget ?? 0);
-      const actual = p.actual == null ? null : Number(p.actual);
-
-      const lineItems = (section?.lineItems ?? []).map((li) => {
-        const est = Number(li.totalCost ?? 0);
-        const phaseDone = p.status === PhaseStatus.Done;
-        const phaseActive = p.status === PhaseStatus.InProgress;
-        const status = phaseDone ? "Done" : phaseActive ? "In progress" : "Pending";
-        return { description: li.description, estimated: est, status };
-      });
+      const actualTotal = actualsMap.get(p.id)?.total;
+      const actual = actualTotal == null ? null : Number(actualTotal);
 
       return {
         number: p.number,
         name: p.name,
         statusLabel,
         days,
-        startDate: formatET(p.startDate, false),
-        endDate: formatET(p.endDate, false),
+        startDate: formatET(phaseStart(p), false),
+        endDate: formatET(phaseEnd(p), false),
         estimated,
         actual,
-        lineItems,
+        lineItems: [],
       };
     });
 

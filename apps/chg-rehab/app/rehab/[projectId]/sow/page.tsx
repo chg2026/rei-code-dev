@@ -14,6 +14,7 @@ import SowAddPhase from "@/components/rehab/SowAddPhase";
 import SowPhaseReorder from "@/components/rehab/SowPhaseReorder";
 import SowPhaseManage from "@/components/rehab/SowPhaseManage";
 import { ensureDefaultTemplates } from "@/lib/rehab/seed-templates";
+import { computePhaseActualBreakdowns } from "@/lib/rehab/invoiceActuals";
 
 export const dynamic = "force-dynamic";
 const fmt$ = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -36,15 +37,32 @@ export default async function SowPage({
   const sp = (await searchParams) ?? {};
   const focusPhase = sp.phase ? parseInt(sp.phase, 10) : NaN;
 
+  // Effective scheduling dates — identical logic to the Schedule tab
+  // (schedule/page.tsx): prefer the planned* fields (basis for the Gantt) and
+  // fall back to the legacy start/end for phases not yet planned. Keeps the SOW
+  // tab and Schedule tab from ever showing different dates for the same phase.
+  type SowPhaseRow = (typeof project.phases)[number];
+  const phaseStart = (p: SowPhaseRow) => p.plannedStartDate ?? p.startDate ?? null;
+  const phaseEnd = (p: SowPhaseRow) => p.plannedEndDate ?? p.endDate ?? null;
+  const phaseDays = (p: SowPhaseRow) => {
+    if (p.estimatedDays && p.estimatedDays > 0) return p.estimatedDays;
+    const s = phaseStart(p);
+    const e = phaseEnd(p);
+    return s && e ? Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000)) : 0;
+  };
+
   const totalValue = project.phases.reduce((acc, p) => acc + Number(p.budget ?? 0), 0);
+  // Per-phase actual spend computed live from invoices — the single source of
+  // truth also used by the Budget & Overview tabs (computePhaseActualBreakdowns).
+  // The SOW tab previously read the Phase.actual cache, which could drift; this
+  // keeps all three tabs showing identical actuals.
+  const actualsMap = await computePhaseActualBreakdowns(project.id);
   // "Addenda" = project-level change orders (phaseId null); ChangeOrder is the
   // single "change" object — the legacy ProjectAddendum table is no longer read.
   const addenda = project.changeOrders.filter((co) => co.phaseId === null);
   const latestAddendum = addenda[addenda.length - 1];
   const meta = parseProjectMeta(project.meta);
 
-  // Pair phases with sow sections by index (both ordered)
-  const sections = project.sowSections;
   // Phase ids in current display (sortOrder) order — drives the reorder controls.
   const orderedPhaseIds = project.phases.map((p) => p.id);
 
@@ -108,10 +126,7 @@ export default async function SowPage({
             <span className="col-label">Status</span>
           </div>
           {project.phases.map((p, idx) => {
-            const section = sections[idx];
-            const days = p.startDate && p.endDate
-              ? Math.max(1, Math.round((p.endDate.getTime() - p.startDate.getTime()) / 86_400_000) + 1)
-              : 0;
+            const days = phaseDays(p);
             const stLabel =
               p.status === PhaseStatus.Done ? "Complete" : p.status === PhaseStatus.InProgress ? "Active" : "Not started";
             const pnClass =
@@ -120,10 +135,11 @@ export default async function SowPage({
               p.checklistItems.length > 0 &&
               p.checklistItems.some((i) => i.status !== "Done" && i.status !== "NA");
 
-            // Actual spend for this phase comes from Phase.actual (kept in sync
-            // by recomputePhaseActuals on every invoice / stage write).
+            // Actual spend for this phase comes from the live invoice-derived
+            // breakdown (computePhaseActualBreakdowns) — same source as Budget.
             const estimated = Number(p.budget ?? 0);
-            const actual = p.actual == null ? null : Number(p.actual);
+            const actualTotal = actualsMap.get(p.id)?.total;
+            const actual = actualTotal == null ? null : Number(actualTotal);
             const hasActual = actual != null && actual > 0;
             let actualDisplay: string;
             let actualColor: string;
@@ -164,12 +180,12 @@ export default async function SowPage({
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 500 }}>{p.name}</div>
                       <div style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
-                        {section?.lineItems.length || 0} line items · {stLabel}
+                        {stLabel}
                       </div>
                     </div>
                     <span style={{ fontSize: 10, textAlign: "right" }}>{days}d</span>
                     <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
-                      {formatET(p.startDate, false)} – {formatET(p.endDate, false)}
+                      {formatET(phaseStart(p), false)} – {formatET(phaseEnd(p), false)}
                     </span>
                     <span style={{ fontSize: 11, fontWeight: 500, textAlign: "right" }}>
                       {fmt$(Number(p.budget ?? 0))}
@@ -207,46 +223,6 @@ export default async function SowPage({
                     name={p.name}
                     canEdit={canEdit}
                   />
-                )}
-                {section && section.lineItems.length > 0 ? (
-                  <>
-                    <div className="li-hd">
-                      <span className="col-label">Line item</span>
-                      <span className="col-label" style={{ textAlign: "right" }}>Estimated</span>
-                      <span className="col-label" style={{ textAlign: "right" }}>Actual</span>
-                      <span className="col-label">Status</span>
-                    </div>
-                    {section.lineItems.map((li) => {
-                      const est = Number(li.totalCost ?? 0);
-                      const phaseDone = p.status === PhaseStatus.Done;
-                      const phaseActive = p.status === PhaseStatus.InProgress;
-                      const isCO = /\(CO\)|CO\)/.test(li.description);
-                      const actClass = isCO && phaseActive ? "li-act-a" : phaseDone ? "li-act-g" : "li-est";
-                      const actVal = phaseDone || isCO ? `$${est.toLocaleString()}` : "—";
-                      const tagCls = phaseDone ? "tag-paid" : phaseActive ? "tag-pend" : "";
-                      const tagLabel = phaseDone ? "Done" : phaseActive ? "In progress" : "Pending";
-                      return (
-                        <div className="li-row" key={li.id}>
-                          <div>
-                            <div className="li-name">{li.description}</div>
-                            {li.notes && <div className="li-sub">{li.notes}</div>}
-                          </div>
-                          <div className="li-est">${est.toLocaleString()}</div>
-                          <div className={actClass}>{actVal}</div>
-                          <span
-                            className={`cell-tag ${tagCls}`}
-                            style={!tagCls ? { background: "#F1EFE8", color: "#5F5E5A" } : undefined}
-                          >
-                            {tagLabel}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <div style={{ padding: "8px 14px", fontSize: 10, color: "var(--text-tertiary)" }}>
-                    No line items recorded.
-                  </div>
                 )}
               </SowPhase>
             );

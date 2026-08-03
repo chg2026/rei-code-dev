@@ -5,8 +5,6 @@ import {
   type Phase,
   type ChecklistItem,
   type Draw,
-  type SOWSection,
-  type SOWLineItem,
   type ChangeOrder,
   type ProjectAssignment,
   type Document,
@@ -26,7 +24,6 @@ export type FullProject = Project & {
     }
   >;
   draws: Draw[];
-  sowSections: Array<SOWSection & { lineItems: SOWLineItem[] }>;
   /**
    * All change orders on the project (ChangeOrder is the single "change"
    * object — the legacy ProjectAddendum table is retired and no longer read).
@@ -53,10 +50,6 @@ export async function loadProjectByCode(companyId: string, code: string): Promis
         },
       },
       draws: { orderBy: { number: "asc" } },
-      sowSections: {
-        orderBy: { order: "asc" },
-        include: { lineItems: { orderBy: { description: "asc" } } },
-      },
       changeOrders: { orderBy: { number: "asc" } },
       assignments: { include: { user: true } },
       documents: { orderBy: { uploadedAt: "desc" } },

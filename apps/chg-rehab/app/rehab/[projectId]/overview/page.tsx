@@ -79,7 +79,6 @@ export default async function OverviewPage({
 
   const code = project.code;
   const meta = parseProjectMeta(project.meta);
-  const budget = Number(project.budget ?? 0);
 
   // Parallel aggregates: invoice spend/outstanding, pending change orders,
   // contractor assignments, property meta (acquisition cost), activity feed.
@@ -388,7 +387,7 @@ export default async function OverviewPage({
             </div>
             <div className="ov-prop-row">
               <span className="ov-prop-l">Rehab budget</span>
-              <span className="ov-prop-v">{fmt$(budget)}</span>
+              <span className="ov-prop-v">{fmt$(workingBudget)}</span>
             </div>
             <div className="ov-prop-row">
               <span className="ov-prop-l">Current spend</span>
