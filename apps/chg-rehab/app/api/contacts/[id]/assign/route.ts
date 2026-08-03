@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { ContactType, Prisma } from "@prisma/client";
 import { evaluateAssignmentCompliance } from "@/lib/assignmentGate";
+import { ensureContractorPortalJob } from "@/lib/contractorPortalBridge";
 import { billingBlockedResponse } from "@/lib/billing-gate";
 
 /**
@@ -94,8 +95,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const role = (body.role || contact.trade || "Contractor").trim();
 
   try {
-    await prisma.$transaction([
-      prisma.contractorAssignment.create({
+    const portalEmail = contact.email?.trim().toLowerCase() || "";
+    const portalAccount = portalEmail
+      ? await prisma.cpAccount.findUnique({ where: { email: portalEmail } })
+      : null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.contractorAssignment.create({
         data: {
           companyId: user.companyId,
           contactId: contact.id,
@@ -104,8 +110,22 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           status: "Active",
           assignedBy: user.id,
         },
-      }),
-      prisma.activityLogEntry.create({
+      });
+
+      let portalJobId: string | null = null;
+      if (portalAccount) {
+        portalJobId = await ensureContractorPortalJob(tx, {
+          contractorId: portalAccount.id,
+          companyId: user.companyId,
+          projectId: project.id,
+          projectName: project.name,
+          projectCode: project.code,
+          role,
+          portalEnabled: portalAccount.contractorPortalEnabled,
+        });
+      }
+
+      await tx.activityLogEntry.create({
         data: {
           companyId: user.companyId,
           actorId: user.id,
@@ -114,6 +134,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           entityId: project.id,
           message:
             `Assigned ${contact.name} to ${project.code} as ${role}` +
+            (portalJobId ? " and linked Contractor Portal job" : "") +
             (warningMessages.length
               ? ` (compliance warnings: ${warningMessages.join(", ")})`
               : ""),
@@ -121,13 +142,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             contactId: contact.id,
             projectCode: project.code,
             role,
+            ...(portalJobId ? { contractorPortalJobId: portalJobId } : {}),
             ...(warningMessages.length
               ? { complianceWarnings: warningMessages }
               : {}),
           },
         },
-      }),
-    ]);
+      });
+
+      return portalJobId;
+    });
+
+    return NextResponse.json({
+      ok: true,
+      warnings,
+      contractorPortal: result
+        ? { linked: true, jobId: result }
+        : { linked: false, reason: "No enabled Contractor Portal account matched this contact email." },
+    });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(
@@ -137,6 +169,4 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
     throw e;
   }
-
-  return NextResponse.json({ ok: true, warnings });
 }

@@ -237,6 +237,7 @@ model Project {
   addenda               ProjectAddendum[]
   assignments           ProjectAssignment[]
   contractorAssignments ContractorAssignment[]
+  contractorPortalJobs  CpJob[]               @relation("ProjectContractorPortalJobs")
   documents             Document[]
   warehouseAllocations  WarehouseItem[]
   invoices              Invoice[]
@@ -1561,6 +1562,7 @@ model CpOperatorEdge {
 model CpJob {
   id                 String   @id @default(cuid())
   contractorId       String
+  projectId          String?
   name               String
   subtitle           String?
   trade              String?
@@ -1578,6 +1580,7 @@ model CpJob {
   updatedAt          DateTime @default(now()) @updatedAt
 
   contractor       CpAccount         @relation("CpJobContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  project          Project?          @relation("ProjectContractorPortalJobs", fields: [projectId], references: [id], onDelete: SetNull)
   awardedByCompany Company?          @relation("CpJobAwardedBy", fields: [awardedByCompanyId], references: [id], onDelete: SetNull)
   awardedByAccount CpAccount?        @relation("CpJobAwardedByAccount", fields: [awardedByAccountId], references: [id], onDelete: SetNull, map: "CpJob_awardedByAccountId_fkey")
   quotes           CpQuote[]
@@ -1586,6 +1589,7 @@ model CpJob {
   threads          CpMessageThread[]
 
   @@index([contractorId, status])
+  @@index([projectId])
 }
 
 model CpQuote {
