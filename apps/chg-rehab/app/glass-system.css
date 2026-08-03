@@ -198,6 +198,12 @@ body::before {
 .pipeline-modal__close:focus-visible { outline: 2px solid var(--chg-glass-marine); outline-offset: 2px; }
 .pipeline-modal__body { padding: 18px 20px 20px; }
 
+.pipeline-deal-actions {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--chg-glass-line);
+}
+
 @media (max-width: 520px) {
   .pipeline-modal-overlay { align-items: flex-start; padding-top: 16px; }
   .pipeline-modal { max-height: calc(100dvh - 32px); border-radius: var(--chg-radius-lg); }

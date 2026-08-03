@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { formatMoney } from "@/lib/pipeline";
 import AddDealButton from "@/app/pipeline/AddDealButton";
+import DealActions from "@/app/pipeline/DealActions";
+import type { DealStage } from "@prisma/client";
 
 export type PipelineDealRow = {
   id: string;
+  propertyId: string | null;
   code: string;
   address: string;
   stage: string;
@@ -158,6 +161,17 @@ function DealCard({ deal }: { deal: PipelineDealRow }) {
             ? new Date(deal.closedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
             : `Day ${days}`}
         </span>
+      </div>
+      <div className="pipeline-deal-actions" onClick={(event) => event.stopPropagation()}>
+        <DealActions
+          deal={{
+            id: deal.id,
+            code: deal.code,
+            stage: deal.stage as DealStage,
+            address: deal.address,
+            propertyId: deal.propertyId,
+          }}
+        />
       </div>
     </div>
   );

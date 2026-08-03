@@ -25,6 +25,7 @@ export default async function PipelinePage() {
 
   const serialized = deals.map((d) => ({
     id: d.id,
+    propertyId: d.propertyId,
     code: d.code,
     address: d.address,
     stage: d.stage,
