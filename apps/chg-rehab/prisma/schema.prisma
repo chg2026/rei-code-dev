@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "auth"]
 }
 
 model Session {
@@ -14,6 +15,7 @@ model Session {
 
   @@index([expire])
   @@map("sessions")
+  @@schema("public")
 }
 
 model Company {
@@ -66,6 +68,7 @@ model Company {
   pmTags               PmTag[]
   pmTasks              PmTask[]
   smsSchedules         WsReminderSms[]
+  @@schema("public")
 }
 
 model User {
@@ -117,6 +120,7 @@ model User {
 
   @@index([companyId])
   @@index([companyId, active])
+  @@schema("public")
 }
 
 model UserNotificationPreference {
@@ -132,6 +136,7 @@ model UserNotificationPreference {
 
   @@unique([userId, event])
   @@index([userId])
+  @@schema("public")
 }
 
 model Property {
@@ -159,6 +164,7 @@ model Property {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@schema("public")
 }
 
 model PropertyAsset {
@@ -172,6 +178,7 @@ model PropertyAsset {
   property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
+  @@schema("public")
 }
 
 model PropertyFinancialSection {
@@ -182,6 +189,7 @@ model PropertyFinancialSection {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, section])
+  @@schema("public")
 }
 
 model PipelineDeal {
@@ -202,6 +210,7 @@ model PipelineDeal {
   property     Property? @relation(fields: [propertyId], references: [id])
 
   @@index([companyId, stage])
+  @@schema("public")
 }
 
 model Project {
@@ -251,6 +260,7 @@ model Project {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@schema("public")
 }
 
 model Estimate {
@@ -269,6 +279,7 @@ model Estimate {
   lines       EstimateLine[]
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model EstimateLine {
@@ -285,6 +296,7 @@ model EstimateLine {
   estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
 
   @@index([estimateId])
+  @@schema("public")
 }
 
 model CompanyRole {
@@ -300,6 +312,7 @@ model CompanyRole {
 
   @@unique([companyId, key])
   @@index([companyId])
+  @@schema("public")
 }
 
 model MaterialOrder {
@@ -322,6 +335,7 @@ model MaterialOrder {
   phase          Phase?         @relation(fields: [phaseId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 enum MaterialStatus {
@@ -330,6 +344,7 @@ enum MaterialStatus {
   Shipped
   Delivered
   Delayed
+  @@schema("public")
 }
 
 model Phase {
@@ -367,6 +382,7 @@ model Phase {
 
   @@unique([projectId, number])
   @@index([projectId])
+  @@schema("public")
 }
 
 model SowTemplate {
@@ -380,6 +396,7 @@ model SowTemplate {
   phases      SowTemplatePhase[]
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model SowTemplatePhase {
@@ -396,6 +413,7 @@ model SowTemplatePhase {
 
   @@unique([templateId, number])
   @@index([templateId])
+  @@schema("public")
 }
 
 model ChecklistItem {
@@ -410,6 +428,7 @@ model ChecklistItem {
   phase     Phase           @relation(fields: [phaseId], references: [id], onDelete: Cascade)
 
   @@index([phaseId])
+  @@schema("public")
 }
 
 model Draw {
@@ -433,6 +452,7 @@ model Draw {
   project            Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model DailyLog {
@@ -448,6 +468,7 @@ model DailyLog {
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model Issue {
@@ -467,6 +488,7 @@ model Issue {
 
   @@index([projectId])
   @@index([phaseId])
+  @@schema("public")
 }
 
 model PunchItem {
@@ -484,6 +506,7 @@ model PunchItem {
   project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model Photo {
@@ -501,22 +524,26 @@ model Photo {
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 enum IssueType {
   Issue
   Question
+  @@schema("public")
 }
 
 enum IssueStatus {
   Open
   InProgress
   Resolved
+  @@schema("public")
 }
 
 enum PunchStatus {
   Open
   Done
+  @@schema("public")
 }
 
 model SOWSection {
@@ -528,6 +555,7 @@ model SOWSection {
   project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model SOWLineItem {
@@ -542,6 +570,7 @@ model SOWLineItem {
   section     SOWSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
   @@index([sectionId])
+  @@schema("public")
 }
 
 model ProjectAddendum {
@@ -556,6 +585,7 @@ model ProjectAddendum {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model ProjectAssignment {
@@ -568,6 +598,7 @@ model ProjectAssignment {
 
   @@unique([projectId, userId, role])
   @@index([userId])
+  @@schema("public")
 }
 
 model Contact {
@@ -596,6 +627,7 @@ model Contact {
   notificationLogs ContactNotificationLog[]
 
   @@index([companyId, type])
+  @@schema("public")
 }
 
 // A persistent assignment of a Contact (typically Contractor / Subcontractor)
@@ -619,6 +651,7 @@ model ContractorAssignment {
   @@index([companyId])
   @@index([contactId])
   @@index([projectId])
+  @@schema("public")
 }
 
 model ContractorComplianceDoc {
@@ -634,6 +667,7 @@ model ContractorComplianceDoc {
   versions  ContractorComplianceDocVersion[]
 
   @@index([contactId])
+  @@schema("public")
 }
 
 model ContractorComplianceDocVersion {
@@ -646,6 +680,7 @@ model ContractorComplianceDocVersion {
   doc        ContractorComplianceDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@index([docId])
+  @@schema("public")
 }
 
 model Lease {
@@ -662,6 +697,7 @@ model Lease {
   property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
+  @@schema("public")
 }
 
 model WarehouseDepartment {
@@ -678,6 +714,7 @@ model WarehouseDepartment {
 
   @@unique([companyId, code])
   @@index([companyId])
+  @@schema("public")
 }
 
 model WarehouseSubcategory {
@@ -692,6 +729,7 @@ model WarehouseSubcategory {
   department   WarehouseDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@unique([departmentId, code])
+  @@schema("public")
 }
 
 model WarehouseItem {
@@ -714,6 +752,7 @@ model WarehouseItem {
 
   @@index([subcategoryId])
   @@index([projectId])
+  @@schema("public")
 }
 
 model WarehouseTemplate {
@@ -728,6 +767,7 @@ model WarehouseTemplate {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model Document {
@@ -754,6 +794,7 @@ model Document {
   photos       Photo[]
 
   @@index([companyId, level])
+  @@schema("public")
 }
 
 model ActivityLogEntry {
@@ -770,6 +811,7 @@ model ActivityLogEntry {
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, createdAt])
+  @@schema("public")
 }
 
 model PermissionMatrixRow {
@@ -782,6 +824,7 @@ model PermissionMatrixRow {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, feature, action])
+  @@schema("public")
 }
 
 model PermissionLabelRow {
@@ -798,6 +841,7 @@ model PermissionLabelRow {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, label])
+  @@schema("public")
 }
 
 model Invite {
@@ -816,6 +860,7 @@ model Invite {
 
   @@index([companyId, status])
   @@index([email])
+  @@schema("public")
 }
 
 model Subscription {
@@ -838,6 +883,7 @@ model Subscription {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @default(now()) @updatedAt
   company                Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@schema("public")
 }
 
 model CompanySetting {
@@ -860,6 +906,7 @@ model CompanySetting {
   contractorPortalEnabled      Boolean @default(false)
   meta                         Json?
   company                      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@schema("public")
 }
 
 enum UserRole {
@@ -870,6 +917,7 @@ enum UserRole {
   Inspector
   Tenant
   Vendor
+  @@schema("public")
 }
 
 enum DealStage {
@@ -879,6 +927,7 @@ enum DealStage {
   UnderContract
   Closed
   Lost
+  @@schema("public")
 }
 
 enum ProjectStatus {
@@ -886,6 +935,7 @@ enum ProjectStatus {
   Active
   OnHold
   Complete
+  @@schema("public")
 }
 
 enum PhaseStatus {
@@ -899,12 +949,14 @@ enum PhaseStatus {
   OnHold
   Done
   Canceled
+  @@schema("public")
 }
 
 enum ForecastMethod {
   Auto
   Manual
   PercentComplete
+  @@schema("public")
 }
 
 enum ChecklistStatus {
@@ -912,6 +964,7 @@ enum ChecklistStatus {
   Done
   Flagged
   NA
+  @@schema("public")
 }
 
 enum DrawStatus {
@@ -919,6 +972,7 @@ enum DrawStatus {
   Approved
   Paid
   Rejected
+  @@schema("public")
 }
 
 enum ContactType {
@@ -934,6 +988,7 @@ enum ContactType {
   Attorney
   Partner
   Employee
+  @@schema("public")
 }
 
 enum TradeCategory {
@@ -967,6 +1022,7 @@ enum TradeCategory {
   Attorney
   PropertyManagement
   Other
+  @@schema("public")
 }
 
 enum DocLevel {
@@ -974,6 +1030,7 @@ enum DocLevel {
   Property
   Project
   Contact
+  @@schema("public")
 }
 
 enum DocStatus {
@@ -982,6 +1039,7 @@ enum DocStatus {
   Pending
   Archived
   Staged
+  @@schema("public")
 }
 
 model Notification {
@@ -1015,6 +1073,7 @@ model Notification {
   @@index([companyId, channel, status, scheduledFor])
   @@index([companyId, channel, status, failedAt])
   @@index([companyId, channel, status, resolvedAt])
+  @@schema("public")
 }
 
 model NotificationState {
@@ -1031,6 +1090,7 @@ model NotificationState {
   updatedAt               DateTime  @default(now()) @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@schema("public")
 }
 
 model StaleSweepAlertLog {
@@ -1049,6 +1109,7 @@ model StaleSweepAlertLog {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, sentAt])
+  @@schema("public")
 }
 
 model ContactNotificationLog {
@@ -1075,6 +1136,7 @@ model ContactNotificationLog {
   @@index([companyId, contactId])
   @@index([companyId, status, failedAt])
   @@index([companyId, status, resolvedAt])
+  @@schema("public")
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1108,6 +1170,7 @@ model Investor {
   notificationPrefs InvestorNotificationPreference[]
 
   @@index([companyId, status])
+  @@schema("public")
 }
 
 model Offering {
@@ -1147,6 +1210,7 @@ model Offering {
 
   @@index([companyId, status])
   @@index([companyId, stage])
+  @@schema("public")
 }
 
 // Investor↔Offering subscription (cap-table row). Named `InvestorSubscription`
@@ -1177,6 +1241,7 @@ model InvestorSubscription {
 
   @@unique([investorId, offeringId])
   @@index([offeringId, status])
+  @@schema("public")
 }
 
 // E-sign / receipt envelopes generated when an investor commits via the
@@ -1196,11 +1261,13 @@ model SubscriptionDocument {
   subscription InvestorSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId])
+  @@schema("public")
 }
 
 enum SubscriptionDocKind {
   Receipt
   Subscription
+  @@schema("public")
 }
 
 model CapitalCall {
@@ -1220,6 +1287,7 @@ model CapitalCall {
 
   @@unique([offeringId, noticeNumber])
   @@index([offeringId, status])
+  @@schema("public")
 }
 
 model CapitalCallAllocation {
@@ -1235,6 +1303,7 @@ model CapitalCallAllocation {
 
   @@unique([capitalCallId, subscriptionId])
   @@index([subscriptionId])
+  @@schema("public")
 }
 
 model Distribution {
@@ -1253,6 +1322,7 @@ model Distribution {
   allocations DistributionAllocation[]
 
   @@index([offeringId, status])
+  @@schema("public")
 }
 
 model DistributionAllocation {
@@ -1268,6 +1338,7 @@ model DistributionAllocation {
 
   @@unique([distributionId, subscriptionId])
   @@index([subscriptionId])
+  @@schema("public")
 }
 
 model InvestorDocument {
@@ -1292,6 +1363,7 @@ model InvestorDocument {
   @@index([investorId])
   @@index([offeringId, docType])
   @@index([companyId])
+  @@schema("public")
 }
 
 model DealUpdate {
@@ -1309,6 +1381,7 @@ model DealUpdate {
   activities InvestorActivity[]
 
   @@index([offeringId, postedAt])
+  @@schema("public")
 }
 
 model InvestorActivity {
@@ -1328,6 +1401,7 @@ model InvestorActivity {
   relatedUpdate   DealUpdate?       @relation(fields: [relatedUpdateId], references: [id])
 
   @@index([investorId, createdAt])
+  @@schema("public")
 }
 
 model InvestorCommunication {
@@ -1343,6 +1417,7 @@ model InvestorCommunication {
   investor Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
   @@index([investorId, loggedAt])
+  @@schema("public")
 }
 
 model InvestorNote {
@@ -1355,6 +1430,7 @@ model InvestorNote {
   investor Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
 
   @@index([investorId])
+  @@schema("public")
 }
 
 model InvestorNotificationPreference {
@@ -1370,12 +1446,14 @@ model InvestorNotificationPreference {
 
   @@unique([investorId, event])
   @@index([investorId])
+  @@schema("public")
 }
 
 enum InvestorAccreditedStatus {
   Unverified
   Self
   Verified
+  @@schema("public")
 }
 
 enum InvestorStatus {
@@ -1383,6 +1461,7 @@ enum InvestorStatus {
   Prospect
   Active
   Inactive
+  @@schema("public")
 }
 
 enum OfferingPropertyType {
@@ -1390,6 +1469,7 @@ enum OfferingPropertyType {
   SF
   MX
   Other
+  @@schema("public")
 }
 
 enum OfferingStage {
@@ -1398,22 +1478,26 @@ enum OfferingStage {
   Raise
   Closing
   Closed
+  @@schema("public")
 }
 
 enum OfferingStatus {
   Active
   Archived
+  @@schema("public")
 }
 
 enum SubscriptionCommitmentType {
   Soft
   Hard
+  @@schema("public")
 }
 
 enum InvestorSubscriptionStatus {
   Pending
   Active
   Closed
+  @@schema("public")
 }
 
 enum CapitalCallStatus {
@@ -1421,23 +1505,27 @@ enum CapitalCallStatus {
   Issued
   Funded
   Cancelled
+  @@schema("public")
 }
 
 enum DistributionType {
   CashFlow
   ReturnOfCapital
   Sale
+  @@schema("public")
 }
 
 enum DistributionStatus {
   Pending
   Sent
+  @@schema("public")
 }
 
 enum DistributionAllocationStatus {
   Pending
   Sent
   Failed
+  @@schema("public")
 }
 
 enum InvestorDocType {
@@ -1447,6 +1535,7 @@ enum InvestorDocType {
   TaxK1
   Update
   Other
+  @@schema("public")
 }
 
 enum DealUpdateType {
@@ -1455,6 +1544,7 @@ enum DealUpdateType {
   Annual
   Distribution
   Market
+  @@schema("public")
 }
 
 enum InvestorActivityType {
@@ -1464,6 +1554,7 @@ enum InvestorActivityType {
   CapitalCall
   Subscription
   Other
+  @@schema("public")
 }
 
 enum InvestorCommunicationChannel {
@@ -1471,6 +1562,7 @@ enum InvestorCommunicationChannel {
   Phone
   Note
   Meeting
+  @@schema("public")
 }
 
 model InvestorInvite {
@@ -1491,6 +1583,7 @@ model InvestorInvite {
 
   @@index([companyId])
   @@index([email])
+  @@schema("public")
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1535,6 +1628,7 @@ model CpAccount {
   onboardingInvites CpOnboardingInvite[] @relation("CpOnboardingInviter")
   quotaUsage        CpQuotaUsage[]
   sentMessageLog    CpSentMessage[]      @relation("CpSentMessageRecipient")
+  @@schema("public")
 }
 
 // The relationship graph: who can see whom.
@@ -1557,6 +1651,7 @@ model CpOperatorEdge {
   @@index([contractorId])
   @@index([layer1CompanyId])
   @@index([inviterAccountId])
+  @@schema("public")
 }
 
 model CpJob {
@@ -1590,6 +1685,7 @@ model CpJob {
 
   @@index([contractorId, status])
   @@index([projectId])
+  @@schema("public")
 }
 
 model CpQuote {
@@ -1619,6 +1715,7 @@ model CpQuote {
   @@index([fromAccountId, status])
   @@index([toCompanyId, status])
   @@index([toAccountId, status])
+  @@schema("public")
 }
 
 model CpQuoteLineItem {
@@ -1632,6 +1729,7 @@ model CpQuoteLineItem {
   quote CpQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
   @@index([quoteId])
+  @@schema("public")
 }
 
 model CpInvoice {
@@ -1656,6 +1754,7 @@ model CpInvoice {
 
   @@index([fromAccountId, status])
   @@index([toCompanyId, status])
+  @@schema("public")
 }
 
 model CpComplianceDoc {
@@ -1671,6 +1770,7 @@ model CpComplianceDoc {
   account CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, docType])
+  @@schema("public")
 }
 
 model CpJobPhoto {
@@ -1684,6 +1784,7 @@ model CpJobPhoto {
   job CpJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
+  @@schema("public")
 }
 
 model CpMessageThread {
@@ -1707,6 +1808,7 @@ model CpMessageThread {
   @@index([contractorAId])
   @@index([contractorBId])
   @@index([layer1CompanyId])
+  @@schema("public")
 }
 
 model CpMessage {
@@ -1723,6 +1825,7 @@ model CpMessage {
   sender CpAccount?      @relation(fields: [senderAccountId], references: [id], onDelete: SetNull)
 
   @@index([threadId, createdAt])
+  @@schema("public")
 }
 
 model CpBidInvitation {
@@ -1744,6 +1847,7 @@ model CpBidInvitation {
   proposals      CpBidProposal[]
 
   @@index([invitedAccountId, status])
+  @@schema("public")
 }
 
 model CpBidProposal {
@@ -1760,6 +1864,7 @@ model CpBidProposal {
   fromAccount CpAccount       @relation(fields: [fromAccountId], references: [id], onDelete: Cascade)
 
   @@unique([invitationId, fromAccountId])
+  @@schema("public")
 }
 
 model CpOnboardingInvite {
@@ -1783,6 +1888,7 @@ model CpOnboardingInvite {
   @@index([email])
   @@index([inviterCompanyId])
   @@index([inviterAccountId])
+  @@schema("public")
 }
 
 model CpQuotaUsage {
@@ -1795,6 +1901,7 @@ model CpQuotaUsage {
   account CpAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, yearMonth])
+  @@schema("public")
 }
 
 // Stub notification log — magic-link emails / SMS land here in dev.
@@ -1812,6 +1919,7 @@ model CpSentMessage {
 
   @@index([toAddress])
   @@index([sentAt])
+  @@schema("public")
 }
 
 // ========================================================================
@@ -1860,6 +1968,7 @@ model WsTask {
   @@index([companyId, createdById, done])
   @@index([parentTaskId])
   @@index([companyId, spaceId])
+  @@schema("public")
 }
 
 enum WsTaskStatus {
@@ -1868,6 +1977,7 @@ enum WsTaskStatus {
   InReview
   Done
   Cancelled
+  @@schema("public")
 }
 
 model WsTaskAssignee {
@@ -1881,6 +1991,7 @@ model WsTaskAssignee {
 
   @@unique([taskId, userId])
   @@index([userId])
+  @@schema("public")
 }
 
 model WsTaskActivity {
@@ -1895,6 +2006,7 @@ model WsTaskActivity {
   user User   @relation("WsTaskActivityUser", fields: [userId], references: [id])
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model WsTaskComment {
@@ -1908,6 +2020,7 @@ model WsTaskComment {
   author User   @relation("WsTaskCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model WsTaskAttachment {
@@ -1924,6 +2037,7 @@ model WsTaskAttachment {
   uploadedBy User   @relation("WsTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model WsChannel {
@@ -1944,6 +2058,7 @@ model WsChannel {
   @@unique([companyId, kind, slug])
   @@unique([companyId, kind, partyType, partyId])
   @@index([companyId, kind])
+  @@schema("public")
 }
 
 model WsChannelMember {
@@ -1958,6 +2073,7 @@ model WsChannelMember {
 
   @@unique([channelId, userId])
   @@index([userId])
+  @@schema("public")
 }
 
 model WsMessage {
@@ -1977,6 +2093,7 @@ model WsMessage {
 
   @@index([channelId, createdAt])
   @@index([companyId, createdAt])
+  @@schema("public")
 }
 
 model WsGoal {
@@ -1998,6 +2115,7 @@ model WsGoal {
 
   @@index([companyId, scope])
   @@index([companyId, ownerUserId])
+  @@schema("public")
 }
 
 model WsReminder {
@@ -2031,6 +2149,7 @@ model WsReminder {
   @@index([companyId, userId, done])
   @@index([companyId, dismissed, dueDate])
   @@index([companyId, assigneeId])
+  @@schema("public")
 }
 
 model WsReminderSms {
@@ -2054,6 +2173,7 @@ model WsReminderSms {
   @@index([status, scheduledFor])
   @@index([reminderId])
   @@index([companyId])
+  @@schema("public")
 }
 
 model WsCalendarEvent {
@@ -2071,6 +2191,7 @@ model WsCalendarEvent {
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([companyId, startAt])
+  @@schema("public")
 }
 
 model PmSpace {
@@ -2089,6 +2210,7 @@ model PmSpace {
   wsTasks   WsTask[]   @relation("WsTaskSpace")
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model PmList {
@@ -2107,6 +2229,7 @@ model PmList {
 
   @@index([companyId])
   @@index([spaceId])
+  @@schema("public")
 }
 
 model PmStatus {
@@ -2125,6 +2248,7 @@ model PmStatus {
   tasks     PmTask[]
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model PmTag {
@@ -2139,6 +2263,7 @@ model PmTag {
   tasks     PmTaskTag[]
 
   @@index([companyId])
+  @@schema("public")
 }
 
 model PmTask {
@@ -2176,6 +2301,7 @@ model PmTask {
   @@index([companyId])
   @@index([listId])
   @@index([parentTaskId])
+  @@schema("public")
 }
 
 model PmTaskAttachment {
@@ -2192,6 +2318,7 @@ model PmTaskAttachment {
   uploadedBy User   @relation("PmTaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model PmTaskAssignee {
@@ -2201,6 +2328,7 @@ model PmTaskAssignee {
   user   User   @relation("PmAssignments", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([taskId, userId])
+  @@schema("public")
 }
 
 model PmTaskTag {
@@ -2210,6 +2338,7 @@ model PmTaskTag {
   tag    PmTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([taskId, tagId])
+  @@schema("public")
 }
 
 model PmComment {
@@ -2224,6 +2353,7 @@ model PmComment {
   author    User     @relation("PmComments", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model PmActivity {
@@ -2237,6 +2367,7 @@ model PmActivity {
   user      User     @relation("PmActivityLog", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@schema("public")
 }
 
 model Invoice {
@@ -2257,6 +2388,7 @@ model Invoice {
   stages         InvoiceStage[]
 
   @@index([projectId])
+  @@schema("public")
 }
 
 model InvoiceJobType {
@@ -2271,6 +2403,7 @@ model InvoiceJobType {
 
   @@index([invoiceId])
   @@index([phaseId])
+  @@schema("public")
 }
 
 model InvoiceAttachment {
@@ -2284,6 +2417,7 @@ model InvoiceAttachment {
   invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@schema("public")
 }
 
 model InvoiceStage {
@@ -2302,6 +2436,7 @@ model InvoiceStage {
   invoice      Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@schema("public")
 }
 
 enum InvoiceClassification {
@@ -2311,12 +2446,14 @@ enum InvoiceClassification {
   Dumpster
   Utility
   Other
+  @@schema("public")
 }
 
 enum InvoiceStatus {
   Unpaid
   Pending
   Paid
+  @@schema("public")
 }
 
 model ChangeOrder {
@@ -2337,12 +2474,14 @@ model ChangeOrder {
 
   @@unique([projectId, number])
   @@index([projectId])
+  @@schema("public")
 }
 
 enum ChangeOrderStatus {
   Pending
   Approved
   Rejected
+  @@schema("public")
 }
 
 // Per-job agreement (subcontract or purchase order). Approved commitments feed
@@ -2363,15 +2502,18 @@ model Commitment {
   phase        Phase?           @relation(fields: [phaseId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@schema("public")
 }
 
 enum CommitmentType {
   Subcontract
   PurchaseOrder
+  @@schema("public")
 }
 
 enum CommitmentStatus {
   Draft
   Approved
   Complete
+  @@schema("public")
 }
