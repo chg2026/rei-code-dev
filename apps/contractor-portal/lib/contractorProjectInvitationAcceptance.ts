@@ -44,7 +44,7 @@ function effectiveExpiry(invitation: { expiresAt: Date; inviteTokenExpiresAt: Da
 }
 
 function terminalOutcome(status: string): InvitationOutcome | null {
-  if (status === "Accepted") return "accepted";
+  if (status === "Accepted" || status === "Activated") return "accepted";
   if (status === "Revoked") return "revoked";
   if (status === "Blocked") return "blocked";
   if (status === "Declined") return "declined";

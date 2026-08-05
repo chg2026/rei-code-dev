@@ -7,17 +7,18 @@ type Cached = {
 };
 const memo = new Map<string, Cached>();
 
-async function loadFresh(companyId: string) {
-  let s = await prisma.companySetting.findUnique({ where: { companyId } });
+async function loadFresh(companyId: string, db: any = prisma) {
+  let s = await db.companySetting.findUnique({ where: { companyId } });
   if (!s) {
-    s = await prisma.companySetting.create({ data: { companyId } });
+    s = await db.companySetting.create({ data: { companyId } });
   }
   return s;
 }
 
 export type CompanySettings = NonNullable<Awaited<ReturnType<typeof loadFresh>>>;
 
-export async function getCompanySettings(companyId: string) {
+export async function getCompanySettings(companyId: string, db: any = prisma) {
+  if (db !== prisma) return loadFresh(companyId, db);
   const cached = memo.get(companyId);
   if (cached && Date.now() - cached.ts < TTL_MS) return cached.s;
   const s = await loadFresh(companyId);

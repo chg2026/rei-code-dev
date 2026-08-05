@@ -977,6 +977,7 @@ enum DrawStatus {
 enum ContractorProjectInvitationStatus {
   Pending
   Accepted
+  Activated
   Declined
   Expired
   Revoked

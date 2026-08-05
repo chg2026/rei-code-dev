@@ -69,6 +69,13 @@ export type AssignmentGateState = {
   allowed: boolean;
 };
 
+type ComplianceDocument = {
+  id: string;
+  type: string;
+  status: string;
+  expiresAt: Date | null;
+};
+
 const COI_TYPES = new Set(["coi", "insurance", "general-liability", "gl"]);
 const W9_TYPES = new Set(["w9", "w-9"]);
 const LICENSE_TYPES = new Set([
@@ -115,14 +122,15 @@ function readRequirements(
  */
 export async function evaluateAssignmentCompliance(
   companyId: string,
-  contactId: string
+  contactId: string,
+  db: any = prisma,
 ): Promise<AssignmentGateState> {
-  const settings = await getCompanySettings(companyId);
+  const settings = await getCompanySettings(companyId, db);
   const meta = (settings.meta as Record<string, unknown> | null) ?? {};
   const requirements = readRequirements(meta);
   const blockingEnabled = settings.blockAssignmentIfDocsMissing;
 
-  const contact = await prisma.contact.findFirst({
+  const contact = await db.contact.findFirst({
     where: { id: contactId, companyId },
     select: { type: true },
   });
@@ -136,7 +144,7 @@ export async function evaluateAssignmentCompliance(
     };
   }
 
-  const docs = await prisma.contractorComplianceDoc.findMany({
+  const docs: ComplianceDocument[] = await db.contractorComplianceDoc.findMany({
     where: { contactId },
     select: { id: true, type: true, status: true, expiresAt: true },
   });

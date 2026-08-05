@@ -1,6 +1,7 @@
 export enum ContractorProjectInvitationStatus {
   Pending = "Pending",
   Accepted = "Accepted",
+  Activated = "Activated",
   Declined = "Declined",
   Expired = "Expired",
   Revoked = "Revoked",
@@ -38,7 +39,10 @@ const ALLOWED_TRANSITIONS: Record<ContractorProjectInvitationStatus, ReadonlySet
     ContractorProjectInvitationStatus.Pending,
     ContractorProjectInvitationStatus.Revoked,
   ]),
-  [ContractorProjectInvitationStatus.Accepted]: new Set(),
+  [ContractorProjectInvitationStatus.Accepted]: new Set([
+    ContractorProjectInvitationStatus.Activated,
+  ]),
+  [ContractorProjectInvitationStatus.Activated]: new Set(),
   [ContractorProjectInvitationStatus.Declined]: new Set(),
   [ContractorProjectInvitationStatus.Expired]: new Set(),
   [ContractorProjectInvitationStatus.Revoked]: new Set(),
