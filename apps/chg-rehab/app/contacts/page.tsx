@@ -6,6 +6,7 @@ import { can, getContractorCompliance } from "@/lib/permissions";
 import { formatET } from "@/lib/datetime";
 import { UnsubscribedRow } from "./UnsubscribedTable";
 import { ContactsDirectory } from "./ContactsDirectory";
+import { classifyContractorPortalLink, normalizePortalEmail } from "@/lib/contractorPortalContactLink";
 import type { ManagedDoc, DocVersion } from "./[id]/ComplianceDocManager";
 import {
   type DirectoryContact,
@@ -44,6 +45,9 @@ export default async function ContactsPage() {
     where: { companyId: user.companyId },
     orderBy: { name: "asc" },
     include: {
+      contractorPortalAccount: {
+        select: { id: true, contractorPortalEnabled: true, status: true },
+      },
       complianceDocs: {
         orderBy: { expiresAt: "asc" },
         include: { versions: { orderBy: { replacedAt: "desc" } } },
@@ -74,6 +78,31 @@ export default async function ContactsPage() {
     })
   );
   const complianceMap = new Map(compliancePairs);
+
+  const portalStatusPairs = await Promise.all(allContacts.map(async (c) => {
+    if (c.type !== "Contractor" && c.type !== "Subcontractor") return [c.id, "NotFound"] as const;
+    const email = normalizePortalEmail(c.email);
+    if (!email) return [c.id, "NotFound"] as const;
+    const [account, onboardingInvite, projectInvite] = await Promise.all([
+      c.contractorPortalAccount ?? prisma.cpAccount.findUnique({
+        where: { email }, select: { id: true, contractorPortalEnabled: true, status: true },
+      }),
+      prisma.cpOnboardingInvite.findFirst({
+        where: { email, inviterCompanyId: user.companyId, consumedAt: null, expiresAt: { gt: new Date() } },
+        select: { id: true },
+      }),
+      prisma.contractorProjectInvitation.findFirst({
+        where: { companyId: user.companyId, contactId: c.id, status: "Pending", expiresAt: { gt: new Date() } },
+        select: { id: true },
+      }),
+    ]);
+    return [c.id, classifyContractorPortalLink({
+      linked: Boolean(c.contractorPortalAccountId),
+      account,
+      invitePending: Boolean(onboardingInvite || projectInvite),
+    })] as const;
+  }));
+  const portalStatusMap = new Map(portalStatusPairs);
 
   const directoryContacts: DirectoryContact[] = allContacts.map((c) => {
     const meta = (c.meta || {}) as ContactMeta;
@@ -124,6 +153,8 @@ export default async function ContactsPage() {
       tags: Array.isArray(meta.tags) ? meta.tags.filter((t): t is string => typeof t === "string") : [],
       compliance: complianceMap.get(c.id) ?? null,
       managedDocs,
+      contractorPortalAccountId: c.contractorPortalAccountId,
+      contractorPortalLinkStatus: portalStatusMap.get(c.id) ?? c.contractorPortalLinkStatus,
     };
   });
 

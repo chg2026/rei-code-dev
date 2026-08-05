@@ -343,6 +343,7 @@ export function ContactsDirectory({ contacts, isAdmin, canManage, canEditDocs, u
           canEditDocs={canEditDocs}
           onClose={() => setSelectedId(null)}
           onEdit={(c) => setEditContact(c)}
+          onPortalUpdated={() => router.refresh()}
         />
       )}
 

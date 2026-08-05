@@ -30,18 +30,24 @@ type Props = {
   canEditDocs: boolean;
   onClose: () => void;
   onEdit: (c: DirectoryContact) => void;
+  onPortalUpdated?: () => void;
 };
 
-export function ContactSidePanel({ contact, isAdmin, canEdit, canEditDocs, onClose, onEdit }: Props) {
+export function ContactSidePanel({ contact, isAdmin, canEdit, canEditDocs, onClose, onEdit, onPortalUpdated }: Props) {
   const [shown, setShown] = useState(false);
   const [tab, setTab] = useState<"details" | "compliance">("details");
+  const [portalStatus, setPortalStatus] = useState(contact.contractorPortalLinkStatus);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
 
   const hasCompliance = contact.type === "Contractor" || contact.type === "Subcontractor";
 
   // Reset to details whenever a different contact is opened.
   useEffect(() => {
     setTab("details");
-  }, [contact.id]);
+    setPortalStatus(contact.contractorPortalLinkStatus);
+    setPortalError(null);
+  }, [contact.id, contact.contractorPortalLinkStatus]);
 
   // Trigger the slide-in transition after mount, and wire Escape to close.
   useEffect(() => {
@@ -64,6 +70,14 @@ export function ContactSidePanel({ contact, isAdmin, canEdit, canEditDocs, onClo
 
   const av = avatarColor(contact.name);
   const tb = typeBadge(contact.type);
+
+  const portalTone = portalStatus === "Linked"
+    ? { bg: "#E4F1EA", fg: "#1F7A4D" }
+    : portalStatus === "Disabled"
+    ? { bg: "#FBE4E4", fg: "#9B1C1C" }
+    : portalStatus === "InvitePending"
+    ? { bg: "#F4EBDF", fg: "#7A5320" }
+    : { bg: "#E8EFF1", fg: "#143641" };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000 }}>
@@ -247,6 +261,40 @@ export function ContactSidePanel({ contact, isAdmin, canEdit, canEditDocs, onClo
                 </div>
               )}
               <DetailRow label="Location" value={contact.address} />
+              {(contact.type === "Contractor" || contact.type === "Subcontractor") && (
+                <div style={{ marginTop: 10, padding: 10, border: "1px solid var(--border-1)", borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700 }}>Contractor Portal</div>
+                  <div style={{ fontSize: 10, color: "var(--text-secondary)", margin: "4px 0 8px" }}>
+                    Existing account link only — no project access or invite is created here.
+                  </div>
+                  {canEdit && portalStatus !== "Linked" && (
+                    <button
+                      type="button"
+                      className="btn-sm"
+                      disabled={portalBusy || !contact.email}
+                      onClick={async () => {
+                        setPortalBusy(true);
+                        setPortalError(null);
+                        try {
+                          const res = await fetch(`/api/contacts/${contact.id}/contractor-portal`, { method: "POST" });
+                          const body = await res.json();
+                          if (!res.ok) throw new Error(body.error ?? "Unable to check Contractor Portal account.");
+                          setPortalStatus(body.contact.contractorPortalLinkStatus);
+                          onPortalUpdated?.();
+                        } catch (error) {
+                          setPortalError(error instanceof Error ? error.message : "Unable to check Contractor Portal account.");
+                        } finally {
+                          setPortalBusy(false);
+                        }
+                      }}
+                    >
+                      {portalBusy ? "Checking…" : "Check / link existing account"}
+                    </button>
+                  )}
+                  {!contact.email && <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Add an email to check for an account.</div>}
+                  {portalError && <div style={{ fontSize: 10, color: "#9B1C1C", marginTop: 6 }}>{portalError}</div>}
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8, padding: "5px 0", fontSize: 11 }}>
                 <span style={{ width: 78, color: "var(--text-tertiary)", flexShrink: 0 }}>Rating</span>
                 <span style={{ color: "#D9A406" }}>
@@ -254,6 +302,11 @@ export function ContactSidePanel({ contact, isAdmin, canEdit, canEditDocs, onClo
                     ? "★".repeat(contact.rating) + "☆".repeat(5 - contact.rating)
                     : <span style={{ color: "var(--text-tertiary)" }}>Not rated</span>}
                 </span>
+                {(contact.type === "Contractor" || contact.type === "Subcontractor") && (
+                  <span className="cell-tag" style={{ background: portalTone.bg, color: portalTone.fg }}>
+                    Portal: {portalStatus === "AccountFound" ? "account found" : portalStatus === "NotFound" ? "not found" : portalStatus === "InvitePending" ? "invite pending" : portalStatus.toLowerCase()}
+                  </span>
+                )}
               </div>
 
               {contact.notes && (

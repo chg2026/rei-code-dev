@@ -40,6 +40,8 @@ export type DirectoryContact = {
   compliance: ComplianceSummary | null;
   /** Full managed compliance docs for the side-panel Compliance tab. */
   managedDocs: ManagedDoc[];
+  contractorPortalLinkStatus: "Linked" | "AccountFound" | "NotFound" | "Disabled" | "InvitePending";
+  contractorPortalAccountId: string | null;
 };
 
 /* ------------------------------------------------------------------ *

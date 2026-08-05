@@ -590,6 +590,8 @@ model Contact {
   meta          Json?
   emailOptOut   Boolean        @default(false)
   emailOptOutAt DateTime?
+  contractorPortalAccountId String?
+  contractorPortalLinkStatus ContractorPortalLinkStatus @default(NotFound)
   createdAt     DateTime       @default(now())
 
   org              Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -597,8 +599,10 @@ model Contact {
   assignments      ContractorAssignment[]
   notificationLogs ContactNotificationLog[]
   projectInvitations ContractorProjectInvitation[]
+  contractorPortalAccount CpAccount? @relation("ContactContractorPortalAccount", fields: [contractorPortalAccountId], references: [id], onDelete: SetNull)
 
   @@index([companyId, type])
+  @@index([contractorPortalAccountId])
 }
 
 // A persistent assignment of a Contact (typically Contractor / Subcontractor)
@@ -972,6 +976,14 @@ enum DrawStatus {
   Approved
   Paid
   Rejected
+}
+
+enum ContractorPortalLinkStatus {
+  Linked
+  AccountFound
+  NotFound
+  Disabled
+  InvitePending
 }
 
 enum ContractorProjectInvitationStatus {
@@ -1605,6 +1617,7 @@ model CpAccount {
   quotaUsage        CpQuotaUsage[]
   sentMessageLog    CpSentMessage[]      @relation("CpSentMessageRecipient")
   projectInvitations ContractorProjectInvitation[]
+  linkedContacts     Contact[] @relation("ContactContractorPortalAccount")
 }
 
 // The relationship graph: who can see whom.
