@@ -54,6 +54,7 @@ model Company {
   cpThreads            CpMessageThread[]        @relation("CpThreadL1")
   cpBidInvitations     CpBidInvitation[]        @relation("CpBidInvFromCompany")
   cpOnboardingInvites  CpOnboardingInvite[]     @relation("CpOnboardingInvCompany")
+  contractorProjectInvitations ContractorProjectInvitation[]
   wsTasks              WsTask[]
   wsChannels           WsChannel[]
   wsMessages           WsMessage[]
@@ -238,6 +239,7 @@ model Project {
   assignments           ProjectAssignment[]
   contractorAssignments ContractorAssignment[]
   contractorPortalJobs  CpJob[]               @relation("ProjectContractorPortalJobs")
+  contractorProjectInvitations ContractorProjectInvitation[]
   documents             Document[]
   warehouseAllocations  WarehouseItem[]
   invoices              Invoice[]
@@ -594,6 +596,7 @@ model Contact {
   complianceDocs   ContractorComplianceDoc[]
   assignments      ContractorAssignment[]
   notificationLogs ContactNotificationLog[]
+  projectInvitations ContractorProjectInvitation[]
 
   @@index([companyId, type])
 }
@@ -619,6 +622,50 @@ model ContractorAssignment {
   @@index([companyId])
   @@index([contactId])
   @@index([projectId])
+}
+
+// CHG-owned lifecycle for linking a Contact to a Contractor Portal account and
+// authorizing that contact for one project. Existing ContractorAssignment rows
+// remain the active-assignment contract until a later activation workflow.
+model ContractorProjectInvitation {
+  id                  String                             @id @default(cuid())
+  companyId           String
+  projectId           String
+  contactId           String
+  cpAccountId         String?
+  emailSnapshot       String
+  role                String
+  roleKey             String
+  trade               String?
+  status              ContractorProjectInvitationStatus @default(Pending)
+  invitedAt           DateTime                           @default(now())
+  expiresAt           DateTime
+  agreementVersion    String
+  agreementAcceptedAt DateTime?
+  acceptedById        String?
+  documentGateState   String                             @default("Pending")
+  complianceGateState String                             @default("Pending")
+  declinedAt          DateTime?
+  declinedById        String?
+  revokedAt           DateTime?
+  revokedById         String?
+  blockedAt           DateTime?
+  blockedById         String?
+  blockedReason       String?
+  invitedById         String?
+  createdAt           DateTime                           @default(now())
+  updatedAt           DateTime                           @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contact   Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  cpAccount CpAccount? @relation(fields: [cpAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, projectId, contactId, roleKey])
+  @@index([companyId, status])
+  @@index([companyId, projectId, status])
+  @@index([contactId, status])
+  @@index([cpAccountId])
 }
 
 model ContractorComplianceDoc {
@@ -919,6 +966,15 @@ enum DrawStatus {
   Approved
   Paid
   Rejected
+}
+
+enum ContractorProjectInvitationStatus {
+  Pending
+  Accepted
+  Declined
+  Expired
+  Revoked
+  Blocked
 }
 
 enum ContactType {
@@ -1535,6 +1591,7 @@ model CpAccount {
   onboardingInvites CpOnboardingInvite[] @relation("CpOnboardingInviter")
   quotaUsage        CpQuotaUsage[]
   sentMessageLog    CpSentMessage[]      @relation("CpSentMessageRecipient")
+  projectInvitations ContractorProjectInvitation[]
 }
 
 // The relationship graph: who can see whom.
