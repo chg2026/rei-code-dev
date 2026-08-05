@@ -7,6 +7,7 @@ import { parseActivityMeta, parseProjectMeta } from "@/lib/rehab/types";
 import { can } from "@/lib/permissions";
 import { parseKickoff } from "@/lib/rehab/kickoff";
 import KickoffChecklist from "@/components/rehab/KickoffChecklist";
+import ContractorOnboarding from "@/components/rehab/ContractorOnboarding";
 import OverviewKpis from "@/components/rehab/OverviewKpis";
 import ActualCompletionDate from "@/components/rehab/ActualCompletionDate";
 import PhaseStatusSelect from "@/components/rehab/PhaseStatusSelect";
@@ -96,6 +97,7 @@ export default async function OverviewPage({
     outstandingAgg,
     pendingChangeOrders,
     contractorAssignments,
+    contractorContacts,
     propertyRow,
     allActivity,
     actualsMap,
@@ -145,6 +147,11 @@ export default async function OverviewPage({
     prisma.contractorAssignment.findMany({
       where: { projectId: project.id, companyId: user.companyId, status: "Active" },
       include: { contact: true },
+    }),
+    prisma.contact.findMany({
+      where: { companyId: user.companyId, type: { in: ["Contractor", "Subcontractor"] } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true, type: true, trade: true },
     }),
     prisma.property.findUnique({
       where: { id: project.propertyId },
@@ -411,6 +418,13 @@ export default async function OverviewPage({
             canEdit={canEditRehab}
           />
         </div>
+
+        {/* ── Contractor project invitation onboarding ── */}
+        <ContractorOnboarding
+          projectId={project.id}
+          contacts={contractorContacts}
+          canEdit={canEditRehab}
+        />
 
         {/* ── Section 2: KPI grid ── */}
         <OverviewKpis
