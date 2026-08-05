@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 const PUBLIC_PATHS = [
   "/login",
   "/signup",
+  "/accept-invite",
   "/api/auth/login",
   "/api/auth/signup",
   "/api/auth/logout",

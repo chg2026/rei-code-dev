@@ -640,6 +640,12 @@ model ContractorProjectInvitation {
   status              ContractorProjectInvitationStatus @default(Pending)
   invitedAt           DateTime                           @default(now())
   expiresAt           DateTime
+  inviteTokenHash     String?                            @unique
+  inviteTokenExpiresAt DateTime?
+  inviteSentAt        DateTime?
+  inviteDeliveryStatus InviteDeliveryStatus             @default(Pending)
+  inviteDeliveryMessageId String?
+  inviteDeliveryError String?
   agreementVersion    String
   agreementAcceptedAt DateTime?
   acceptedById        String?
@@ -975,6 +981,12 @@ enum ContractorProjectInvitationStatus {
   Expired
   Revoked
   Blocked
+}
+
+enum InviteDeliveryStatus {
+  Pending
+  Delivered
+  Failed
 }
 
 enum ContactType {

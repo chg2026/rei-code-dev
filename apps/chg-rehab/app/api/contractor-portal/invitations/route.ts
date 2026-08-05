@@ -5,6 +5,11 @@ import { billingBlockedResponse } from "@/lib/billing-gate";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { contractorProjectInvitationRoleKey } from "@/lib/contractorProjectInvitationState";
+import {
+  buildContractorInviteJoinUrl,
+  createContractorInviteToken,
+  sendContractorProjectInvitationEmail,
+} from "@/lib/contractorProjectInvitationEmail";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +29,10 @@ function safeInvitation(invitation: {
   documentGateState: string;
   complianceGateState: string;
   cpAccountId: string | null;
+  inviteDeliveryStatus: string;
+  inviteSentAt: Date | null;
+  inviteDeliveryMessageId: string | null;
+  inviteDeliveryError: string | null;
   contact: { id: string; name: string; email: string | null; type: ContactType };
   project: { id: string; code: string; name: string };
 }) {
@@ -40,6 +49,9 @@ function safeInvitation(invitation: {
     documentGateState: invitation.documentGateState,
     complianceGateState: invitation.complianceGateState,
     cpAccountId: invitation.cpAccountId,
+    inviteDeliveryStatus: invitation.inviteDeliveryStatus,
+    inviteSentAt: invitation.inviteSentAt,
+    inviteDeliveryMessageId: invitation.inviteDeliveryMessageId,
     contact: invitation.contact,
     project: invitation.project,
   };
@@ -126,6 +138,8 @@ export async function POST(req: NextRequest) {
   }
   const roleKey = contractorProjectInvitationRoleKey(role);
   if (!roleKey) return NextResponse.json({ error: "role is required" }, { status: 400 });
+  const company = await prisma.company.findUnique({ where: { id: user.companyId }, select: { name: true } });
+  if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -133,9 +147,11 @@ export async function POST(req: NextRequest) {
         where: { companyId_projectId_contactId_roleKey: { companyId: user.companyId, projectId: project.id, contactId: contact.id, roleKey } },
         include: invitationInclude,
       });
-      if (existing) return { invitation: existing, duplicate: true };
+      if (existing) return { invitation: existing, duplicate: true as const };
 
       const cpAccount = await tx.cpAccount.findUnique({ where: { email: emailSnapshot }, select: { id: true } });
+      const { rawToken, tokenHash } = createContractorInviteToken();
+      const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000);
       const invitation = await tx.contractorProjectInvitation.create({
         data: {
           companyId: user.companyId,
@@ -147,7 +163,10 @@ export async function POST(req: NextRequest) {
           roleKey,
           trade: contact.trade,
           agreementVersion,
-          expiresAt: new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000),
+          expiresAt,
+          inviteTokenHash: tokenHash,
+          inviteTokenExpiresAt: expiresAt,
+          inviteDeliveryStatus: "Pending",
           invitedById: user.id,
         },
         include: invitationInclude,
@@ -163,10 +182,34 @@ export async function POST(req: NextRequest) {
           meta: { projectId: project.id, contactId: contact.id, roleKey, agreementVersion },
         },
       });
-      return { invitation, duplicate: false };
+      return { invitation, duplicate: false, rawToken };
     });
 
-    return NextResponse.json({ ok: true, duplicate: result.duplicate, invitation: safeInvitation(result.invitation) }, { status: result.duplicate ? 200 : 201 });
+    if (result.duplicate) {
+      return NextResponse.json({ ok: true, duplicate: true, invitation: safeInvitation(result.invitation) });
+    }
+
+    const delivery = await sendContractorProjectInvitationEmail({
+      to: result.invitation.emailSnapshot,
+      inviterName: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "CHG Rehab",
+      companyName: company.name,
+      projectCode: project.code,
+      projectName: project.name,
+      role: result.invitation.role,
+      joinUrl: buildContractorInviteJoinUrl(result.rawToken),
+      expiresAt: result.invitation.expiresAt,
+    });
+    const invitation = await prisma.contractorProjectInvitation.update({
+      where: { id: result.invitation.id },
+      data: {
+        inviteDeliveryStatus: delivery.delivered ? "Delivered" : "Failed",
+        inviteSentAt: delivery.delivered ? new Date() : null,
+        inviteDeliveryMessageId: delivery.messageId ?? null,
+        inviteDeliveryError: delivery.delivered ? null : (delivery.reason ?? "delivery_failed"),
+      },
+      include: invitationInclude,
+    });
+    return NextResponse.json({ ok: true, duplicate: false, invitation: safeInvitation(invitation) }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await prisma.contractorProjectInvitation.findUnique({

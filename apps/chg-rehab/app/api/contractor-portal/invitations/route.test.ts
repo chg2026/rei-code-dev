@@ -8,8 +8,18 @@ const db = vi.hoisted(() => ({
   invitations: [] as any[],
   activity: [] as any[],
   cpAccounts: [] as any[],
+  company: { id: "co-1", name: "CHG Company" },
   seq: 0,
   reset() { this.projects = []; this.contacts = []; this.invitations = []; this.activity = []; this.cpAccounts = []; this.seq = 0; },
+}));
+
+const delivery = vi.hoisted(() => ({
+  send: vi.fn(async () => ({ delivered: true, messageId: "msg-1" })),
+}));
+vi.mock("@/lib/contractorProjectInvitationEmail", () => ({
+  createContractorInviteToken: vi.fn(() => ({ rawToken: "raw-secret", tokenHash: "hash-only" })),
+  buildContractorInviteJoinUrl: vi.fn((token: string) => `https://contractor.doorine.com/accept-invite?token=${token}`),
+  sendContractorProjectInvitationEmail: delivery.send,
 }));
 
 vi.mock("@prisma/client", () => {
@@ -41,6 +51,12 @@ vi.mock("@/lib/prisma", () => {
       db.invitations.push(row);
       return withRelations(row, include);
     },
+    update: async ({ where, data, include }: any) => {
+      const row = db.invitations.find((r) => r.id === where.id);
+      if (!row) throw new Error("not found");
+      Object.assign(row, data);
+      return withRelations(row, include);
+    },
   };
   const withRelations = (row: any, _include: any) => ({ ...row, contact: db.contacts.find((c) => c.id === row.contactId), project: db.projects.find((p) => p.id === row.projectId) });
   const tx = {
@@ -53,6 +69,7 @@ vi.mock("@/lib/prisma", () => {
       project: { findFirst: async ({ where }: any) => db.projects.find((p) => match(p, where)) ?? null },
       contact: { findFirst: async ({ where }: any) => db.contacts.find((c) => match(c, where)) ?? null },
       contractorProjectInvitation: invitationTable,
+      company: { findUnique: async ({ where }: any) => db.company.id === where.id ? db.company : null },
       $transaction: async (fn: any) => fn(tx),
     },
   };
@@ -71,7 +88,7 @@ const user = (companyId = "co-1"): SessionUser => ({ id: "u-1", companyId, role:
 const request = (method: string, body?: unknown, query = "") => new NextRequest(`http://test/api/contractor-portal/invitations${query}`, { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { "content-type": "application/json" } });
 
 beforeEach(() => {
-  vi.clearAllMocks(); db.reset(); auth.mockResolvedValue(user()); permission.mockResolvedValue(true); billing.mockResolvedValue(null);
+  vi.clearAllMocks(); db.reset(); delivery.send.mockResolvedValue({ delivered: true, messageId: "msg-1" }); auth.mockResolvedValue(user()); permission.mockResolvedValue(true); billing.mockResolvedValue(null);
   db.projects.push({ id: "p-1", companyId: "co-1", code: "CHG-1", name: "Project One" });
   db.contacts.push({ id: "c-1", companyId: "co-1", type: "Contractor", name: "Build Co", email: "Build@Example.com", trade: "GC" });
 });
@@ -92,13 +109,15 @@ describe("contractor project invitations route", () => {
   it("creates a pending invitation and activity entry", async () => {
     db.cpAccounts.push({ id: "cp-1", email: "build@example.com" });
     const res = await POST(request("POST", { projectId: "p-1", contactId: "c-1", role: " GC ", agreementVersion: "v1" }));
-    expect(res.status).toBe(201); expect((await res.json()).invitation).toMatchObject({ status: "Pending", roleKey: "gc", cpAccountId: "cp-1" }); expect(db.activity).toHaveLength(1);
+    expect(res.status).toBe(201); expect((await res.json()).invitation).toMatchObject({ status: "Pending", roleKey: "gc", cpAccountId: "cp-1", inviteDeliveryStatus: "Delivered" }); expect(db.activity).toHaveLength(1);
+    expect(db.invitations[0].inviteTokenHash).toBe("hash-only"); expect(db.invitations[0].inviteTokenHash).not.toContain("raw-secret");
+    expect(delivery.send).toHaveBeenCalledTimes(1); expect(delivery.send.mock.calls[0]?.[0]?.joinUrl).toContain("raw-secret");
   });
   it("is idempotent on the Prisma unique key", async () => {
     const body = { projectId: "p-1", contactId: "c-1", role: "GC", agreementVersion: "v1" };
     expect((await POST(request("POST", body))).status).toBe(201);
     const second = await POST(request("POST", body));
-    expect(second.status).toBe(200); expect((await second.json()).duplicate).toBe(true); expect(db.invitations).toHaveLength(1); expect(db.activity).toHaveLength(1);
+    expect(second.status).toBe(200); expect((await second.json()).duplicate).toBe(true); expect(db.invitations).toHaveLength(1); expect(db.activity).toHaveLength(1); expect(delivery.send).toHaveBeenCalledTimes(1);
   });
   it("scopes GET results to the current company and project", async () => {
     db.invitations.push({ id: "i-1", companyId: "co-1", projectId: "p-1", contactId: "c-1", roleKey: "gc", role: "GC", emailSnapshot: "build@example.com", agreementVersion: "v1", trade: "GC", status: "Pending", invitedAt: new Date(), expiresAt: new Date(), documentGateState: "Pending", complianceGateState: "Pending", cpAccountId: null });

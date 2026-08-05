@@ -7,6 +7,8 @@ export type InviteEmail = {
   role: string;
   joinUrl: string;
   expiresAt: Date;
+  projectCode?: string;
+  projectName?: string;
 };
 
 export type SendResult = {
@@ -40,21 +42,26 @@ export async function sendInviteEmail(msg: InviteEmail): Promise<SendResult> {
   });
 
   const subject = `You've been invited to join ${msg.companyName} on CHG Rehab`;
+  const projectLine = msg.projectCode && msg.projectName
+    ? `Project: ${msg.projectCode} — ${msg.projectName}`
+    : undefined;
 
   const text = [
     `${msg.inviterName} invited you to join ${msg.companyName} on CHG Rehab as a ${msg.role}.`,
+    projectLine,
     ``,
-    `Accept your invite (expires ${expires}):`,
+    `Accept your invite (expires ${expires}) by opening the link below, then follow the instructions to create or sign in to your Contractor Portal account:`,
     msg.joinUrl,
     ``,
     `If you weren't expecting this invite, you can ignore this email.`,
-  ].join("\n");
+  ].filter((line): line is string => line !== undefined).join("\n");
 
   const html = `
     <div style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;max-width:480px;margin:0 auto">
       <p style="font-size:15px"><strong>${escapeHtml(msg.inviterName)}</strong> invited you to join
       <strong>${escapeHtml(msg.companyName)}</strong> on CHG Rehab as a
       <strong>${escapeHtml(msg.role)}</strong>.</p>
+      ${projectLine ? `<p><strong>${escapeHtml(projectLine)}</strong></p>` : ""}
       <p style="margin:24px 0">
         <a href="${escapeHtml(msg.joinUrl)}"
            style="display:inline-block;padding:11px 22px;background:#111827;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500">
