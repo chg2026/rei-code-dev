@@ -45,6 +45,10 @@ export function invitationIsActivatable(invitation: Pick<Invitation, "status">) 
   return invitation.status === "Accepted";
 }
 
+export function invitationIsRevokable(invitation: Pick<Invitation, "status" | "expiresAt">, now = Date.now()) {
+  return invitation.status === "Pending" && new Date(invitation.expiresAt).getTime() > now;
+}
+
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
@@ -110,7 +114,7 @@ export default function ContractorOnboarding({ projectId, contacts, canEdit }: P
     }
   }
 
-  async function mutateInvitation(invitation: Invitation, action: "resend" | "activate") {
+  async function mutateInvitation(invitation: Invitation, action: "resend" | "activate" | "revoke") {
     setBusy(`${action}:${invitation.id}`);
     setError(null);
     setNotice(null);
@@ -119,7 +123,8 @@ export default function ContractorOnboarding({ projectId, contacts, canEdit }: P
       const payload = (await response.json().catch(() => null)) as { invitation?: Invitation; error?: string } | null;
       if (!response.ok || !payload?.invitation) throw new Error(payload?.error || `Could not ${action} invitation`);
       setInvitations((current) => current.map((item) => (item.id === invitation.id ? payload.invitation! : item)));
-      setNotice(action === "activate" ? "Invitation activated." : "Invitation resent.");
+      void loadInvitations();
+      setNotice(action === "activate" ? "Invitation activated." : action === "revoke" ? "Invitation revoked." : "Invitation resent.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Could not ${action} invitation`);
     } finally {
@@ -178,6 +183,7 @@ export default function ContractorOnboarding({ projectId, contacts, canEdit }: P
             {invitations.map((invitation) => {
               const resendable = canEdit && invitationIsResendable(invitation);
               const activatable = canEdit && invitationIsActivatable(invitation);
+              const revokable = canEdit && invitationIsRevokable(invitation);
               return (
                 <div key={invitation.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 10px", borderTop: "0.5px solid var(--border-lo)" }}>
                   <div style={{ minWidth: 0 }}>
@@ -191,6 +197,7 @@ export default function ContractorOnboarding({ projectId, contacts, canEdit }: P
                     <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "var(--bg-primary)", color: "var(--text-primary)" }}>{invitation.status}</span>
                     {resendable && <button className="btn-sm" type="button" disabled={busy === `resend:${invitation.id}`} onClick={() => void mutateInvitation(invitation, "resend")}>{busy === `resend:${invitation.id}` ? "Resending…" : "Resend"}</button>}
                     {activatable && <button className="btn-sm btn-primary" type="button" disabled={busy === `activate:${invitation.id}`} onClick={() => void mutateInvitation(invitation, "activate")}>{busy === `activate:${invitation.id}` ? "Activating…" : "Activate"}</button>}
+                    {revokable && <button className="btn-sm" type="button" disabled={busy === `revoke:${invitation.id}`} onClick={() => void mutateInvitation(invitation, "revoke")}>{busy === `revoke:${invitation.id}` ? "Revoking…" : "Revoke"}</button>}
                   </div>
                 </div>
               );

@@ -8,9 +8,11 @@ const db = vi.hoisted(() => ({
   invitations: [] as any[],
   activity: [] as any[],
   cpAccounts: [] as any[],
+  replacementCasCount: 1,
+  deliveryCasCount: 1,
   company: { id: "co-1", name: "CHG Company" },
   seq: 0,
-  reset() { this.projects = []; this.contacts = []; this.invitations = []; this.activity = []; this.cpAccounts = []; this.seq = 0; },
+  reset() { this.projects = []; this.contacts = []; this.invitations = []; this.activity = []; this.cpAccounts = []; this.replacementCasCount = 1; this.deliveryCasCount = 1; this.seq = 0; },
 }));
 
 const delivery = vi.hoisted(() => ({
@@ -42,7 +44,9 @@ vi.mock("@/lib/prisma", () => {
   const invitationTable = {
     findUnique: async ({ where, include }: any) => {
       const key = where.companyId_projectId_contactId_roleKey;
-      const row = db.invitations.find((r) => r.companyId === key.companyId && r.projectId === key.projectId && r.contactId === key.contactId && r.roleKey === key.roleKey);
+      const row = key
+        ? db.invitations.find((r) => r.companyId === key.companyId && r.projectId === key.projectId && r.contactId === key.contactId && r.roleKey === key.roleKey)
+        : db.invitations.find((r) => r.id === where.id);
       return row ? withRelations(row, include) : null;
     },
     findMany: async ({ where, include }: any) => db.invitations.filter((r) => match(r, where)).map((r) => withRelations(r, include)),
@@ -50,6 +54,26 @@ vi.mock("@/lib/prisma", () => {
       const row = { id: `inv-${++db.seq}`, status: "Pending", documentGateState: "Pending", complianceGateState: "Pending", invitedAt: new Date(), createdAt: new Date(), updatedAt: new Date(), ...data };
       db.invitations.push(row);
       return withRelations(row, include);
+    },
+    updateMany: async ({ where, data }: any) => {
+      if (data.status === "Pending" && data.inviteTokenHash) {
+        if (db.replacementCasCount !== 1) {
+          const concurrent = db.invitations.find((r) => r.id === where.id);
+          if (concurrent) Object.assign(concurrent, { status: "Pending", inviteTokenHash: "winner-hash", inviteTokenExpiresAt: concurrent.expiresAt });
+          return { count: 0 };
+        }
+        db.replacementCasCount = 0;
+      } else if (data.inviteDeliveryStatus && db.deliveryCasCount !== 1) {
+        return { count: 0 };
+      }
+      const row = db.invitations.find((r) => r.id === where.id && Object.entries(where).every(([key, value]: any) => {
+        if (key === "id") return true;
+        if (key === "updatedAt") return r[key] === value;
+        return r[key] === value;
+      }));
+      if (!row) return { count: 0 };
+      Object.assign(row, data);
+      return { count: 1 };
     },
     update: async ({ where, data, include }: any) => {
       const row = db.invitations.find((r) => r.id === where.id);
@@ -118,6 +142,29 @@ describe("contractor project invitations route", () => {
     expect((await POST(request("POST", body))).status).toBe(201);
     const second = await POST(request("POST", body));
     expect(second.status).toBe(200); expect((await second.json()).duplicate).toBe(true); expect(db.invitations).toHaveLength(1); expect(db.activity).toHaveLength(1); expect(delivery.send).toHaveBeenCalledTimes(1);
+  });
+  it("replaces a revoked invitation without granting active access or creating a duplicate row", async () => {
+    db.invitations.push({ id: "inv-revoked", companyId: "co-1", projectId: "p-1", contactId: "c-1", roleKey: "gc", role: "GC", emailSnapshot: "build@example.com", status: "Revoked", expiresAt: new Date(Date.now() - 1000), inviteTokenHash: null, inviteTokenExpiresAt: null, cpAccountId: null, documentGateState: "Complete", complianceGateState: "Blocked", blockedAt: new Date(), blockedById: "old-user", blockedReason: "old reason" });
+    const response = await POST(request("POST", { projectId: "p-1", contactId: "c-1", role: "GC", agreementVersion: "v2" }));
+    expect(response.status).toBe(201); expect(db.invitations).toHaveLength(1); expect(db.invitations[0]).toMatchObject({ id: "inv-revoked", status: "Pending", agreementVersion: "v2", documentGateState: "Pending", complianceGateState: "Pending", blockedAt: null, blockedById: null, blockedReason: null }); expect(db.activity).toHaveLength(1); expect(delivery.send).toHaveBeenCalledTimes(1);
+  });
+  it("loses a concurrent replacement CAS without sending a second token", async () => {
+    db.invitations.push({ id: "inv-pending", companyId: "co-1", projectId: "p-1", contactId: "c-1", roleKey: "gc", role: "GC", emailSnapshot: "build@example.com", status: "Revoked", expiresAt: new Date(Date.now() - 60_000), inviteTokenHash: null, inviteTokenExpiresAt: null, updatedAt: new Date() });
+    db.replacementCasCount = 0;
+    const response = await POST(request("POST", { projectId: "p-1", contactId: "c-1", role: "GC", agreementVersion: "v2" }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).duplicate).toBe(true);
+    expect(delivery.send).not.toHaveBeenCalled();
+  });
+  it("does not claim delivery after the invitation loses its delivery CAS", async () => {
+    db.deliveryCasCount = 0;
+    const response = await POST(request("POST", { projectId: "p-1", contactId: "c-1", role: "GC", agreementVersion: "v1" }));
+    expect(response.status).toBe(409);
+    expect(db.invitations[0].inviteDeliveryStatus).toBe("Pending");
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, conflict: "delivery_cas_lost", reconciliationRequired: true });
+    expect(body.invitation.inviteDeliveryStatus).toBe("Pending");
+    expect(body.invitation).not.toHaveProperty("inviteTokenHash");
   });
   it("scopes GET results to the current company and project", async () => {
     db.invitations.push({ id: "i-1", companyId: "co-1", projectId: "p-1", contactId: "c-1", roleKey: "gc", role: "GC", emailSnapshot: "build@example.com", agreementVersion: "v1", trade: "GC", status: "Pending", invitedAt: new Date(), expiresAt: new Date(), documentGateState: "Pending", complianceGateState: "Pending", cpAccountId: null });

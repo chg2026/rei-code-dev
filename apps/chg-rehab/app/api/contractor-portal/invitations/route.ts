@@ -147,11 +147,76 @@ export async function POST(req: NextRequest) {
         where: { companyId_projectId_contactId_roleKey: { companyId: user.companyId, projectId: project.id, contactId: contact.id, roleKey } },
         include: invitationInclude,
       });
-      if (existing) return { invitation: existing, duplicate: true as const };
+      const terminalReplacement = existing && ["Revoked", "Expired", "Declined"].includes(existing.status);
+      if (existing && !terminalReplacement) return { invitation: existing, duplicate: true as const };
 
       const cpAccount = await tx.cpAccount.findUnique({ where: { email: emailSnapshot }, select: { id: true } });
       const { rawToken, tokenHash } = createContractorInviteToken();
       const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000);
+      if (existing && terminalReplacement) {
+        const claimed = await tx.contractorProjectInvitation.updateMany({
+          where: {
+            id: existing.id,
+            companyId: user.companyId,
+            status: existing.status,
+            expiresAt: existing.expiresAt,
+            inviteTokenHash: existing.inviteTokenHash,
+            inviteTokenExpiresAt: existing.inviteTokenExpiresAt,
+            updatedAt: existing.updatedAt,
+          },
+          data: {
+            status: "Pending",
+            cpAccountId: cpAccount?.id ?? null,
+            emailSnapshot,
+            role,
+            trade: contact.trade,
+            agreementVersion,
+            invitedAt: new Date(),
+            expiresAt,
+            inviteTokenHash: tokenHash,
+            inviteTokenExpiresAt: expiresAt,
+            inviteSentAt: null,
+            inviteDeliveryStatus: "Pending",
+            inviteDeliveryMessageId: null,
+            inviteDeliveryError: null,
+            agreementAcceptedAt: null,
+            acceptedById: null,
+            documentGateState: "Pending",
+            complianceGateState: "Pending",
+            declinedAt: null,
+            declinedById: null,
+            revokedAt: null,
+            revokedById: null,
+            blockedAt: null,
+            blockedById: null,
+            blockedReason: null,
+          },
+        });
+        if (claimed.count !== 1) {
+          const current = await tx.contractorProjectInvitation.findUnique({
+            where: { companyId_projectId_contactId_roleKey: { companyId: user.companyId, projectId: project.id, contactId: contact.id, roleKey } },
+            include: invitationInclude,
+          });
+          return { invitation: current ?? existing, duplicate: true as const };
+        }
+        const replacement = await tx.contractorProjectInvitation.findUnique({
+          where: { id: existing.id },
+          include: invitationInclude,
+        });
+        if (!replacement) return { invitation: existing, duplicate: true as const };
+        await tx.activityLogEntry.create({
+          data: {
+            companyId: user.companyId,
+            actorId: user.id,
+            action: "contractor_project_invitation.replace",
+            entity: "ContractorProjectInvitation",
+            entityId: replacement.id,
+            message: `Replaced ${existing.status.toLowerCase()} contractor invitation for ${contact.name}`,
+            meta: { projectId: project.id, contactId: contact.id, roleKey, agreementVersion, replacedStatus: existing.status },
+          },
+        });
+        return { invitation: replacement, duplicate: false as const, rawToken };
+      }
       const invitation = await tx.contractorProjectInvitation.create({
         data: {
           companyId: user.companyId,
@@ -199,16 +264,31 @@ export async function POST(req: NextRequest) {
       joinUrl: buildContractorInviteJoinUrl(result.rawToken),
       expiresAt: result.invitation.expiresAt,
     });
-    const invitation = await prisma.contractorProjectInvitation.update({
-      where: { id: result.invitation.id },
+    const deliveryClaim = await prisma.contractorProjectInvitation.updateMany({
+      where: {
+        id: result.invitation.id,
+        companyId: user.companyId,
+        status: "Pending",
+        inviteTokenHash: result.invitation.inviteTokenHash,
+      },
       data: {
         inviteDeliveryStatus: delivery.delivered ? "Delivered" : "Failed",
         inviteSentAt: delivery.delivered ? new Date() : null,
         inviteDeliveryMessageId: delivery.messageId ?? null,
         inviteDeliveryError: delivery.delivered ? null : (delivery.reason ?? "delivery_failed"),
       },
+    });
+    const invitation = await prisma.contractorProjectInvitation.findUnique({
+      where: { id: result.invitation.id },
       include: invitationInclude,
     });
+    if (!invitation) throw new Error("Invitation disappeared after delivery");
+    if (deliveryClaim.count !== 1) {
+      return NextResponse.json(
+        { ok: false, conflict: "delivery_cas_lost", reconciliationRequired: true, invitation: safeInvitation(invitation) },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ ok: true, duplicate: false, invitation: safeInvitation(invitation) }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

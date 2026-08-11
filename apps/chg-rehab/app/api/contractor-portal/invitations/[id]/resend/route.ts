@@ -13,6 +13,28 @@ export const dynamic = "force-dynamic";
 
 const TERMINAL_STATUSES = new Set(["Accepted", "Declined", "Revoked", "Blocked", "Expired"]);
 
+function safeInvitation(invitation: any) {
+  return {
+    id: invitation.id,
+    status: invitation.status,
+    emailSnapshot: invitation.emailSnapshot,
+    role: invitation.role,
+    roleKey: invitation.roleKey,
+    trade: invitation.trade,
+    agreementVersion: invitation.agreementVersion,
+    invitedAt: invitation.invitedAt,
+    expiresAt: invitation.expiresAt,
+    documentGateState: invitation.documentGateState,
+    complianceGateState: invitation.complianceGateState,
+    cpAccountId: invitation.cpAccountId,
+    inviteDeliveryStatus: invitation.inviteDeliveryStatus,
+    inviteSentAt: invitation.inviteSentAt,
+    inviteDeliveryMessageId: invitation.inviteDeliveryMessageId,
+    contact: invitation.contact,
+    project: invitation.project,
+  };
+}
+
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -76,37 +98,38 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     joinUrl: buildContractorInviteJoinUrl(rawToken),
     expiresAt: rotated.expiresAt,
   });
-  const invitation = await prisma.contractorProjectInvitation.update({
-    where: { id: rotated.id },
+  const deliveryClaim = await prisma.contractorProjectInvitation.updateMany({
+    where: {
+      id: rotated.id,
+      companyId: user.companyId,
+      status: "Pending",
+      inviteTokenHash: rotated.inviteTokenHash,
+    },
     data: {
       inviteDeliveryStatus: delivery.delivered ? "Delivered" : "Failed",
       inviteSentAt: delivery.delivered ? new Date() : null,
       inviteDeliveryMessageId: delivery.messageId ?? null,
       inviteDeliveryError: delivery.delivered ? null : (delivery.reason ?? "delivery_failed"),
     },
+  });
+  const invitation = await prisma.contractorProjectInvitation.findUnique({
+    where: { id: rotated.id },
     include: {
       contact: { select: { id: true, name: true, email: true, type: true } },
       project: { select: { id: true, code: true, name: true } },
     },
   });
+  if (!invitation) return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+
+  if (deliveryClaim.count !== 1) {
+    return NextResponse.json(
+      { ok: false, conflict: "delivery_cas_lost", reconciliationRequired: true, invitation: safeInvitation(invitation) },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json({
     ok: true,
-    invitation: {
-      id: invitation.id,
-      status: invitation.status,
-      emailSnapshot: invitation.emailSnapshot,
-      role: invitation.role,
-      roleKey: invitation.roleKey,
-      trade: invitation.trade,
-      agreementVersion: invitation.agreementVersion,
-      invitedAt: invitation.invitedAt,
-      expiresAt: invitation.expiresAt,
-      inviteDeliveryStatus: invitation.inviteDeliveryStatus,
-      inviteSentAt: invitation.inviteSentAt,
-      inviteDeliveryMessageId: invitation.inviteDeliveryMessageId,
-      contact: invitation.contact,
-      project: invitation.project,
-    },
+    invitation: safeInvitation(invitation),
   });
 }

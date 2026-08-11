@@ -7,6 +7,7 @@ const joinUrl = vi.hoisted(() => vi.fn());
 const db = vi.hoisted(() => ({
   invitation: null as any,
   updates: [] as any[],
+  deliveryCasCount: 1,
   company: { id: "co-1", name: "CHG Company" },
 }));
 
@@ -25,15 +26,12 @@ vi.mock("@/lib/prisma", () => ({
       findFirst: async ({ where }: any) => db.invitation && db.invitation.id === where.id && db.invitation.companyId === where.companyId ? db.invitation : null,
       findUnique: async ({ where }: any) => db.invitation && db.invitation.id === where.id ? db.invitation : null,
       updateMany: async ({ where, data }: any) => {
-        const matches = db.invitation && db.invitation.id === where.id && db.invitation.companyId === where.companyId && db.invitation.status === where.status && db.invitation.inviteTokenHash === where.inviteTokenHash && db.invitation.expiresAt > where.expiresAt.gt;
+        if (data.inviteDeliveryStatus && db.deliveryCasCount !== 1) return { count: 0 };
+        const matches = db.invitation && db.invitation.id === where.id && db.invitation.companyId === where.companyId && db.invitation.status === where.status && db.invitation.inviteTokenHash === where.inviteTokenHash && (!where.expiresAt || db.invitation.expiresAt > where.expiresAt.gt);
         if (!matches) return { count: 0 };
-        Object.assign(db.invitation, data);
-        return { count: 1 };
-      },
-      update: async ({ data }: any) => {
         db.updates.push(data);
         db.invitation = { ...db.invitation, ...data };
-        return db.invitation;
+        return { count: 1 };
       },
     },
     $transaction: async (fn: any) => fn({ contractorProjectInvitation: {
@@ -91,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.invitation = pendingInvitation();
   db.updates = [];
+  db.deliveryCasCount = 1;
   auth.mockResolvedValue(user());
   permission.mockResolvedValue(true);
   billing.mockResolvedValue(null);
@@ -121,5 +120,14 @@ describe("resend contractor project invitation", () => {
     const response = await POST(new Request("http://test"), { params: Promise.resolve({ id: "inv-1" }) });
     expect(response.status).toBe(200);
     expect(db.updates[1]).toMatchObject({ inviteDeliveryStatus: "Failed", inviteSentAt: null, inviteDeliveryError: "resend_not_configured" });
+  });
+
+  it("returns a reconciliation conflict when delivery loses its CAS", async () => {
+    db.deliveryCasCount = 0;
+    const response = await POST(new Request("http://test"), { params: Promise.resolve({ id: "inv-1" }) });
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: false, conflict: "delivery_cas_lost", reconciliationRequired: true });
+    expect(body.invitation).not.toHaveProperty("inviteTokenHash");
   });
 });
