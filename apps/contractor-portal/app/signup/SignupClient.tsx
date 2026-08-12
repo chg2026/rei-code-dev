@@ -9,7 +9,7 @@ const PRODUCT_CODE = "contractor-portal";
 type Mode = "email" | "phone";
 type PhoneStep = "enter" | "verify";
 
-export default function SignupClient() {
+export default function SignupClient({ projectToken = "", legacyToken = "" }: { projectToken?: string; legacyToken?: string }) {
   const [mode, setMode] = useState<Mode>("email");
 
   // Email + password state
@@ -50,16 +50,14 @@ export default function SignupClient() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/signup`, {
+      const signupPath = projectToken ? "/api/auth/project-signup" : `${API_BASE}/api/auth/signup`;
+      const payload = projectToken
+        ? { projectToken, email: email.trim(), password, fullName: fullName.trim(), companyName: companyName.trim() }
+        : { email: email.trim(), password, full_name: fullName.trim(), company_name: companyName.trim(), product_code: PRODUCT_CODE };
+      const res = await fetch(signupPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          full_name: fullName.trim(),
-          company_name: companyName.trim(),
-          product_code: PRODUCT_CODE,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -69,6 +67,10 @@ export default function SignupClient() {
           return;
         }
         throw new Error(body?.message || body?.error || "Signup failed. Please try again.");
+      }
+      if (body?.autoLogin === false && !body?.session) {
+        window.location.href = `/login?next=${encodeURIComponent(projectToken ? "/invitations" : "/")}`;
+        return;
       }
       await applySession(body?.session || body);
     } catch (err: unknown) {
@@ -203,7 +205,7 @@ export default function SignupClient() {
           {alreadyRegistered ? (
             <div className="login-error" style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
               You already have a Gold Bridge account.{" "}
-              <a href="/login" style={{ color: "#92400E", textDecoration: "underline", fontWeight: 600 }}>
+              <a href={projectToken ? `/login?next=${encodeURIComponent(`/api/invitations/claim?projectToken=${projectToken}`)}` : "/login"} style={{ color: "#92400E", textDecoration: "underline", fontWeight: 600 }}>
                 Sign in with your existing credentials
               </a>
               .

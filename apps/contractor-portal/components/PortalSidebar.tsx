@@ -10,6 +10,7 @@ interface NavItem { href: string; label: string; dot: string; badge?: string }
 
 const NAV_MY: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", dot: "#D85A30" },
+  { href: "/invitations", label: "Project invitations", dot: "#BA7517" },
   { href: "/jobs", label: "My jobs & CRM", dot: "#378ADD" },
   { href: "/bids", label: "Bid board", dot: "#7F77DD" },
 ];

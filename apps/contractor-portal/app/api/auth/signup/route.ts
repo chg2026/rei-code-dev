@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { normalizeContractorEmail } from "@/lib/auth";
 import { getSupabaseAdminClient, getSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest) {
   if (invite.consumedAt) return NextResponse.json({ error: "Invite already used" }, { status: 410 });
   if (invite.expiresAt.getTime() < Date.now()) return NextResponse.json({ error: "Invite has expired" }, { status: 410 });
 
+  const canonicalEmail = normalizeContractorEmail(invite.email);
+
   const admin = getSupabaseAdminClient();
   let authUserId: string | null = null;
   // Paginate through ALL Supabase auth users with no hard page cap.
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (updErr) return NextResponse.json({ error: `Failed to set password: ${updErr.message}` }, { status: 500 });
   } else {
     const { data, error } = await admin.auth.admin.createUser({
-      email: invite.email,
+      email: canonicalEmail,
       password,
       email_confirm: true,
       user_metadata: { full_name: contactName || invite.contactName || undefined },
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
   );
   if (upErr) return NextResponse.json({ error: `Profile upsert failed: ${upErr.message}` }, { status: 500 });
 
-  const finalContact = contactName || invite.contactName || invite.email;
+  const finalContact = contactName || invite.contactName || canonicalEmail;
   const finalCompany = companyName || invite.companyName || finalContact;
   const finalTrade = trade || invite.trade || null;
 
@@ -77,7 +80,7 @@ export async function POST(req: NextRequest) {
     where: { id: authUserId },
     create: {
       id: authUserId,
-      email: invite.email,
+      email: canonicalEmail,
       contactName: finalContact,
       companyName: finalCompany,
       trade: finalTrade,
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
   });
 
   const supabase = await getSupabaseServerClient();
-  const { error: signInErr } = await supabase.auth.signInWithPassword({ email: invite.email, password });
+  const { error: signInErr } = await supabase.auth.signInWithPassword({ email: canonicalEmail, password });
   if (signInErr) return NextResponse.json({ ok: true, autoLogin: false, reason: signInErr.message });
   return NextResponse.json({ ok: true, autoLogin: true });
 }

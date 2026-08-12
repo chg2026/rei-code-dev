@@ -6,7 +6,8 @@
     "dev": "next dev -H 0.0.0.0 -p 3003",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3003",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx"
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "test": "tsx --test lib/*.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

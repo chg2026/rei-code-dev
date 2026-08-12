@@ -4,6 +4,10 @@ import { prisma } from "./prisma";
 import { getSupabaseServerClient, getSupabaseAdminClient } from "./supabaseServer";
 import type { CpAccount } from "@prisma/client";
 
+export function normalizeContractorEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 export interface SessionContractor {
   id: string;
   email: string;
@@ -90,13 +94,14 @@ async function resolve(): Promise<SessionContractor | null> {
   const accountProducts = await loadAccountProductCodes(profile.account_id);
 
   // Mirror to Prisma CpAccount on first sign-in.
+  const canonicalEmail = normalizeContractorEmail(profile.email || user.email || `${user.id}@unknown`);
   let account: CpAccount | null = await prisma.cpAccount.findUnique({ where: { id: user.id } });
   if (!account) {
     const fullName = (profile.full_name || "").trim() || (profile.email || user.email || "Contractor");
     account = await prisma.cpAccount.upsert({
       where: { id: user.id },
       update: {
-        email: profile.email || user.email || `${user.id}@unknown`,
+        email: canonicalEmail,
         contactName: fullName,
         companyName: fullName,
         phone: profile.phone,
@@ -104,7 +109,7 @@ async function resolve(): Promise<SessionContractor | null> {
       },
       create: {
         id: user.id,
-        email: profile.email || user.email || `${user.id}@unknown`,
+        email: canonicalEmail,
         contactName: fullName,
         companyName: fullName,
         phone: profile.phone,
@@ -114,10 +119,10 @@ async function resolve(): Promise<SessionContractor | null> {
   } else {
     account = await prisma.cpAccount.update({
       where: { id: account.id },
-      data: { lastLoginAt: new Date() },
+      data: { email: canonicalEmail, lastLoginAt: new Date() },
     });
   }
-  if (account.status === "Suspended") return null;
+  if (account.status === "Suspended" || !account.contractorPortalEnabled) return null;
 
   return {
     id: account.id,
