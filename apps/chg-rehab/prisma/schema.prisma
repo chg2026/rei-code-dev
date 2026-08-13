@@ -154,9 +154,11 @@ model Property {
   pipelineDeals PipelineDeal[]
   projects      Project[]
   company       Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  assets        PropertyAsset[]
-  financials    PropertyFinancialSection[]
-  offerings     Offering[]
+  assets               PropertyAsset[]
+  financials           PropertyFinancialSection[]
+  offerings            Offering[]
+  maintenanceReports   MaintenanceReport[]
+  maintenanceVisits    MaintenanceVisit[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -598,8 +600,10 @@ model Contact {
   complianceDocs   ContractorComplianceDoc[]
   assignments      ContractorAssignment[]
   notificationLogs ContactNotificationLog[]
-  projectInvitations ContractorProjectInvitation[]
+  projectInvitations    ContractorProjectInvitation[]
   contractorPortalAccount CpAccount? @relation("ContactContractorPortalAccount", fields: [contractorPortalAccountId], references: [id], onDelete: SetNull)
+  maintenanceAgreements MaintenanceAgreement[]
+  maintenanceVisits     MaintenanceVisit[]
 
   @@index([companyId, type])
   @@index([contractorPortalAccountId])
@@ -2457,4 +2461,141 @@ enum CommitmentStatus {
   Draft
   Approved
   Complete
+}
+
+// ── Maintenance ──────────────────────────────────────────────
+
+enum MaintenancePriority {
+  Emergency
+  High
+  Medium
+  Low
+}
+
+enum MaintenanceReportStatus {
+  New
+  Reviewed
+  Converted
+  Declined
+}
+
+enum MaintenanceAgreementStatus {
+  Active
+  Paused
+  Ended
+}
+
+enum MaintenanceVisitStatus {
+  Scheduled
+  InProgress
+  Completed
+}
+
+model MaintenanceAgreement {
+  id             String                     @id @default(cuid())
+  companyId      String
+  contactId      String
+  name           String
+  retainerAmount Decimal                    @db.Decimal(14, 2)
+  tripsPerMonth  Int                        @default(3)
+  startDate      DateTime                   @db.Date
+  endDate        DateTime?                  @db.Date
+  status         MaintenanceAgreementStatus @default(Active)
+  notes          String?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  contact        Contact                    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  visits         MaintenanceVisit[]
+  payments       MaintenancePayment[]
+
+  @@index([companyId])
+  @@index([contactId])
+}
+
+model MaintenanceReport {
+  id                 String                  @id @default(cuid())
+  companyId          String
+  propertyId         String
+  reportedBy         String?
+  reportedAt         DateTime                @default(now())
+  description        String
+  priority           MaintenancePriority     @default(Medium)
+  status             MaintenanceReportStatus @default(New)
+  convertedToVisitId String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  property           Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  convertedToVisit   MaintenanceVisit?       @relation("ReportConversion", fields: [convertedToVisitId], references: [id], onDelete: SetNull)
+  visitReport        MaintenanceVisit?       @relation("VisitReport")
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model MaintenanceVisit {
+  id                String                 @id @default(cuid())
+  companyId         String
+  propertyId        String
+  agreementId       String
+  contactId         String
+  reportId          String?                 @unique
+  visitedAt         DateTime               @db.Date
+  tripNumber        Int
+  description       String?
+  status            MaintenanceVisitStatus @default(Scheduled)
+  laborCostTotal    Decimal?               @db.Decimal(14, 2)
+  materialCostTotal Decimal?               @db.Decimal(14, 2)
+  isRepeatFix       Boolean                @default(false)
+  photos            Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  property          Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  agreement         MaintenanceAgreement   @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  contact           Contact                @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  report            MaintenanceReport?     @relation("VisitReport", fields: [reportId], references: [id], onDelete: SetNull)
+  workItems         MaintenanceWorkItem[]
+  convertedFrom     MaintenanceReport[]    @relation("ReportConversion")
+
+  @@index([companyId])
+  @@index([propertyId])
+  @@index([agreementId])
+  @@index([contactId])
+}
+
+model MaintenanceWorkItem {
+  id           String   @id @default(cuid())
+  visitId      String
+  description  String
+  category     String   @default("Repair")
+  laborCost    Decimal? @db.Decimal(14, 2)
+  materialCost Decimal? @db.Decimal(14, 2)
+  receiptUrl   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  visit        MaintenanceVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId])
+}
+
+model MaintenancePayment {
+  id          String   @id @default(cuid())
+  companyId   String
+  agreementId String
+  amount      Decimal  @db.Decimal(14, 2)
+  paidAt      DateTime @db.Date
+  period      String
+  notes       String?
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agreement   MaintenanceAgreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([agreementId])
 }
