@@ -24,6 +24,7 @@ import {
   Settings,
   ShieldCheck,
   UserCog,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/session";
@@ -57,6 +58,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/admin": Settings,
   "/super-admin": ShieldCheck,
   "/account": UserCog,
+  "/maintenance": Wrench,
 };
 
 const BASE_SECTIONS: NavSection[] = [
@@ -84,6 +86,7 @@ const BASE_SECTIONS: NavSection[] = [
       { href: "/warehouse", label: "Warehouse" },
       { href: "/investor-portal?tab=finance", label: "Finance" },
       { href: "/docs", label: "Documents Hub" },
+      { href: "/maintenance", label: "Maintenance" },
     ],
   },
   {
