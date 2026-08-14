@@ -66,6 +66,12 @@ export async function POST(req: NextRequest) {
       tripNumber,
       description: description?.trim() || null,
       isRepeatFix: !!isRepeatFix,
+      laborCostTotal: Array.isArray(workItems)
+        ? workItems.reduce((sum: number, wi: Record<string, unknown>) => sum + (Number(wi.laborCost) || 0), 0)
+        : null,
+      materialCostTotal: Array.isArray(workItems)
+        ? workItems.reduce((sum: number, wi: Record<string, unknown>) => sum + (Number(wi.materialCost) || 0), 0)
+        : null,
       workItems: workItems?.length
         ? { create: workItems.map((wi: Record<string, unknown>) => ({
             description: wi.description,

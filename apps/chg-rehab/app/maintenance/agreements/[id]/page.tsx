@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { RecordPaymentButton } from "./RecordPaymentButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,10 @@ export default async function AgreementDetailPage({ params }: { params: Promise<
           </div>
         </div>
         {isAdmin && (
-          <Link href={`/maintenance/visits/new?agreementId=${agreement.id}`} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--blue)", color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none" }}>+ Log Visit</Link>
+          <div style={{ display: "flex", gap: 8 }}>
+            <RecordPaymentButton agreementId={agreement.id} />
+            <Link href={`/maintenance/visits/new?agreementId=${agreement.id}`} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--border-1)", background: "transparent", color: "var(--ink)", fontSize: 14, fontWeight: 500, textDecoration: "none" }}>+ Log Visit</Link>
+          </div>
         )}
       </div>
 
