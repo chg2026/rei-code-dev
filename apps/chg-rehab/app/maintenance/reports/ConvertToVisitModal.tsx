@@ -6,11 +6,15 @@ type AgreementRef = { id: string; name: string; contact: { id: string; name: str
 
 export function ConvertToVisitModal({
   reportId,
+  propertyId,
+  description,
   agreements,
   onClose,
   onSuccess,
 }: {
   reportId: string;
+  propertyId: string;
+  description: string;
   agreements: AgreementRef[];
   onClose: () => void;
   onSuccess: () => void;
@@ -23,32 +27,16 @@ export function ConvertToVisitModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agreementId) return;
+    if (!agreementId || !propertyId) {
+      setError("Select an agreement.");
+      return;
+    }
     setBusy(true);
     setError("");
 
     const selected = agreements.find((a) => a.id === agreementId);
+
     const res = await fetch("/api/maintenance/visits", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        propertyId: "", // Will be filled from report — handled server-side via report lookup
-        agreementId,
-        contactId: selected?.contact.id,
-        reportId,
-        visitedAt,
-        tripNumber,
-      }),
-    });
-
-    // The visit creation also needs the propertyId from the report.
-    // Let's fetch the report first to get the propertyId.
-    const reportRes = await fetch(`/api/maintenance/reports/${reportId}`);
-    const reportData = await reportRes.json();
-    const propertyId = reportData.report?.propertyId;
-
-    // Now create the visit with propertyId
-    const visitRes = await fetch("/api/maintenance/visits", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -58,23 +46,16 @@ export function ConvertToVisitModal({
         reportId,
         visitedAt,
         tripNumber,
-        description: reportData.report?.description || "",
+        description: description || null,
       }),
     });
 
-    const json = await visitRes.json();
-    if (!visitRes.ok) {
+    const json = await res.json();
+    if (!res.ok) {
       setError(json.error || "Failed to create visit");
       setBusy(false);
       return;
     }
-
-    // Mark report as Converted
-    await fetch(`/api/maintenance/reports/${reportId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Converted", convertedToVisitId: json.visit.id }),
-    });
 
     onSuccess();
   };

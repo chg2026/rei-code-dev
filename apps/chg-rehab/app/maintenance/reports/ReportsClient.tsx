@@ -276,17 +276,23 @@ export function ReportsClient({
       )}
 
       {/* Convert to Visit modal */}
-      {convertingId && (
-        <ConvertToVisitModal
-          reportId={convertingId}
-          agreements={agreements}
-          onClose={() => setConvertingId(null)}
-          onSuccess={() => {
-            setConvertingId(null);
-            router.refresh();
-          }}
-        />
-      )}
+      {convertingId && (() => {
+        const report = reports.find((r) => r.id === convertingId);
+        if (!report) return null;
+        return (
+          <ConvertToVisitModal
+            reportId={report.id}
+            propertyId={report.propertyId}
+            description={report.description}
+            agreements={agreements}
+            onClose={() => setConvertingId(null)}
+            onSuccess={() => {
+              setConvertingId(null);
+              router.refresh();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

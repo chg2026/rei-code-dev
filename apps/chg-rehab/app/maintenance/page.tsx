@@ -184,8 +184,9 @@ export default async function MaintenancePage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {recentVisits.map((v) => (
-            <div
+            <Link
               key={v.id}
+              href={`/maintenance/visits/${v.id}`}
               style={{
                 background: "rgba(255,255,255,0.04)",
                 backdropFilter: "blur(12px)",
@@ -196,6 +197,8 @@ export default async function MaintenancePage() {
                 display: "flex",
                 alignItems: "center",
                 gap: 14,
+                textDecoration: "none",
+                color: "inherit",
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -209,7 +212,7 @@ export default async function MaintenancePage() {
               <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, background: v.status === "Completed" ? "rgba(34,197,94,0.12)" : "rgba(234,179,8,0.12)", color: v.status === "Completed" ? "var(--green)" : "var(--amber)" }}>
                 {v.status}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       )}
