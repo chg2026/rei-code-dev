@@ -43,6 +43,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/messages": MessageSquare,
   "/pipeline": Workflow,
   "/underwriting": ClipboardCheck,
+  "/property-management": Building2,
   "/property": Building2,
   "/rehab": Hammer,
   "/warehouse": WarehouseIcon,
@@ -76,6 +77,13 @@ const BASE_SECTIONS: NavSection[] = [
     items: [
       { href: "/pipeline", label: "Pipeline" },
       { href: "/underwriting", label: "Underwriting" },
+    ],
+  },
+  {
+    label: "Property Management",
+    items: [
+      { href: "/property-management", label: "Dashboard" },
+      { href: "/property-management/properties", label: "Properties" },
     ],
   },
   {

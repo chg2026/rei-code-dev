@@ -29,6 +29,7 @@ model Company {
   estimates            Estimate[]
   companyRoles         CompanyRole[]
   leases               Lease[]
+  rentPayments         RentPayment[]
   permissionLabels     PermissionLabelRow[]
   permissionRows       PermissionMatrixRow[]
   pipelineDeals        PipelineDeal[]
@@ -710,19 +711,41 @@ model ContractorComplianceDocVersion {
 }
 
 model Lease {
-  id         String    @id @default(cuid())
-  companyId  String
-  propertyId String
-  tenantName String
-  rent       Decimal?  @db.Decimal(10, 2)
-  startDate  DateTime?
-  endDate    DateTime?
-  status     String    @default("Active")
-  meta       Json?
-  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  companyId       String
+  propertyId      String
+  tenantName      String
+  tenantEmail     String?
+  tenantPhone     String?
+  rent            Decimal?  @db.Decimal(10, 2)
+  securityDeposit Decimal?  @db.Decimal(10, 2)
+  startDate       DateTime?
+  endDate         DateTime?
+  status          String    @default("Active")
+  meta            Json?
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  payments        RentPayment[]
 
   @@index([propertyId])
+}
+
+model RentPayment {
+  id         String   @id @default(cuid())
+  companyId  String
+  leaseId    String
+  amount     Decimal  @db.Decimal(10, 2)
+  period     String   // "2026-08" (YYYY-MM)
+  receivedAt DateTime @default(now())
+  method     String?  // "Cash", "Check", "ACH", "Zelle"
+  notes      String?
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lease      Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@unique([leaseId, period])
+  @@index([companyId])
+  @@index([leaseId])
 }
 
 model WarehouseDepartment {
